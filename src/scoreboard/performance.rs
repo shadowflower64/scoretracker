@@ -13,6 +13,7 @@ pub type PerformanceMetadata = HashMap<String, String>;
 
 #[typetag::serde(tag = "game")]
 pub trait Performance: Debug {
+    fn score(&self) -> f64;
     fn proof(&self) -> Vec<UuidString>;
     fn timestamp(&self) -> NsTimestamp;
     fn comment(&self) -> Option<String>;

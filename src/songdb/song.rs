@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 // TODO
 #[derive(Deserialize, Serialize)]
@@ -38,6 +39,9 @@ impl From<SongAlbumInfo> for Option<String> {
 
 #[typetag::serde(tag = "game")]
 pub trait Song: Debug {
+    fn global_song_id(&self) -> Option<Uuid> {
+        None
+    }
     fn title(&self) -> String;
     fn artist(&self) -> String;
     fn album(&self) -> Option<SongAlbumInfo> {

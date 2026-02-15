@@ -18,6 +18,7 @@ pub enum SpreadsheetParseError {
 #[typetag::serde(tag = "game")]
 pub trait Game: Debug {
     fn pretty_name(&self) -> &'static str;
+    fn url_shortname(&self) -> &'static str;
 
     fn ask_for_performance_new(&self) -> Result<Box<dyn Performance>, AskError> {
         unimplemented!()

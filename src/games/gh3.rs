@@ -10,4 +10,7 @@ impl Game for GuitarHero3 {
     fn pretty_name(&self) -> &'static str {
         "Guitar Hero III: Legends of Rock"
     }
+    fn url_shortname(&self) -> &'static str {
+        "gh3"
+    }
 }
