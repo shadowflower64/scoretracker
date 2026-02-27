@@ -1,7 +1,7 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
 use crate::game::Game;
-use crate::scoreboard::performance::{self, Performance, PerformanceMetadata};
-use crate::songdb::song::{Song, SongAlbumInfo};
+use crate::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceMetadata, PerformanceTrait};
+use crate::songdb::song::{SongAlbumInfo, SongTrait};
 use crate::util::cmd::{AskError, ask_string, ask_u64, ask_uuid};
 use crate::util::percentage::Percentage;
 use crate::util::timestamp::NsTimestamp;
@@ -69,7 +69,7 @@ pub enum Modifier {
 
 /// A YARG performance - a performance of one player playing on one instrument on a specific chart.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct YARGPerformance {
+pub struct Performance {
     ///// Who played what and when. /////
     /// Timestamp of the performance - specifically, the timestamp of the first frame of the end screen. Can be approximate.
     pub timestamp: NsTimestamp,
@@ -125,15 +125,15 @@ pub struct YARGPerformance {
 }
 
 #[typetag::serde(name = "yarg")]
-impl Performance for YARGPerformance {
+impl PerformanceTrait for Performance {
+    fn common(&self) -> CommonPerformanceInfo {
+        todo!()
+    }
     fn score(&self) -> f64 {
         self.score as f64
     }
     fn proof(&self) -> Vec<UuidString> {
         self.proof.clone()
-    }
-    fn timestamp(&self) -> NsTimestamp {
-        self.timestamp
     }
     fn comment(&self) -> Option<String> {
         self.comment.clone()
@@ -148,7 +148,7 @@ impl Performance for YARGPerformance {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct YARGSong {
+pub struct Song {
     pub global_song_id: Option<UuidString>,
     pub title: String,
     pub artist: String,
@@ -156,8 +156,7 @@ pub struct YARGSong {
     pub year: String,
 }
 
-#[typetag::serde(name = "yarg")]
-impl Song for YARGSong {
+impl SongTrait for Song {
     fn global_song_id(&self) -> Option<Uuid> {
         self.global_song_id.map(|x| x.0)
     }
@@ -187,8 +186,8 @@ impl Game for YARG {
         "yarg"
     }
 
-    fn ask_for_performance_new(&self) -> Result<Box<dyn performance::Performance>, AskError> {
-        Ok(Box::new(YARGPerformance {
+    fn ask_for_performance_new(&self) -> Result<Box<dyn performance::PerformanceTrait>, AskError> {
+        Ok(Box::new(Performance {
             player_uuid: ask_uuid("player uuid", None)?.into(),
             song_id: ask_string("song id", None)?,
             instrument: Instrument::LeadGuitar,

@@ -1,16 +1,16 @@
-//! Data structures for UNBEATABLE
+//! Data structures for Rhythm Doctor
 use crate::game::Game;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct UNBEATABLE {}
+pub struct RhythmDoctor;
 
-#[typetag::serde(name = "unbeatable")]
-impl Game for UNBEATABLE {
+#[typetag::serde(name = "rd")]
+impl Game for RhythmDoctor {
     fn pretty_name(&self) -> &'static str {
-        "UNBEATABLE"
+        "Rhythm Doctor"
     }
     fn url_shortname(&self) -> &'static str {
-        "unbeatable"
+        "rd"
     }
 }

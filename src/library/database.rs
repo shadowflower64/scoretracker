@@ -248,7 +248,7 @@ impl Default for LibraryEntry {
     fn default() -> Self {
         Self {
             // Explicitly set custom values
-            uuid: Uuid::new_v4().into(),
+            uuid: Uuid::now_v7().into(),
             timestamp_added: NsTimestamp::now(),
 
             // Default values for other fields

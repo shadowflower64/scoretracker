@@ -1,16 +1,16 @@
-//! Data structures for UNBEATABLE
+//! Data structures for osu!
 use crate::game::Game;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct UNBEATABLE {}
+pub struct Osu {}
 
-#[typetag::serde(name = "unbeatable")]
-impl Game for UNBEATABLE {
+#[typetag::serde(name = "ch")]
+impl Game for Osu {
     fn pretty_name(&self) -> &'static str {
-        "UNBEATABLE"
+        "osu!"
     }
     fn url_shortname(&self) -> &'static str {
-        "unbeatable"
+        "osu"
     }
 }

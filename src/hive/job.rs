@@ -88,7 +88,7 @@ impl Job {
                 let _library = open_library_database(config, worker_info)?;
                 let _ = Success::CutVideo {
                     cloth: *source_proof_uuid,
-                    fragment: Uuid::new_v4().into(),
+                    fragment: Uuid::now_v7().into(),
                 };
                 todo!()
             }

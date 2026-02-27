@@ -40,7 +40,7 @@ pub struct Task {
 impl Task {
     pub fn new(name: String, job: Job) -> Self {
         Self {
-            uuid: Uuid::new_v4().into(),
+            uuid: Uuid::now_v7().into(),
             name,
             comment: None,
             job,

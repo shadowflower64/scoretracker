@@ -1,13 +1,12 @@
-use std::fmt::Debug;
-
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use uuid::Uuid;
 
-// TODO
 #[derive(Deserialize, Serialize)]
-pub struct SongDatabase {
+pub struct SongDatabase<Song: SongTrait> {
     pub format_version: i32,
-    pub songs: Vec<Box<dyn Song>>,
+    pub game: String,
+    pub songs: Vec<Song>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -37,8 +36,7 @@ impl From<SongAlbumInfo> for Option<String> {
     }
 }
 
-#[typetag::serde(tag = "game")]
-pub trait Song: Debug {
+pub trait SongTrait: Debug {
     fn global_song_id(&self) -> Option<Uuid> {
         None
     }

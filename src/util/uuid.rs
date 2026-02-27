@@ -20,7 +20,7 @@ use uuid::Uuid;
 /// use uuid::Uuid;
 /// use scoretracker_core::util::uuid::UuidString;
 ///
-/// let uuid = Uuid::new_v4();
+/// let uuid = Uuid::now_v7();
 /// let uuid_string = UuidString::from(uuid);
 /// assert_eq!(uuid_string.0, uuid);
 /// ```

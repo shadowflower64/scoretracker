@@ -1,4 +1,4 @@
-use crate::{scoreboard::performance::Performance, songdb::song::Song, util::cmd::AskError};
+use crate::{scoreboard::performance::PerformanceTrait, songdb::song::SongTrait, util::cmd::AskError};
 use serde::Serialize;
 use std::{error::Error, fmt::Debug};
 use thiserror::Error;
@@ -20,15 +20,18 @@ pub trait Game: Debug {
     fn pretty_name(&self) -> &'static str;
     fn url_shortname(&self) -> &'static str;
 
-    fn ask_for_performance_new(&self) -> Result<Box<dyn Performance>, AskError> {
+    fn ask_for_performance_new(&self) -> Result<Box<dyn PerformanceTrait>, AskError> {
         unimplemented!()
     }
 
-    fn create_performance_from_spreadsheet_row(&self, _row: Vec<(String, String)>) -> Result<Box<dyn Performance>, SpreadsheetParseError> {
+    fn create_performance_from_spreadsheet_row(
+        &self,
+        _row: Vec<(String, String)>,
+    ) -> Result<Box<dyn PerformanceTrait>, SpreadsheetParseError> {
         Err(SpreadsheetParseError::NotImplemented)
     }
 
-    fn create_song_from_spreadsheet_row(&self, _row: Vec<(String, String)>) -> Result<Box<dyn Song>, SpreadsheetParseError> {
+    fn create_song_from_spreadsheet_row(&self, _row: Vec<(String, String)>) -> Result<Box<dyn SongTrait>, SpreadsheetParseError> {
         Err(SpreadsheetParseError::NotImplemented)
     }
 }
