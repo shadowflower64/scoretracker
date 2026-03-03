@@ -1,9 +1,8 @@
-use serde::{Deserialize, Serialize};
-
 use crate::{
     scoreboard::AnyValue,
     util::{cmd::AskError, timestamp::NsTimestamp, uuid::UuidString},
 };
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 pub type MatchMetadata = HashMap<String, AnyValue>;
 
