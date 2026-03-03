@@ -174,6 +174,7 @@ impl PerformanceTrait for Performance {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Match {
+    #[serde(flatten)]
     pub common: CommonMatchInfo,
 }
 
