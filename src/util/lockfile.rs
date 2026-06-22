@@ -74,8 +74,7 @@ pub fn is_file_locked<T>(result: &Result<T>) -> bool {
 /// 4. The processed data is written to the file.
 ///    Again - since the lockfile still exists, this guarantees that other processes using this system do not overwrite the file.
 /// 5. After writing is finished, the lockfile is removed. This frees up any other processes to take over the file again.
-///
-/// NOTE: DO NOT CLONE - Owning an instance of this structure represents unique ownership of the associated. It should never be cloned.
+// DEV NOTE: DO NOT ADD CLONE - Owning an instance of this structure represents unique ownership of the associated file. It should never be cloned.
 #[derive(Debug)]
 pub struct LockfileHandle {
     main_file_path: PathBuf,

@@ -1,7 +1,8 @@
 use crate::cmd::Error;
-use scoretracker::config::{Config, ConfigLock};
+use scoretracker::config::Config;
 use scoretracker::util::cmd::{ask_string, ask_yn};
 use scoretracker::util::file_ex::FileEx;
+use scoretracker::util::filelocked::FileLockableDataWithDefaultPath;
 use scoretracker::util::lockfile;
 use scoretracker::{info_npr, success_npr, warn_npr};
 use std::io::{self, Write};
@@ -16,7 +17,7 @@ fn display_config(config: &Config) -> Result<(), Error> {
 }
 
 pub fn init() -> Result<(), Error> {
-    let path = ConfigLock::env_path_or_default();
+    let path = Config::default_path();
     let has_to_confirm = match path.read_from_json() {
         Ok(Some(config)) => {
             info_npr!("current config is:");
@@ -63,7 +64,7 @@ pub fn show() -> Result<(), Error> {
 }
 
 pub fn set(key: String, value: String) -> Result<(), Error> {
-    let mut config = ConfigLock::read_default_safe(None).map_err(Error::ConfigReadError)?;
+    let mut config = Config::lock_default_and_read(None).map_err(Error::ConfigReadError)?;
 
     match key.as_str() {
         "domain_name" => config.inner.domain_name = value,
@@ -72,9 +73,9 @@ pub fn set(key: String, value: String) -> Result<(), Error> {
         key => Err(Error::InvalidConfigKey(key.to_string()))?,
     }
 
-    // TODO save changes in config
-
     config.write_to_file().map_err(Error::ConfigWriteError)?;
+    config.unlock().map_err(Error::ConfigWriteError)?;
+
     success_npr!("successfully updated config");
 
     Ok(())

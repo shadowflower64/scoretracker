@@ -5,11 +5,11 @@ use crate::library::cache::LibraryCacheLock;
 use crate::library::database::LibraryDatabaseLock;
 use crate::library::index::LibraryIndex;
 use crate::util::dirs::config_dir;
-use crate::util::file_ex::{self, FileEx};
-use crate::util::lockfile::{self, LockfileHandle};
+use crate::util::filelocked::{FileLockableData, FileLockableDataWithDefaultPath, FileLocked};
+use crate::util::lockfile::{self};
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -23,9 +23,9 @@ impl Config {
         Self::load_with_worker(None)
     }
 
-    pub fn load_with_worker(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        // todo - this function should not be using lockfiles just to immediately drop the lock - that's just bad for performance.
-        ConfigLock::read_default_safe(worker_info).map(|lock| lock.inner)
+    pub fn load_with_worker(_worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        // TODO: decide on whether this should actually be locking or not
+        Ok(Config::read_default_without_locking()?)
     }
 
     pub fn library_database_path(&self) -> PathBuf {
@@ -49,36 +49,19 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
-pub struct ConfigLock {
-    pub inner: Config,
-    lockfile: LockfileHandle,
-}
-
-impl ConfigLock {
+impl Config {
     pub const STANDARD_FILENAME: &str = "scoretracker_config.json";
-
-    pub fn default_path() -> PathBuf {
+    fn default_path_static() -> PathBuf {
         config_dir().join(Self::STANDARD_FILENAME)
     }
+}
 
-    pub fn env_path_or_default() -> PathBuf {
+impl FileLockableData for Config {}
+impl FileLockableDataWithDefaultPath for Config {
+    fn default_path() -> PathBuf {
         env::var("SCORETRACKER_CONFIG_PATH")
             .map(PathBuf::from)
-            .unwrap_or(Self::default_path())
-    }
-
-    pub fn read_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
-        let inner = lockfile.read_from_json()?.ok_or(file_ex::Error::file_not_found())?;
-        Ok(Self { inner, lockfile })
-    }
-
-    pub fn read_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        Self::read_safe(Self::env_path_or_default(), worker_info)
-    }
-
-    pub fn write_to_file(&self) -> lockfile::Result<()> {
-        Ok(self.lockfile.write_as_json_pretty(&self.inner)?)
+            .unwrap_or(Self::default_path_static())
     }
 }
+pub type ConfigLock = FileLocked<Config>;

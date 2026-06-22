@@ -1,6 +1,7 @@
 pub mod cmd;
 pub mod dirs;
 pub mod file_ex;
+pub mod filelocked;
 pub mod lockfile;
 pub mod log;
 pub mod percentage;
