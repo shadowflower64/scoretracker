@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::ipc::start_listener_thread;
-use crate::util::filelocked::{FileLockableData, FileLocked};
+use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::lockfile;
 use crate::util::timestamp::NsTimestamp;
 use crate::{error, info, log_fn_name, success};
@@ -95,7 +95,7 @@ impl Worker {
     }
 
     pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
-        TaskQueue::lock_and_read(self.config.library_database_path(), Some(self.worker_info())).map_err(Error::CannotReadQueue)
+        TaskQueue::lock_and_read_or_default(self.config.library_database_path(), Some(self.worker_info())).map_err(Error::CannotReadQueue)
     }
 
     /// Execute a task in the current thread.

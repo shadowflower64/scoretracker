@@ -7,7 +7,7 @@ use crate::library::cache::LibraryCache;
 use crate::library::database::LibraryDatabase;
 use crate::library::info::LibraryInfo;
 use crate::util::file_ex::{Error, FileEx};
-use crate::util::filelocked::{FileLockableData, FileLockableDataDefault};
+use crate::util::filelocked::FileLockableDataDefault;
 use crate::util::uuid::UuidString;
 use crate::{debug, info, log_fn_name, log_should_print_debug};
 use serde::Serialize;
@@ -76,8 +76,8 @@ impl LibraryIndex {
         let mut index = Self::default();
         let mut cache = LibraryCache::lock_and_read_or_default(library_dir.join(LibraryCache::STANDARD_FILENAME), None)
             .expect("could not read library cache");
-        let info =
-            LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("could not read library info");
+        let info = LibraryInfo::read_without_locking_or_default(library_dir.join(LibraryInfo::STANDARD_FILENAME))
+            .expect("could not read library info");
 
         let files_to_scan: Vec<_> = WalkDir::new(library_dir)
             .into_iter()

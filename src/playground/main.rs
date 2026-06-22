@@ -9,7 +9,7 @@ use scoretracker::info;
 use scoretracker::library::database::LibraryDatabase;
 use scoretracker::library::index::LibraryIndex;
 use scoretracker::log_fn_name;
-use scoretracker::util::filelocked::{FileLockableData, FileLockableDataDefault};
+use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::util::{file_ex::FileEx, lockfile::LockfileHandle, timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
 use std::env::args;
@@ -127,7 +127,7 @@ pub fn test_queue(_args: &[String]) {
     let mut currently_doing_task_opt = None;
 
     // Read the queue to either add something or take on a task
-    let mut queue = TaskQueue::lock_and_read("playground/test_queue.jsonl", None).expect("couldn't read queue");
+    let mut queue = TaskQueue::lock_and_read_or_default("playground/test_queue.jsonl", None).expect("couldn't read queue");
     let task_todo_opt = queue.top_queued_task_mut();
     if let Some(task_todo) = task_todo_opt {
         // Take on a task
@@ -174,7 +174,7 @@ pub fn test_queue(_args: &[String]) {
         task.finish_timestamp = Some(NsTimestamp::now());
 
         // Read the queue file again to update the state of the task
-        let mut queue = TaskQueue::lock_and_read("playground/test_queue.jsonl", None).expect("couldn't read queue");
+        let mut queue = TaskQueue::lock_and_read_or_default("playground/test_queue.jsonl", None).expect("couldn't read queue");
         queue.update_task(task);
         queue.write_to_file();
     }

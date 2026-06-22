@@ -37,7 +37,7 @@ use uuid::Uuid;
 /// 15. Update the [`Task::finish_timestamp`] field to the current timestamp.
 /// 16. Save the updated task info to the queue file.
 /// 17. Unlock the queue file.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TaskQueue {
     tasks: Vec<Task>,
 }

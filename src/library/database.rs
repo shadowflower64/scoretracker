@@ -274,8 +274,9 @@ pub struct LibraryDatabase {
     entries: Vec<LibraryEntry>,
 }
 
-const UNKNOWN_DOMAIN: &str = "unknown.local";
-const EXAMPLE_DOMAIN: &str = "library.example.com";
+// TODO
+// const UNKNOWN_DOMAIN: &str = "unknown.local";
+// const EXAMPLE_DOMAIN: &str = "library.example.com";
 
 impl LibraryDatabase {
     pub const STANDARD_FILENAME: &str = "library_database.json";
