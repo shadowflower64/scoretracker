@@ -77,7 +77,7 @@ pub fn test_scanning(args: &[String]) {
     let library_index_path = library_dir_path.join("library_index.json");
     let library_data_path = Path::new("playground/test_library_database.json");
 
-    let mut library_data = LibraryDatabaseLock::read_or_create_new_safe(&library_data_path, None).expect("library data could not be read");
+    let mut library_data = LibraryDatabaseLock::read_or_create_new_safe(library_data_path, None).expect("library data could not be read");
     let library_index = LibraryIndex::scan_library_dir(library_dir_path, &mut library_data);
 
     library_index.save(&library_index_path).expect("library index could not be saved");
@@ -208,7 +208,7 @@ pub fn ask_edit(args: &[String]) {
     log_fn_name!("playground:ask_edit");
 
     let game_id = args.get(1).expect("no argument provided");
-    let game = game_instance_from_id(game_id).expect(&format!("unknown game: {}", game_id));
+    let game = game_instance_from_id(game_id).unwrap_or_else(|| panic!("unknown game: {}", game_id));
 
     let mut perf = game.ask_for_performance_new().unwrap();
     println!("{:#?}", perf);
@@ -217,7 +217,7 @@ pub fn ask_edit(args: &[String]) {
     println!("{:#?}", perf);
 }
 
-fn main() 
+fn main() {
     #[allow(unused)]
     let args: Vec<_> = args().collect();
 
