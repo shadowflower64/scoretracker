@@ -1,5 +1,7 @@
 use scoretracker::config::Config;
-use scoretracker::library::{database::LibraryDatabaseLock, index::LibraryIndex};
+use scoretracker::library::database::LibraryDatabase;
+use scoretracker::library::index::LibraryIndex;
+use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::util::{file_ex, lockfile};
 use scoretracker::{info, log_fn_name, success_npr};
 use std::path::Path;
@@ -22,10 +24,10 @@ pub fn rescan(library_dir_path: &Path) -> Result<(), LibraryScanError> {
     let shared_data_repo_path = Config::load().unwrap().shared_data_repo_path;
 
     let library_index_path = library_dir_path.join(LibraryIndex::STANDARD_FILENAME);
-    let library_database_path = shared_data_repo_path.join(LibraryDatabaseLock::STANDARD_FILENAME);
+    let library_database_path = shared_data_repo_path.join(LibraryDatabase::STANDARD_FILENAME);
 
     let mut library_database =
-        LibraryDatabaseLock::read_or_create_new_safe(&library_database_path, None).map_err(LibraryScanError::LibraryDatabaseReadError)?;
+        LibraryDatabase::lock_and_read_or_default(&library_database_path, None).map_err(LibraryScanError::LibraryDatabaseReadError)?;
     let library_index = LibraryIndex::scan_library_dir(library_dir_path, &mut library_database);
 
     library_index

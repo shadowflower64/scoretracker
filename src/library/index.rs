@@ -3,9 +3,11 @@
 //! A library index is a file that maps every filename existing in the library directory to a "proof UUID", which should be shared across all connected libraries.
 //!
 //! This file is re-created every time the library gets re-scanned for new content.
-use crate::library::info::{LibraryInfo, LibraryInfoLock};
-use crate::library::{cache::LibraryCacheLock, database::LibraryDatabaseLock};
+use crate::library::cache::LibraryCache;
+use crate::library::database::LibraryDatabase;
+use crate::library::info::LibraryInfo;
 use crate::util::file_ex::{Error, FileEx};
+use crate::util::filelocked::{FileLockableData, FileLockableDataDefault};
 use crate::util::uuid::UuidString;
 use crate::{debug, info, log_fn_name, log_should_print_debug};
 use serde::Serialize;
@@ -65,20 +67,17 @@ impl LibraryIndex {
         filename.ends_with(".mp4") || filename.ends_with(".mkv")
     }
 
-    pub fn scan_library_dir(library_dir: &Path, library_data: &mut LibraryDatabaseLock) -> Self {
+    pub fn scan_library_dir(library_dir: &Path, library_db: &mut LibraryDatabase) -> Self {
         log_fn_name!("scan:scan_library_dir");
         log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
 
         let scanning_start_timestamp = Instant::now();
 
         let mut index = Self::default();
-        let mut cache = LibraryCacheLock::read_or_create_new(library_dir.join(LibraryCacheLock::STANDARD_FILENAME))
+        let mut cache = LibraryCache::lock_and_read_or_default(library_dir.join(LibraryCache::STANDARD_FILENAME), None)
             .expect("could not read library cache");
-        let info: LibraryInfo = library_dir
-            .join(LibraryInfoLock::STANDARD_FILENAME)
-            .read_from_json()
-            .expect("could not read library info")
-            .expect("library info not found");
+        let info =
+            LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("could not read library info");
 
         let files_to_scan: Vec<_> = WalkDir::new(library_dir)
             .into_iter()
@@ -103,14 +102,14 @@ impl LibraryIndex {
 
             debug!("[scan] [{i}/{len}] scanning {path:?}");
 
-            let sha256_hash = cache.find_or_compute_file_sha256_hash(path);
-            let uuid = if let Some(existing_entry) = library_data.find_entry_by_sha256_hash(&sha256_hash) {
+            let sha256_hash = cache.fetch_or_compute_file_sha256_hash(path);
+            let uuid = if let Some(existing_entry) = library_db.find_entry_by_sha256_hash(&sha256_hash) {
                 let existing_uuid = existing_entry.uuid.0;
                 debug!("[scan] found duplicate file: sha256: {sha256_hash}, uuid: {existing_uuid}");
                 // TODO: record this duplicate file path in the library entry
                 existing_uuid
             } else {
-                library_data.add(path, sha256_hash, &info.domain)
+                library_db.add(path, sha256_hash, &info.domain)
             };
             index.files.insert(path.to_owned(), uuid.into());
         }

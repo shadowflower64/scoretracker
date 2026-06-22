@@ -3,9 +3,8 @@
 //! A library database file is a file shared globally across libraries, that maps "proof UUIDs" to actual information and metadata about the proof.
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
 //! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
-use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::FileEx;
-use crate::util::lockfile::{self, LockfileHandle};
+use crate::util::filelocked::FileLockableData;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
@@ -270,16 +269,15 @@ impl Default for LibraryEntry {
     }
 }
 
-#[derive(Debug)]
-pub struct LibraryDatabaseLock {
+#[derive(Debug, Default)]
+pub struct LibraryDatabase {
     entries: Vec<LibraryEntry>,
-    lockfile: LockfileHandle,
 }
 
 const UNKNOWN_DOMAIN: &str = "unknown.local";
 const EXAMPLE_DOMAIN: &str = "library.example.com";
 
-impl LibraryDatabaseLock {
+impl LibraryDatabase {
     pub const STANDARD_FILENAME: &str = "library_database.json";
 
     pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
@@ -298,14 +296,13 @@ impl LibraryDatabaseLock {
         self.entries.push(library_entry);
         uuid
     }
+}
 
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
-        let entries = lockfile.read_from_jsonlines()?.unwrap_or_default();
-        Ok(Self { entries, lockfile })
+impl FileLockableData for LibraryDatabase {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> crate::util::file_ex::Result<Option<Self>> {
+        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { entries: y }))
     }
-
-    pub fn write_to_file(&self) -> lockfile::Result<()> {
-        Ok(self.lockfile.write_as_jsonlines(&self.entries)?)
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> crate::util::file_ex::Result<()> {
+        file_ex.write_as_jsonlines(&self.entries)
     }
 }

@@ -1,4 +1,6 @@
-use crate::{config::Config, hive::worker::WorkerInfo, info, library::database::LibraryDatabaseLock, log_fn_name, util::uuid::UuidString};
+use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
+use crate::util::uuid::UuidString;
+use crate::{config::Config, hive::worker::WorkerInfo, info, library::database::LibraryDatabase, log_fn_name};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, thread::sleep, time::Duration};
 use thiserror::Error;
@@ -58,9 +60,8 @@ pub enum Job {
     },
 }
 
-fn open_library_database(config: &Config, worker_info: Option<&WorkerInfo>) -> Result<LibraryDatabaseLock, Error> {
-    LibraryDatabaseLock::read_or_create_new_safe(config.library_database_path(), worker_info)
-        .map_err(|e| Error::LibraryError(e.to_string()))
+fn open_library_database(config: &Config, worker_info: Option<&WorkerInfo>) -> Result<FileLocked<LibraryDatabase>, Error> {
+    LibraryDatabase::lock_and_read_or_default(config.library_database_path(), worker_info).map_err(|e| Error::LibraryError(e.to_string()))
 }
 
 impl Job {

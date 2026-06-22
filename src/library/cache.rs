@@ -8,12 +8,13 @@
 //! Therefore, this file should not be deleted often.
 use crate::library::index::LibraryIndex;
 use crate::util::file_ex::{self, FileEx};
+use crate::util::filelocked::{FileLockableData, FileLocked};
 use crate::util::timestamp::NsTimestamp;
 use crate::{debug, log_fn_name, log_should_print_debug};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Library cache entry for one file.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -34,14 +35,6 @@ pub struct FileCacheInfo {
     pub sha256: String,
 }
 
-/// Inner structure for [`LibraryCache`].
-///
-/// This structure contains data that is actually deserialized/serialized into the cache file.
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct LibraryCache {
-    pub files: Vec<FileCacheInfo>,
-}
-
 /// Cache containing hashes of library files.
 ///
 /// The library cache is a file used to avoid repeated hash calculations for file contents.
@@ -51,15 +44,12 @@ pub struct LibraryCache {
 ///
 /// If any of these values are not identical to an entry in the cache, the file can be assumed to be different, and the hash can be recalculated.
 /// The newly calculated hash can also be added to the cache for future use.
-///
-/// This is a wrapper structure for [`LibraryCache`]. Apart from the data, it also contains the file path of the cache file.
-#[derive(Debug, Clone)]
-pub struct LibraryCacheLock {
-    inner: LibraryCache,
-    file_path: PathBuf,
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct LibraryCache {
+    pub files: Vec<FileCacheInfo>,
 }
 
-impl LibraryCacheLock {
+impl LibraryCache {
     /// Determines whether or not the cache data should be automatically saved to disk after adding a new entry.
     ///
     /// This is recommended to be `true` as it reduces the risk of having to do all of the hash calculations all over when the program crashes.
@@ -122,8 +112,7 @@ impl LibraryCacheLock {
         birth_timestamp: NsTimestamp,
         modify_timestamp: NsTimestamp,
     ) -> Option<String> {
-        self.inner
-            .files
+        self.files
             .iter()
             .find(Self::cache_find_predicate(filename, file_size, birth_timestamp, modify_timestamp))
             .map(|cache_entry| cache_entry.sha256.clone())
@@ -135,7 +124,7 @@ impl LibraryCacheLock {
     ///
     /// If this file has not been recorded in the cache yet, this function will read in the whole file,
     /// compute the hash of the file, update the cache file and save it to disk automatically.
-    pub fn find_or_compute_file_sha256_hash(&mut self, path: &Path) -> String {
+    pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> (String, bool) {
         log_fn_name!("scan:find_or_compute_file_sha256_hash");
         log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
 
@@ -146,16 +135,11 @@ impl LibraryCacheLock {
 
         if let Some(cached_hash) = self.find_cached_sha256_hash(&filename, file_size, birth_timestamp, modify_timestamp) {
             debug!("using cached hash for {path:?}: {cached_hash}");
-            cached_hash
+            (cached_hash, false)
         } else {
             let computed_hash = compute_hash_of_file(path);
             self.insert(filename, file_size, birth_timestamp, modify_timestamp, computed_hash.clone());
-
-            if Self::AUTOSAVE {
-                self.write_to_file().expect("could not autosave cache to file");
-            }
-
-            computed_hash
+            (computed_hash, true)
         }
     }
 
@@ -171,7 +155,7 @@ impl LibraryCacheLock {
         modify_timestamp: NsTimestamp,
         sha256: String,
     ) {
-        if let Some(existing) = self.inner.files.iter_mut().find(Self::cache_find_predicate_mut(
+        if let Some(existing) = self.files.iter_mut().find(Self::cache_find_predicate_mut(
             &filename,
             file_size,
             birth_timestamp,
@@ -183,7 +167,7 @@ impl LibraryCacheLock {
             existing.modify_timestamp = modify_timestamp;
             existing.sha256 = sha256;
         } else {
-            self.inner.files.push(FileCacheInfo {
+            self.files.push(FileCacheInfo {
                 filename,
                 birth_timestamp,
                 modify_timestamp,
@@ -192,46 +176,44 @@ impl LibraryCacheLock {
             });
         }
     }
+}
 
-    /// Loads cache data from a file or creates a new cache.
-    ///
-    /// This function loads the cache from a JSON file at the provided file path, or creates a new cache structure if the file does not exist.
-    ///
-    /// This function will return Err when:
-    /// * the file could not be read to string, or
-    /// * the JSON structure could not be parsed.
-    ///
-    /// This is to prevent overwriting existing data if it has become corrupted or protected by permissions.
-    pub fn read_or_create_new(cache_file_path: PathBuf) -> file_ex::Result<Self> {
+impl FileLockableData for LibraryCache {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
         log_fn_name!("scan:read_or_create_new");
         log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
 
-        let inner_opt = cache_file_path.read_from_json()?;
+        let inner_opt = file_ex.read_from_json()?;
+        let cache_file_path = file_ex.file_path();
         if inner_opt.is_some() {
             debug!("loading library cache from {cache_file_path:?}");
         } else {
-            debug!("creating library cache at {cache_file_path:?}");
+            debug!("library cache at {cache_file_path:?} not found");
         }
-
-        let inner = inner_opt.unwrap_or_default();
-        Ok(Self {
-            inner,
-            file_path: cache_file_path,
-        })
+        Ok(inner_opt)
     }
 
     /// Saves the cache file to disk.
     ///
     /// This function uses the stored file path to save the cache data to file.
     /// Depending on the constant [`Self::WRITE_PRETTY_JSON`], this function either writes the data using [`serde_json::to_string`] or [`serde_json::to_string_pretty`].
-    pub fn write_to_file(&self) -> file_ex::Result<()> {
-        let _ = self.file_path.parent().and_then(|parent| fs::create_dir_all(parent).ok());
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
         if Self::WRITE_PRETTY_JSON {
-            self.file_path.write_as_json_pretty(&self.inner)?;
+            file_ex.write_as_json_pretty(self)?;
         } else {
-            self.file_path.write_as_json(&self.inner)?;
+            file_ex.write_as_json(self)?;
         }
         Ok(())
+    }
+}
+
+impl FileLocked<LibraryCache> {
+    pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> String {
+        let (hash, new) = self.inner.fetch_or_compute_file_sha256_hash(path);
+        if new && LibraryCache::AUTOSAVE {
+            self.write_to_file().expect("could not autosave cache to file");
+        }
+        hash
     }
 }
 

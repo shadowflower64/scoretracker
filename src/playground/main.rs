@@ -2,12 +2,14 @@ use ctrlc::{self};
 use scoretracker::config::Config;
 use scoretracker::game::game_instance_from_id;
 use scoretracker::hive::job::Job;
-use scoretracker::hive::queue::TaskQueueLock;
+use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::{Task, TaskState};
 use scoretracker::hive::worker::WorkerInfo;
 use scoretracker::info;
-use scoretracker::library::{database::LibraryDatabaseLock, index::LibraryIndex};
+use scoretracker::library::database::LibraryDatabase;
+use scoretracker::library::index::LibraryIndex;
 use scoretracker::log_fn_name;
+use scoretracker::util::filelocked::{FileLockableData, FileLockableDataDefault};
 use scoretracker::util::{file_ex::FileEx, lockfile::LockfileHandle, timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
 use std::env::args;
@@ -77,7 +79,7 @@ pub fn test_scanning(args: &[String]) {
     let library_index_path = library_dir_path.join("library_index.json");
     let library_data_path = Path::new("playground/test_library_database.json");
 
-    let mut library_data = LibraryDatabaseLock::read_or_create_new_safe(library_data_path, None).expect("library data could not be read");
+    let mut library_data = LibraryDatabase::lock_and_read_or_default(library_data_path, None).expect("library data could not be read");
     let library_index = LibraryIndex::scan_library_dir(library_dir_path, &mut library_data);
 
     library_index.save(&library_index_path).expect("library index could not be saved");
@@ -125,7 +127,7 @@ pub fn test_queue(_args: &[String]) {
     let mut currently_doing_task_opt = None;
 
     // Read the queue to either add something or take on a task
-    let mut queue = TaskQueueLock::read_or_create_new_safe("playground/test_queue.jsonl", None).expect("couldn't read queue");
+    let mut queue = TaskQueue::lock_and_read("playground/test_queue.jsonl", None).expect("couldn't read queue");
     let task_todo_opt = queue.top_queued_task_mut();
     if let Some(task_todo) = task_todo_opt {
         // Take on a task
@@ -172,7 +174,7 @@ pub fn test_queue(_args: &[String]) {
         task.finish_timestamp = Some(NsTimestamp::now());
 
         // Read the queue file again to update the state of the task
-        let mut queue = TaskQueueLock::read_or_create_new_safe("playground/test_queue.jsonl", None).expect("couldn't read queue");
+        let mut queue = TaskQueue::lock_and_read("playground/test_queue.jsonl", None).expect("couldn't read queue");
         queue.update_task(task);
         queue.write_to_file();
     }

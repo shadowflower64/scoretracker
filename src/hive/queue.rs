@@ -1,8 +1,6 @@
 use crate::hive::task::{Task, TaskState};
-use crate::hive::worker::WorkerInfo;
-use crate::util::file_ex::FileEx;
-use crate::util::lockfile::{self, LockfileHandle};
-use std::path::{Path, PathBuf};
+use crate::util::file_ex::{self, FileEx};
+use crate::util::filelocked::FileLockableData;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -40,9 +38,8 @@ use uuid::Uuid;
 /// 16. Save the updated task info to the queue file.
 /// 17. Unlock the queue file.
 #[derive(Debug)]
-pub struct TaskQueueLock {
+pub struct TaskQueue {
     tasks: Vec<Task>,
-    lockfile: LockfileHandle,
 }
 
 #[derive(Debug, Error)]
@@ -53,7 +50,7 @@ pub struct TaskAlreadyExists(Uuid);
 #[error("task with this UUID was not found: {0}")]
 pub struct TaskNotFound(Uuid);
 
-impl TaskQueueLock {
+impl TaskQueue {
     pub const STANDARD_FILENAME: &str = "task_queue.jsonl";
 
     pub fn top_queued_task(&self) -> Option<&Task> {
@@ -115,31 +112,13 @@ impl TaskQueueLock {
     pub fn get_task_mut(&mut self, task_uuid: Uuid) -> Option<&mut Task> {
         self.tasks.iter_mut().find(|task| task.uuid.0 == task_uuid)
     }
-
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
-        let tasks = lockfile.read_from_jsonlines()?.unwrap_or_default();
-        Ok(Self { tasks, lockfile })
-    }
-
-    pub fn write_to_file(&self) -> lockfile::Result<()> {
-        Ok(self.lockfile.write_as_jsonlines(&self.tasks)?)
-    }
-
-    pub fn close(self) -> ClosedTaskQueue {
-        ClosedTaskQueue {
-            main_file_path: self.lockfile.main_file_path().to_path_buf(),
-        }
-    }
 }
 
-#[derive(Debug)]
-pub struct ClosedTaskQueue {
-    main_file_path: PathBuf,
-}
-
-impl ClosedTaskQueue {
-    pub fn reopen(self, worker_info: Option<&WorkerInfo>) -> lockfile::Result<TaskQueueLock> {
-        TaskQueueLock::read_or_create_new_safe(self.main_file_path, worker_info)
+impl FileLockableData for TaskQueue {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
+        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { tasks: y }))
+    }
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
+        file_ex.write_as_jsonlines(&self.tasks)
     }
 }

@@ -1,12 +1,13 @@
 mod ipc;
 
 use crate::config::Config;
-use crate::hive::queue::TaskNotFound;
+use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::ipc::start_listener_thread;
+use crate::util::filelocked::{FileLockableData, FileLocked};
 use crate::util::lockfile;
+use crate::util::timestamp::NsTimestamp;
 use crate::{error, info, log_fn_name, success};
-use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpListener};
 use std::{io, process};
@@ -93,9 +94,8 @@ impl Worker {
         Self::new(format!("defaultworker{pid}.scoretracker.local"), config)
     }
 
-    pub fn open_queue(&self) -> Result<TaskQueueLock, Error> {
-        TaskQueueLock::read_or_create_new_safe(self.config.library_database_path(), Some(self.worker_info()))
-            .map_err(Error::CannotReadQueue)
+    pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
+        TaskQueue::lock_and_read(self.config.library_database_path(), Some(self.worker_info())).map_err(Error::CannotReadQueue)
     }
 
     /// Execute a task in the current thread.
@@ -131,11 +131,11 @@ impl Worker {
     /// This function will mark the task as being worked on and write to the [`TaskQueueLock`] file using [`lockfile`];
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
-    pub fn execute_task<F: Fn(&mut TaskQueueLock) -> Result<&mut Task, Error>>(
+    pub fn execute_task<F: Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>>(
         &self,
-        mut queue: TaskQueueLock,
+        mut queue: FileLocked<TaskQueue>,
         task_getter: F,
-    ) -> Result<TaskQueueLock, Error> {
+    ) -> Result<FileLocked<TaskQueue>, Error> {
         log_fn_name!("worker:exec_task_safe");
 
         // Take on a task
