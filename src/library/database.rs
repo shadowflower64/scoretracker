@@ -2,7 +2,7 @@
 //!
 //! A library database file is a file shared globally across libraries, that maps "proof UUIDs" to actual information and metadata about the proof.
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
-//! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded), as well as other information.
+//! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
 use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::FileEx;
 use crate::util::lockfile::{self, LockfileHandle};
