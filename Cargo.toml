@@ -10,7 +10,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "scoretracker-toolkit"
-path = "src/toolkit/main.rs"
+path = "src/cli/main.rs"
 
 [[bin]]
 name = "scoretracker-playground"

@@ -3,6 +3,7 @@
 //! A library index is a file that maps every filename existing in the library directory to a "proof UUID", which should be shared across all connected libraries.
 //!
 //! This file is re-created every time the library gets re-scanned for new content.
+use crate::library::info::{LibraryInfo, LibraryInfoLock};
 use crate::library::{cache::LibraryCacheLock, database::LibraryDatabaseLock};
 use crate::util::file_ex::{Error, FileEx};
 use crate::util::uuid::UuidString;
@@ -18,6 +19,7 @@ use walkdir::WalkDir;
 /// The library index is a data structure that links specific proof files on disk to proof UUIDs.
 ///
 /// The index does not actually store any meaningful data, and is used only as a quick-access list of all available proof files in the library.
+/// It is safe to delete, as it can be reconstructed from the files on disk.
 ///
 /// # Usage
 ///
@@ -72,6 +74,11 @@ impl LibraryIndex {
         let mut index = Self::default();
         let mut cache = LibraryCacheLock::read_or_create_new(library_dir.join(LibraryCacheLock::STANDARD_FILENAME))
             .expect("could not read library cache");
+        let info: LibraryInfo = library_dir
+            .join(LibraryInfoLock::STANDARD_FILENAME)
+            .read_from_json()
+            .expect("could not read library info")
+            .expect("library info not found");
 
         let files_to_scan: Vec<_> = WalkDir::new(library_dir)
             .into_iter()
@@ -97,13 +104,13 @@ impl LibraryIndex {
             debug!("[scan] [{i}/{len}] scanning {path:?}");
 
             let sha256_hash = cache.find_or_compute_file_sha256_hash(path);
-            let uuid = if let Some(entry) = library_data.find_entry_by_sha256_hash(&sha256_hash) {
-                let uuid = entry.uuid.0;
-                debug!("[scan] found duplicate file: sha256: {sha256_hash}, uuid: {uuid}");
+            let uuid = if let Some(existing_entry) = library_data.find_entry_by_sha256_hash(&sha256_hash) {
+                let existing_uuid = existing_entry.uuid.0;
+                debug!("[scan] found duplicate file: sha256: {sha256_hash}, uuid: {existing_uuid}");
                 // TODO: record this duplicate file path in the library entry
-                uuid
+                existing_uuid
             } else {
-                library_data.add(path, sha256_hash)
+                library_data.add(path, sha256_hash, &info.domain)
             };
             index.files.insert(path.to_owned(), uuid.into());
         }

@@ -276,6 +276,9 @@ pub struct LibraryDatabaseLock {
     lockfile: LockfileHandle,
 }
 
+const UNKNOWN_DOMAIN: &str = "unknown.local";
+const EXAMPLE_DOMAIN: &str = "library.example.com";
+
 impl LibraryDatabaseLock {
     pub const STANDARD_FILENAME: &str = "library_database.json";
 
@@ -283,11 +286,10 @@ impl LibraryDatabaseLock {
         self.entries.iter().find(|x| x.sha256 == sha256)
     }
 
-    pub fn add(&mut self, file_path: &Path, sha256: String) -> Uuid {
-        const DOMAIN: &str = "domain.example.com"; // TODO
+    pub fn add(&mut self, file_path: &Path, sha256: String, domain: &str) -> Uuid {
         let relative_file_path = file_path.to_string_lossy().to_string(); // TODO
         let library_entry = LibraryEntry {
-            library_urls: vec![format!("stpl://{DOMAIN}/{relative_file_path}")],
+            library_urls: vec![format!("stpl://{domain}/{relative_file_path}")],
             sha256,
             ..Default::default()
         };
