@@ -101,7 +101,7 @@ pub enum ContentDescription {
     GameGeneric { game: Option<GameId> },
 
     /// The contents of the video or image don't belong to any other category.
-    Other,
+    Other { description: Option<String> },
 }
 
 /// The quality state of the proof file.
@@ -159,7 +159,7 @@ pub enum LibraryEntryKind {
     Unspecified,
 
     /// Video not showing a performance, unrelated to proof stuff but still in library for some reason.
-    Unrelated,
+    NotProof,
 
     /// Video showing a performance, but not yet possible to associate with a performance - the performance is not saveable in database for some reason. for example, one-finger-challenge FCs.
     Unsupported,
