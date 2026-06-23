@@ -1,8 +1,9 @@
-use crate::cmd::handle_command;
+use crate::util::handle_command;
 use scoretracker::error_npr;
 use std::{env::args, process::ExitCode};
 
 pub mod cmd;
+pub mod util;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() -> ExitCode {
