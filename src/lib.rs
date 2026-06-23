@@ -9,7 +9,7 @@
 //! | 3  | **YouTubeManager**           | Handles uploading proofs to YouTube and assigns the metadata using the YouTube API.  |     0.1% |
 //! | 4  | [**Scoreboard**](scoreboard) | A database of rhythm game plays/scores/performances.                                 |       2% |
 //! | 5  | [**SongDB**](songdb)         | A database of songs from rhythm games, along with their note counts and other stats. |     0.1% |
-//! | 6  | **scoretracker-cli**         | Command-Line Interface for all scoretracker features.                                |      15% |
+//! | 6  | [**scoretracker-toolkit**](../scoretracker_toolkit/index.html)     | Command-Line Interface for all scoretracker features.                                |      15% |
 //! | 7  | **scoretracker-api**         | HTTP server with a JSON API interface for most or all scoretracker features.         |       0% |
 //! | 8  | **scoretracker-web**         | Web frontend that connects to the scoretracker-api mentioned above.                  |     0.1% |
 //! | 9  | **obs-frontend**             | A web-based frontend designed specifically for OBS, for displaying stats etc.        |       0% |
@@ -17,7 +17,8 @@
 //! | 11 | **OCR**                      | Automatic proof reading.                                                             |     0.1% |
 //! | 12 | **ReplayReader**             | Game-specific file parsing, mainly for reading replays.                              |       0% |
 //!
-//! This crate specifically will include components 1..=5 and 11..=12. Components 6..=10 will be separate, but built upon the `scoretracker_core` library.
+//! This lib crate specifically will include components 1..=5 and 11..=12. Components 6..=10 will be separate, but built upon the `scoretracker` library.
+//! `scoretracker-toolkit` is also present in this codebase in `src/cli/main.rs`.
 //!
 //! # Glossary
 //! Here is some of the terminology used in "scoretracker":
@@ -41,7 +42,7 @@ pub mod songdb;
 pub mod tests;
 pub mod util;
 
-/// Current version of `scoretracker-core`, read from `CARGO_PKG_VERSION` at compile time.
+/// Current version of `scoretracker`, read from `CARGO_PKG_VERSION` at compile time.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn example_add(left: u64, right: u64) -> u64 {

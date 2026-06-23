@@ -18,7 +18,7 @@ use uuid::Uuid;
 /// # Example
 /// ```
 /// use uuid::Uuid;
-/// use scoretracker_core::util::uuid::UuidString;
+/// use scoretracker::util::uuid::UuidString;
 ///
 /// let uuid = Uuid::now_v7();
 /// let uuid_string = UuidString::from(uuid);

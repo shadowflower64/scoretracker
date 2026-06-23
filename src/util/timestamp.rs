@@ -44,7 +44,7 @@ impl NsTimestamp {
     /// # Example
     /// ```
     /// use std::time::{SystemTime, Duration};
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// let now_system_time = SystemTime::now();
     /// let now_ns = NsTimestamp::now();
@@ -77,7 +77,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_nanos(-3_000_000_000).as_secs(), -3);
     /// assert_eq!(NsTimestamp::from_nanos(-2_999_999_999).as_secs(), -3);
@@ -124,7 +124,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_nanos(-3_000_000).as_millis(), -3);
     /// assert_eq!(NsTimestamp::from_nanos(-2_999_999).as_millis(), -3);
@@ -171,7 +171,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_nanos(-3_000).as_micros(), -3);
     /// assert_eq!(NsTimestamp::from_nanos(-2_999).as_micros(), -3);
@@ -201,7 +201,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_nanos(1234).as_nanos(), 1234);
     /// assert_eq!(NsTimestamp::from_nanos(0).as_nanos(), 0);
@@ -223,7 +223,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_secs(1234).as_nanos(), 1_234_000_000_000);
     /// assert_eq!(NsTimestamp::from_secs(0).as_nanos(), 0);
@@ -245,7 +245,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     ///
     /// assert_eq!(NsTimestamp::try_from_secs(1234).unwrap().as_nanos(), 1_234_000_000_000);
     /// assert_eq!(NsTimestamp::try_from_secs(0).unwrap().as_nanos(), 0);
@@ -268,7 +268,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_millis(1234).as_nanos(), 1_234_000_000);
     /// assert_eq!(NsTimestamp::from_millis(0).as_nanos(), 0);
@@ -290,7 +290,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     ///
     /// assert_eq!(NsTimestamp::try_from_millis(1234).unwrap().as_nanos(), 1_234_000_000);
     /// assert_eq!(NsTimestamp::try_from_millis(0).unwrap().as_nanos(), 0);
@@ -313,7 +313,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_micros(1234).as_nanos(), 1_234_000);
     /// assert_eq!(NsTimestamp::from_micros(0).as_nanos(), 0);
@@ -335,7 +335,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     ///
     /// assert_eq!(NsTimestamp::try_from_micros(1234).unwrap().as_nanos(), 1_234_000);
     /// assert_eq!(NsTimestamp::try_from_micros(0).unwrap().as_nanos(), 0);
@@ -357,7 +357,7 @@ impl NsTimestamp {
     ///
     /// # Example
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// let ns_timestamp = NsTimestamp::from_nanos(1_234_567_890_123_456_789);
     /// assert_eq!(&ns_timestamp.to_date_time_string_utc(), "2009-02-13T23:31:30.123456789Z");
@@ -373,7 +373,7 @@ impl NsTimestamp {
     ///
     /// # Example
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     /// use chrono::{DateTime, Local, SecondsFormat};
     ///
     /// let ns_timestamp = NsTimestamp::from_nanos(1_234_567_890_123_456_789);
@@ -393,7 +393,7 @@ impl NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// let origin = NsTimestamp::from_secs(5);
     /// let two_seconds_later = origin + 2_000_000_000;
@@ -424,7 +424,7 @@ impl Add<i128> for NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     /// use std::ops::Add;
     ///
     /// let initial_timestamp = NsTimestamp::from_secs(3);
@@ -435,7 +435,7 @@ impl Add<i128> for NsTimestamp {
     ///
     /// Attempting to add with overflow will cause a panic:
     /// ```should_panic
-    /// # use scoretracker_core::util::timestamp::NsTimestamp;
+    /// # use scoretracker::util::timestamp::NsTimestamp;
     /// # use std::ops::Add;
     /// NsTimestamp::MAX.add(1);
     /// ```
@@ -452,7 +452,7 @@ impl Sub<i128> for NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     /// use std::ops::Sub;
     ///
     /// let initial_timestamp = NsTimestamp::from_secs(3);
@@ -463,7 +463,7 @@ impl Sub<i128> for NsTimestamp {
     ///
     /// Attempting to subtract with overflow will cause a panic:
     /// ```should_panic
-    /// # use scoretracker_core::util::timestamp::NsTimestamp;
+    /// # use scoretracker::util::timestamp::NsTimestamp;
     /// # use std::ops::Sub;
     /// NsTimestamp::MIN.sub(1);
     /// ```
@@ -479,7 +479,7 @@ impl Sub for NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     /// use std::ops::Sub;
     ///
     /// assert_eq!(NsTimestamp::from_secs(3).sub(NsTimestamp::UNIX_EPOCH), 3_000_000_000);
@@ -489,7 +489,7 @@ impl Sub for NsTimestamp {
     ///
     /// Attempting to subtract with overflow will cause a panic:
     /// ```should_panic
-    /// # use scoretracker_core::util::timestamp::NsTimestamp;
+    /// # use scoretracker::util::timestamp::NsTimestamp;
     /// # use std::ops::Sub;
     /// NsTimestamp::from_secs(100).sub(NsTimestamp::MIN);
     /// ```
@@ -503,7 +503,7 @@ impl From<i128> for NsTimestamp {
     ///
     /// # Example
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     ///
     /// let nanoseconds = 1_234_567_890;
     /// let timestamp = NsTimestamp::from(nanoseconds);
@@ -524,7 +524,7 @@ impl TryFrom<u128> for NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     ///
     /// let nanoseconds: u128 = 1_234_567_890;
     /// let timestamp = NsTimestamp::try_from(nanoseconds).unwrap();
@@ -545,7 +545,7 @@ impl From<Duration> for NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     /// use std::time::Duration;
     ///
     /// let duration = Duration::ZERO;
@@ -567,7 +567,7 @@ impl From<SystemTime> for NsTimestamp {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     /// use std::time::{SystemTime, UNIX_EPOCH, Duration};
     ///
     /// let system_time = SystemTime::now();
@@ -606,7 +606,7 @@ impl<Tz: TimeZone> From<DateTime<Tz>> for NsTimestamp {
     ///
     /// # Example
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     /// use chrono::{Utc, DateTime, NaiveDate};
     ///
     /// let date_time = NaiveDate::from_ymd_opt(1970, 1, 1)
@@ -638,7 +638,7 @@ impl TryFrom<NsTimestamp> for Duration {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     /// use std::time::Duration;
     ///
     /// let timestamp = NsTimestamp::now();
@@ -696,7 +696,7 @@ impl TryFrom<NsTimestamp> for (bool, Duration) {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     /// use std::time::{SystemTime, Duration, UNIX_EPOCH};
     ///
     /// let timestamp = NsTimestamp::from_nanos(1);
@@ -780,7 +780,7 @@ impl TryFrom<NsTimestamp> for SystemTime {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use scoretracker::util::timestamp::{NsTimestamp, Error};
     /// use std::time::{SystemTime, UNIX_EPOCH, Duration};
     ///
     /// let timestamp = NsTimestamp::from_nanos(1);
@@ -856,7 +856,7 @@ where
     ///
     /// # Example
     /// ```
-    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use scoretracker::util::timestamp::NsTimestamp;
     /// use chrono::{Utc, DateTime, NaiveDate};
     ///
     /// let date_time_utc: DateTime<Utc> = NsTimestamp::from_millis(1_444).try_into().unwrap();

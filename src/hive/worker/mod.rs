@@ -128,7 +128,7 @@ impl Worker {
     ///
     /// Please note that executing a task may take a long time.
     ///
-    /// This function will mark the task as being worked on and write to the [`TaskQueueLock`] file using [`lockfile`];
+    /// This function will mark the task as being worked on and write to the [`TaskQueue`] file using [`lockfile`];
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
     pub fn execute_task<F: Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>>(
@@ -143,7 +143,7 @@ impl Worker {
         task_to_do.state = TaskState::Working;
         task_to_do.start_timestamp = Some(NsTimestamp::now());
         task_to_do.worker_info = Some(self.info.clone());
-        // task_to_do.comment = Some(String::from("this job was started by scoretracker-core"));
+        // task_to_do.comment = Some(String::from("this job was started by scoretracker"));
 
         let mut task = task_to_do.clone();
         info!("taking on task with uuid: {}", task.uuid.0);

@@ -40,7 +40,7 @@ pub trait Game: Debug {
 ///
 /// # Examples
 /// ```
-/// use scoretracker_core::game::game_instance_from_id;
+/// use scoretracker::game::game_instance_from_id;
 ///
 /// let game = game_instance_from_id("yarg").unwrap();
 /// assert_eq!(game.pretty_name(), "Yet Another Rhythm Game");

@@ -1,3 +1,7 @@
+//! One piece of work to do.
+//!
+//! A job is one action that has to be done by a [`crate::hive::worker`].
+//! One worker may take on a job, and then report a success, or a failure.
 use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::uuid::UuidString;
 use crate::{config::Config, hive::worker::WorkerInfo, info, library::database::LibraryDatabase, log_fn_name};

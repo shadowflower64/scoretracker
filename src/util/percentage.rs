@@ -20,7 +20,7 @@ use std::{
 ///
 /// # Examples
 /// ```
-/// use scoretracker_core::util::percentage::Percentage;
+/// use scoretracker::util::percentage::Percentage;
 ///
 /// for i in 0..=100 {
 ///     let float = i as f64 / 100.0;
@@ -40,7 +40,7 @@ impl Percentage {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::percentage::Percentage;
+    /// use scoretracker::util::percentage::Percentage;
     ///
     /// assert_eq!(Percentage(100.0).as_multiplier(), 1.0);
     /// assert_eq!(Percentage(125.0).as_multiplier(), 1.25);
@@ -53,7 +53,7 @@ impl Percentage {
     ///
     /// # Examples
     /// ```
-    /// use scoretracker_core::util::percentage::Percentage;
+    /// use scoretracker::util::percentage::Percentage;
     ///
     /// assert_eq!(Percentage(100.0).as_percentage(), 100.0);
     /// assert_eq!(Percentage(125.0).as_percentage(), 125.0);

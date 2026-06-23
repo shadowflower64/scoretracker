@@ -1,3 +1,9 @@
+//! An instance of a job, with worker info and current state.
+//!
+//! A task structure contains information about a job to do.
+//! It includes information about whether the job is currently being worked on,
+//! the worker that is currently working on the job, the input parameters for the job,
+//! and when it finishes, the results of the job.
 use crate::hive::job::{self, Job};
 use crate::hive::worker::WorkerInfo;
 use crate::util::timestamp::NsTimestamp;
