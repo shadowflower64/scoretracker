@@ -3,6 +3,7 @@ use scoretracker::config::Config;
 use scoretracker::hive::worker::WorkerCreateError;
 use scoretracker::info_npr;
 use scoretracker::library::LibraryScanError;
+use scoretracker::library::stpl_url::LibraryDomain;
 use scoretracker::util::cmd::AskError;
 use scoretracker::util::lockfile;
 use std::io::{self};
@@ -134,11 +135,8 @@ macro_rules! parse_arg {
     (String, $arg_value: ident) => {
         Result::<String, std::convert::Infallible>::Ok($arg_value.to_string())
     };
-    (PathBuf, $arg_value: ident) => {
-        std::convert::TryInto::<PathBuf>::try_into($arg_value)
-    };
-    (Uuid, $arg_value: ident) => {
-        std::convert::TryInto::<Uuid>::try_into($arg_value)
+    ($x: ident, $arg_value: ident) => {
+        std::convert::TryInto::<$x>::try_into($arg_value)
     };
 }
 
@@ -190,6 +188,10 @@ pub fn handle_command(args: &[String]) -> Result<(), Error> {
             "rescan-default" => {
                 let config = Config::load().map_err(Error::ConfigReadError)?;
                 cmd::library::rescan_library(&config.default_library_dir_path).map_err(E::LibraryRescanError)
+            },
+            "remove-domain" => {
+                arg!(library_domain: LibraryDomain, "library domain name", fcn, args, 3);
+                cmd::library::remove_domain_from_db(library_domain).map_err(E::LibraryRescanError)
             }
         ),
         "hive" => cmd!(fcn, args, 2,

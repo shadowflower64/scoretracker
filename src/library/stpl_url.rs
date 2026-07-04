@@ -90,6 +90,13 @@ impl TryFrom<String> for LibraryDomain {
     }
 }
 
+impl TryFrom<&String> for LibraryDomain {
+    type Error = StplUrlError;
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        LibraryDomain::try_from(value.to_owned())
+    }
+}
+
 impl Display for LibraryDomain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

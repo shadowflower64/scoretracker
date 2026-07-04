@@ -313,7 +313,7 @@ pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lock
 
     for entry in library_db.entries.iter_mut() {
         // Remove all old URLs that reference this library, without touching all of the other ones.
-        entry.library_urls.retain(|url| url.domain != library_domain.clone());
+        entry.library_urls.retain(|url| url.domain != library_domain);
 
         // Add all URLs that are contained within this library.
         if let Some(files_for_this_proof) = reverse_index.get_mut(&entry.uuid) {
@@ -325,6 +325,7 @@ pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lock
             unused_proof_uuids_in_index.remove(&entry.uuid);
         }
     }
+    library_db.unlock_and_save().expect("cannot write database file"); // TODO: error handling
 
     // Check if any of the proof UUIDs that are in the index were not present in the database
     for absent_uuid in unused_proof_uuids_in_index {
@@ -338,7 +339,6 @@ pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lock
         }
     }
 
-    library_db.unlock_and_save().expect("cannot write database file"); // TODO: error handling
     Ok(())
 }
 
@@ -369,4 +369,19 @@ pub fn sync_library_index_with_db(
         library_domain,
         worker_info,
     )
+}
+
+pub fn remove_library_domain_from_db(
+    library_domain: LibraryDomain,
+    library_db_path: &Path,
+    worker_info: Option<&WorkerInfo>,
+) -> Result<(), LibraryScanError> {
+    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).expect("cannot open database file"); // TODO: error handling
+
+    for entry in library_db.entries.iter_mut() {
+        // Remove all old URLs that reference this library, without touching all of the other ones.
+        entry.library_urls.retain(|url| url.domain != library_domain);
+    }
+    library_db.unlock_and_save().expect("cannot write database file"); // TODO: error handling
+    Ok(())
 }
