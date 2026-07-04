@@ -1,44 +1,16 @@
 use scoretracker::config::Config;
 use scoretracker::library::database::LibraryDatabase;
-use scoretracker::library::index::LibraryIndex;
-use scoretracker::util::filelocked::FileLockableDataDefault;
-use scoretracker::util::{file_ex, lockfile};
-use scoretracker::{info, log_fn_name, success_npr};
+use scoretracker::library::{LibraryScanError, scan_full};
+use scoretracker::{log_fn_name, success_npr};
 use std::path::Path;
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum LibraryScanError {
-    #[error("could not read library database: {0}")]
-    LibraryDatabaseReadError(lockfile::Error),
-    #[error("could not write to library database: {0}")]
-    LibraryDatabaseWriteError(lockfile::Error),
-    #[error("could not write to library index: {0}")]
-    LibraryIndexWriteError(file_ex::Error),
-}
-
-// todo this should be moved to core
-pub fn rescan(library_dir_path: &Path) -> Result<(), LibraryScanError> {
+pub fn rescan_library(library_dir_path: &Path) -> Result<(), LibraryScanError> {
     log_fn_name!("rescan_library");
 
     let shared_data_repo_path = Config::load().unwrap().shared_data_repo_path;
+    let library_database_path = shared_data_repo_path.join(LibraryDatabase::standard_path());
 
-    let library_index_path = library_dir_path.join(LibraryIndex::STANDARD_FILENAME);
-    let library_database_path = shared_data_repo_path.join(LibraryDatabase::STANDARD_FILENAME);
-
-    let mut library_database =
-        LibraryDatabase::lock_and_read_or_default(&library_database_path, None).map_err(LibraryScanError::LibraryDatabaseReadError)?;
-    let library_index = LibraryIndex::scan_library_dir(library_dir_path, &mut library_database);
-
-    library_index
-        .save(&library_index_path)
-        .map_err(LibraryScanError::LibraryIndexWriteError)?;
-    info!("saved library index to {library_index_path:?}");
-
-    library_database
-        .write_to_file()
-        .map_err(LibraryScanError::LibraryDatabaseWriteError)?;
-    info!("saved library data to {library_database_path:?}");
+    scan_full(library_dir_path, &library_database_path, None)?;
 
     success_npr!("successfully rescanned library");
     Ok(())

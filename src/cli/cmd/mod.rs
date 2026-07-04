@@ -1,7 +1,8 @@
-use crate::cmd::{self, library::LibraryScanError};
+use crate::cmd::{self};
 use scoretracker::config::Config;
 use scoretracker::hive::worker::WorkerCreateError;
 use scoretracker::info_npr;
+use scoretracker::library::LibraryScanError;
 use scoretracker::util::cmd::AskError;
 use scoretracker::util::lockfile;
 use std::io::{self};
@@ -184,11 +185,11 @@ pub fn handle_command(args: &[String]) -> Result<(), Error> {
         "library" => cmd!(fcn, args, 2,
             "rescan" => {
                 arg!(path: PathBuf, "path of the library directory", fcn, args, 3);
-                cmd::library::rescan(&path).map_err(E::LibraryRescanError)
+                cmd::library::rescan_library(&path).map_err(E::LibraryRescanError)
             },
             "rescan-default" => {
                 let config = Config::load().map_err(Error::ConfigReadError)?;
-                cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryRescanError)
+                cmd::library::rescan_library(&config.default_library_dir_path).map_err(E::LibraryRescanError)
             }
         ),
         "hive" => cmd!(fcn, args, 2,

@@ -5,8 +5,8 @@
 //!
 //! While a library cache does not contain any important data and can be safely removed, doing so will significantly increase the
 //! next library scan duration. Scanning a 3,000-file library without a cache may take several hours to complete.
-//! Therefore, this file should not be deleted often.
-use crate::library::index::LibraryIndex;
+//! Therefore, this file should not be deleted often, or at all - in fact, you might want to make backups of this file.
+use crate::library::VERBOSE_SCANNING;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::filelocked::{FileLockableData, FileLocked};
 use crate::util::timestamp::NsTimestamp;
@@ -118,6 +118,21 @@ impl LibraryCache {
             .map(|cache_entry| cache_entry.sha256.clone())
     }
 
+    /// Finds the cached SHA256 hash of a file.
+    ///
+    /// This function takes in a path of the file, and returns a SHA256 hash. The function uses the cache to avoid doing repeated calculations.
+    ///
+    /// If this file has not been recorded in the cache yet, this function will read in the whole file,
+    /// compute the hash of the file, update the cache file and save it to disk automatically.
+    pub fn fetch_file_sha256_hash(&mut self, path: &Path) -> Option<String> {
+        let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let file_size = fs::metadata(path).unwrap().size();
+        let birth_timestamp = fs::metadata(path).unwrap().created().unwrap().into();
+        let modify_timestamp = fs::metadata(path).unwrap().modified().unwrap().into();
+
+        self.find_cached_sha256_hash(&filename, file_size, birth_timestamp, modify_timestamp)
+    }
+
     /// Finds the cached SHA256 hash of a file, or computes the hash if it is not cached yet.
     ///
     /// This function takes in a path of the file, and returns a SHA256 hash. The function uses the cache to avoid doing repeated calculations.
@@ -125,8 +140,8 @@ impl LibraryCache {
     /// If this file has not been recorded in the cache yet, this function will read in the whole file,
     /// compute the hash of the file, update the cache file and save it to disk automatically.
     pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> (String, bool) {
-        log_fn_name!("scan:find_or_compute_file_sha256_hash");
-        log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
+        log_fn_name!("library_cache:fetch_or_compute_file_sha256_hash");
+        log_should_print_debug!(VERBOSE_SCANNING);
 
         let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         let file_size = fs::metadata(path).unwrap().size();
@@ -181,7 +196,7 @@ impl LibraryCache {
 impl FileLockableData for LibraryCache {
     fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
         log_fn_name!("scan:read_or_create_new");
-        log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
+        log_should_print_debug!(VERBOSE_SCANNING);
 
         let inner_opt = file_ex.read_from_json()?;
         let cache_file_path = file_ex.file_path();
@@ -211,7 +226,7 @@ impl FileLocked<LibraryCache> {
     pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> String {
         let (hash, new) = self.inner.fetch_or_compute_file_sha256_hash(path);
         if new && LibraryCache::AUTOSAVE {
-            self.write_to_file().expect("could not autosave cache to file");
+            self.save_to_file().expect("could not autosave cache to file");
         }
         hash
     }
@@ -226,7 +241,7 @@ enum HashingMethod {
 
 pub fn compute_hash_of_file(path: &Path) -> String {
     log_fn_name!("scan:compute_hash_of_file");
-    log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
+    log_should_print_debug!(VERBOSE_SCANNING);
 
     // note: changing the hashing method does not change the behaviour/naming of the hash in other places - everywhere else its still called sha256
     const METHOD: HashingMethod = HashingMethod::SHA256;

@@ -148,18 +148,16 @@ impl Worker {
         let mut task = task_to_do.clone();
         info!("taking on task with uuid: {}", task.uuid.0);
 
-        queue.write_to_file().map_err(Error::CannotWriteQueue)?;
-
         // Drop file lock here to and let other processes access the queue
-        let queue = queue.close();
+        let queue = queue.close_and_save().map_err(Error::CannotWriteQueue)?;
 
         // Do some task if there is something to do
         self.execute_task_body(&mut task);
 
         // Update the queue file again to update the state of the task
-        let mut queue = queue.reopen(Some(self.worker_info())).map_err(Error::CannotReopenQueue)?;
+        let mut queue = queue.reopen().map_err(Error::CannotReopenQueue)?;
         queue.update_task(task).map_err(Error::CannotUpdateTask)?;
-        queue.write_to_file().map_err(Error::CannotWriteQueue)?;
+        queue.save_to_file().map_err(Error::CannotWriteQueue)?;
         Ok(queue)
     }
 

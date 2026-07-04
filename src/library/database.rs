@@ -3,13 +3,17 @@
 //! A library database file is a file shared globally across libraries, that maps "proof UUIDs" to actual information and metadata about the proof.
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
 //! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
+use crate::library::stpl_url::{LibraryDomain, StplUrl};
 use crate::util::file_ex::FileEx;
 use crate::util::filelocked::FileLockableData;
+use crate::util::path_from_segments;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
+use relative_path::RelativePath;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use uuid::Uuid;
 
 /// Basic metadata about the file from the `stat` command.
@@ -46,6 +50,7 @@ pub struct FileStat {
 pub enum MediaCategory {
     /// Default value - value not selected by user yet.
     #[default]
+    #[serde(alias = "unset")] // temp alias for migration while testing, can be removed later
     Unspecified,
 
     /// An image of the screen captured from a PC.
@@ -155,6 +160,7 @@ pub enum QualityState {
 pub enum LibraryEntryKind {
     /// Default value - value not selected by user yet.
     #[default]
+    #[serde(alias = "unset")] // temp alias for migration while testing, can be removed later
     Unspecified,
 
     /// Video not showing a performance, unrelated to proof stuff but still in library for some reason.
@@ -186,7 +192,7 @@ pub struct LibraryEntry {
     pub sha256: String,
 
     /// Known library locations of the file. Updated on rescan.
-    pub library_urls: Vec<String>,
+    pub library_urls: Vec<StplUrl>,
 
     /// Is the media file linked to any performance? Will it be linked to a performance in the future? Or is this not a video of a performance at all?
     pub entry_kind: LibraryEntryKind,
@@ -201,11 +207,13 @@ pub struct LibraryEntry {
     pub metadata: Option<MediaMetadata>,
 
     /// Category of the media that this entry describes - is it a screenshot, a video from a camera, a mobile screen recording, something else?
+    #[serde(alias = "category")] // temp alias for migration while testing, can be removed later
     pub media_category: MediaCategory,
 
     /// Content of the video - whether the video is showing gameplay, just the results, or something else. This field also contains information about the game being played.
     ///
     /// This field can be used by sorting and filtering systems to show relevant videos to the user.
+    #[serde(default)]
     pub content_description: ContentDescription,
 
     /// Is this a full raw recording/stream vod, or is it cut already and shows only the relevant performance?
@@ -234,6 +242,7 @@ pub struct LibraryEntry {
     pub clips: Option<Vec<UuidString>>,
 
     /// List of tags that are assigned to this library entry by the user.
+    #[serde(default)]
     pub tags: HashSet<Tag>,
 
     /// User-added comment for this library entry.
@@ -271,7 +280,7 @@ impl Default for LibraryEntry {
 
 #[derive(Debug, Default)]
 pub struct LibraryDatabase {
-    entries: Vec<LibraryEntry>,
+    pub entries: Vec<LibraryEntry>,
 }
 
 // TODO
@@ -279,16 +288,28 @@ pub struct LibraryDatabase {
 // const EXAMPLE_DOMAIN: &str = "library.example.com";
 
 impl LibraryDatabase {
-    pub const STANDARD_FILENAME: &str = "library_database.json";
+    pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "library_database.jsonl"];
+
+    pub fn standard_path() -> &'static Path {
+        static CACHE: LazyLock<PathBuf> = LazyLock::new(|| path_from_segments(&LibraryDatabase::STANDARD_PATH_SEGMENTS));
+        &CACHE
+    }
 
     pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
         self.entries.iter().find(|x| x.sha256 == sha256)
     }
 
-    pub fn add(&mut self, file_path: &Path, sha256: String, domain: &str) -> Uuid {
-        let relative_file_path = file_path.to_string_lossy().to_string(); // TODO
+    pub fn find_entry_by_uuid(&self, uuid: UuidString) -> Option<&LibraryEntry> {
+        self.entries.iter().find(|x| x.uuid == uuid)
+    }
+
+    pub fn find_entry_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut LibraryEntry> {
+        self.entries.iter_mut().find(|x| x.uuid == uuid)
+    }
+
+    pub fn add(&mut self, relative_path: &RelativePath, sha256: String, domain: LibraryDomain) -> Uuid {
         let library_entry = LibraryEntry {
-            library_urls: vec![format!("stpl://{domain}/{relative_file_path}")],
+            library_urls: vec![StplUrl::new(domain.clone(), Some(relative_path.to_string()))],
             sha256,
             ..Default::default()
         };

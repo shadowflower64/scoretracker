@@ -73,9 +73,7 @@ pub fn set(key: String, value: String) -> Result<(), Error> {
         key => Err(Error::InvalidConfigKey(key.to_string()))?,
     }
 
-    config.write_to_file().map_err(Error::ConfigWriteError)?;
-    config.unlock().map_err(Error::ConfigWriteError)?;
-
+    config.unlock_and_save().map_err(Error::ConfigWriteError)?;
     success_npr!("successfully updated config");
 
     Ok(())

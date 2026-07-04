@@ -24,7 +24,7 @@ use uuid::Uuid;
 /// let uuid_string = UuidString::from(uuid);
 /// assert_eq!(uuid_string.0, uuid);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UuidString(pub Uuid);
 
 impl From<Uuid> for UuidString {

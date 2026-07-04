@@ -26,7 +26,7 @@ pub enum TaskState {
 #[serde(rename_all = "snake_case")]
 pub enum TaskResult {
     Success(job::Success),
-    Error(job::Error),
+    Error(job::Failure),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

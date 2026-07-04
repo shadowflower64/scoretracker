@@ -6,8 +6,7 @@ use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::{Task, TaskState};
 use scoretracker::hive::worker::WorkerInfo;
 use scoretracker::info;
-use scoretracker::library::database::LibraryDatabase;
-use scoretracker::library::index::LibraryIndex;
+use scoretracker::library::scan_full;
 use scoretracker::log_fn_name;
 use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::util::{file_ex::FileEx, lockfile::LockfileHandle, timestamp::NsTimestamp};
@@ -73,20 +72,10 @@ pub fn test_lockfile(_args: &[String]) {
 pub fn test_scanning(args: &[String]) {
     log_fn_name!("playground:scanning");
 
-    let library_dir_path = Path::new(args.get(1).expect("library dir path not provided"));
+    let library_dir = Path::new(args.get(1).expect("library dir path not provided"));
     let shared_data_repo_path = Config::load().expect("invalid config").shared_data_repo_path;
-
-    let library_index_path = library_dir_path.join("library_index.json");
-    let library_data_path = Path::new("playground/test_library_database.json");
-
-    let mut library_data = LibraryDatabase::lock_and_read_or_default(library_data_path, None).expect("library data could not be read");
-    let library_index = LibraryIndex::scan_library_dir(library_dir_path, &mut library_data);
-
-    library_index.save(&library_index_path).expect("library index could not be saved");
-    info!("saved library index to {library_index_path:?}");
-
-    library_data.write_to_file().expect("library data could not be saved");
-    info!("saved library data to {library_data_path:?}");
+    let library_db_path = Path::new("playground/test_library_database.json");
+    scan_full(library_dir, library_db_path, None);
 }
 
 #[allow(unused)]
@@ -155,7 +144,7 @@ pub fn test_queue(_args: &[String]) {
         );
         queue.add_task(new_task);
     }
-    queue.write_to_file();
+    queue.save_to_file();
     drop(queue);
     // Drop here to unlock the lockfile
 
@@ -176,7 +165,7 @@ pub fn test_queue(_args: &[String]) {
         // Read the queue file again to update the state of the task
         let mut queue = TaskQueue::lock_and_read_or_default("playground/test_queue.jsonl", None).expect("couldn't read queue");
         queue.update_task(task);
-        queue.write_to_file();
+        queue.save_to_file();
     }
 }
 

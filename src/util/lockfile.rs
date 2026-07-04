@@ -3,7 +3,7 @@ use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
-use crate::{VERSION, debug, log_fn_name, log_should_print_debug, warn};
+use crate::{VERSION, debug, info, log_fn_name, log_should_print_debug, warn};
 use notify::{ErrorKind, Event, RecursiveMode, Watcher};
 use std::ffi::OsString;
 use std::fs::{self, File};
@@ -79,6 +79,7 @@ pub fn is_file_locked<T>(result: &Result<T>) -> bool {
 pub struct LockfileHandle {
     main_file_path: PathBuf,
     lockfile_path: PathBuf,
+    unlocked_manually: bool,
 }
 
 impl LockfileHandle {
@@ -175,6 +176,7 @@ lock_timestamp: {timestamp_num}
         Ok(Self {
             main_file_path: path.as_ref().to_path_buf(),
             lockfile_path,
+            unlocked_manually: false,
         })
     }
 
@@ -228,7 +230,7 @@ lock_timestamp: {timestamp_num}
             return result;
         }
 
-        debug!("waiting for file to be unlocked");
+        info!("waiting for file {lockfile_path:?} to be unlocked");
         for res in rx {
             let event = res.unwrap();
             debug!("event about lockfile: {event:?}");
@@ -271,11 +273,12 @@ lock_timestamp: {timestamp_num}
         unreachable!();
     }
 
-    pub fn unlock(self) -> lockfile::Result<()> {
+    pub fn unlock(mut self) -> lockfile::Result<()> {
         log_fn_name!("lockfile:unlock");
         log_should_print_debug!(LockfileHandle::VERBOSE);
 
         fs::remove_file(&self.lockfile_path).map_err(Error::CannotRemoveLockfile)?;
+        self.unlocked_manually = true;
 
         debug!("unlocked manually: {:?}", &self.lockfile_path);
         Ok(())
@@ -286,6 +289,13 @@ impl Drop for LockfileHandle {
     fn drop(&mut self) {
         log_fn_name!("lockfile:drop");
         log_should_print_debug!(LockfileHandle::VERBOSE);
+
+        if self.unlocked_manually {
+            // File was already deleted, do not try to delete it again.
+            // If another process has created a new file in-between calling [`LockfileHandle::unlock`] and dropping,
+            // attempting to delete the lock file can lead to bugs.
+            return;
+        }
 
         if let Err(e) = fs::remove_file(&self.lockfile_path) {
             warn!("could not remove lockfile at {:?}: {e:?}", &self.lockfile_path);

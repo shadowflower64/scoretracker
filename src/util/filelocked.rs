@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 pub struct FileLocked<T: FileLockableData> {
     pub inner: T,
     lockfile: LockfileHandle,
+    worker_info: Option<WorkerInfo>,
 }
 
 pub trait FileLockableData: Sized {
@@ -24,7 +25,11 @@ pub trait FileLockableData: Sized {
     fn lock_and_read<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
         let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let inner = Self::_inner_read(&lockfile)?.ok_or(file_ex::Error::file_not_found())?;
-        Ok(FileLocked { inner, lockfile })
+        Ok(FileLocked {
+            inner,
+            lockfile,
+            worker_info: worker_info.cloned(),
+        })
     }
 }
 
@@ -59,7 +64,11 @@ pub trait FileLockableDataDefault: FileLockableData + Default {
     fn lock_and_read_or_default<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
         let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let inner = Self::_inner_read(&lockfile)?.unwrap_or_default();
-        Ok(FileLocked { inner, lockfile })
+        Ok(FileLocked {
+            inner,
+            lockfile,
+            worker_info: worker_info.cloned(),
+        })
     }
 }
 
@@ -76,21 +85,35 @@ pub trait FileLockableDataWithDefaultPath: FileLockableData {
 }
 
 impl<T: FileLockableData> FileLocked<T> {
-    pub fn unlock(self) -> lockfile::Result<()> {
+    pub fn unlock_without_saving(self) -> lockfile::Result<()> {
         self.lockfile.unlock()
     }
-    pub fn close(self) -> ClosedFileLocked<T> {
-        ClosedFileLocked {
+    pub fn close_without_saving(self) -> lockfile::Result<ClosedFileLocked<T>> {
+        let a = ClosedFileLocked {
             main_file_path: self.lockfile.main_file_path().to_path_buf(),
+            worker_info: self.worker_info,
             phantom: PhantomData,
-        }
+        };
+        self.lockfile.unlock()?;
+        Ok(a)
     }
 }
 
 impl<T: FileLockableData> FileLocked<T> {
-    pub fn write_to_file(&self) -> lockfile::Result<()> {
+    pub fn save_to_file(&self) -> lockfile::Result<()> {
         Ok(T::_inner_write(&self.inner, &self.lockfile)?)
     }
+
+    pub fn unlock_and_save(self) -> lockfile::Result<()> {
+        self.save_to_file()?;
+        self.unlock_without_saving()
+    }
+
+    pub fn close_and_save(self) -> lockfile::Result<ClosedFileLocked<T>> {
+        self.save_to_file()?;
+        self.close_without_saving()
+    }
+
     pub fn create_parent_dirs_and_write_to_file(&self) -> lockfile::Result<()> {
         let _ = self
             .lockfile
@@ -104,6 +127,7 @@ impl<T: FileLockableData> FileLocked<T> {
 #[derive(Debug)]
 pub struct ClosedFileLocked<T> {
     main_file_path: PathBuf,
+    worker_info: Option<WorkerInfo>,
     phantom: PhantomData<T>,
 }
 
@@ -121,7 +145,11 @@ impl<T: FileLockableData> DerefMut for FileLocked<T> {
 }
 
 impl<T: FileLockableData> ClosedFileLocked<T> {
-    pub fn reopen(self, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<T>> {
+    pub fn reopen(self) -> lockfile::Result<FileLocked<T>> {
+        T::lock_and_read(self.main_file_path, self.worker_info.as_ref())
+    }
+
+    pub fn reopen_with_new_worker_info(self, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<T>> {
         T::lock_and_read(self.main_file_path, worker_info)
     }
 }

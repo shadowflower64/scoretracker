@@ -29,7 +29,7 @@ impl Config {
     }
 
     pub fn library_database_path(&self) -> PathBuf {
-        self.shared_data_repo_path.join(LibraryDatabase::STANDARD_FILENAME)
+        self.shared_data_repo_path.join(LibraryDatabase::standard_path())
     }
 
     pub fn task_queue_path(&self) -> PathBuf {
