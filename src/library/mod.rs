@@ -375,7 +375,7 @@ pub fn remove_library_domain_from_db(
     library_domain: LibraryDomain,
     library_db_path: &Path,
     worker_info: Option<&WorkerInfo>,
-) -> Result<(), LibraryScanError> {
+) -> Result<(), ()> {
     let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).expect("cannot open database file"); // TODO: error handling
 
     for entry in library_db.entries.iter_mut() {

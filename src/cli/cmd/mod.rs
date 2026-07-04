@@ -3,7 +3,7 @@ use scoretracker::config::Config;
 use scoretracker::hive::worker::WorkerCreateError;
 use scoretracker::info_npr;
 use scoretracker::library::LibraryScanError;
-use scoretracker::library::stpl_url::LibraryDomain;
+use scoretracker::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::util::cmd::AskError;
 use scoretracker::util::lockfile;
 use std::io::{self};
@@ -19,6 +19,9 @@ pub mod performance;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("unknown error")]
+    #[deprecated = "this should not be used, please define an actual error variant instead"]
+    UnknownError,
     #[error("help was displayed")]
     Help,
     #[error("no command provided")]
@@ -62,6 +65,7 @@ pub enum Error {
 impl Error {
     pub fn exit_status(&self) -> ExitCode {
         match self {
+            Self::UnknownError => ExitCode::from(1),
             Self::Help => ExitCode::from(2),
             Self::NoCommandProvided
             | Self::NoSubcommandProvided { .. }
@@ -181,17 +185,22 @@ pub fn handle_command(args: &[String]) -> Result<(), Error> {
             }
         ),
         "library" => cmd!(fcn, args, 2,
+            "init" => {
+                arg!(library_dir: PathBuf, "path of the library directory", fcn, args, 3);
+                arg!(library_domain_name: LibraryDomainName, "library domain name", fcn, args, 4);
+                cmd::library::init(&library_dir, library_domain_name).map_err(|_| E::UnknownError) // TODO
+            },
             "rescan" => {
-                arg!(path: PathBuf, "path of the library directory", fcn, args, 3);
-                cmd::library::rescan_library(&path).map_err(E::LibraryRescanError)
+                arg!(library_dir: PathBuf, "path of the library directory", fcn, args, 3);
+                cmd::library::rescan(&library_dir).map_err(E::LibraryRescanError)
             },
             "rescan-default" => {
                 let config = Config::load().map_err(Error::ConfigReadError)?;
-                cmd::library::rescan_library(&config.default_library_dir_path).map_err(E::LibraryRescanError)
+                cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryRescanError)
             },
             "remove-domain" => {
                 arg!(library_domain: LibraryDomain, "library domain name", fcn, args, 3);
-                cmd::library::remove_domain_from_db(library_domain).map_err(E::LibraryRescanError)
+                cmd::library::remove_domain(library_domain).map_err(|_| E::UnknownError) // TODO
             }
         ),
         "hive" => cmd!(fcn, args, 2,

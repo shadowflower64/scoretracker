@@ -26,6 +26,13 @@ impl TryFrom<String> for LibraryDomainName {
     }
 }
 
+impl TryFrom<&String> for LibraryDomainName {
+    type Error = StplUrlError;
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_owned())
+    }
+}
+
 impl Display for LibraryDomainName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -93,7 +100,7 @@ impl TryFrom<String> for LibraryDomain {
 impl TryFrom<&String> for LibraryDomain {
     type Error = StplUrlError;
     fn try_from(value: &String) -> Result<Self, Self::Error> {
-        LibraryDomain::try_from(value.to_owned())
+        Self::try_from(value.to_owned())
     }
 }
 
