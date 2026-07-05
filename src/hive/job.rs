@@ -41,6 +41,8 @@ pub enum Failure {
     EntryNotFound(UuidString),
     #[error("proof url is not present in the provided library entry: {expected_url}, {entry:?}")]
     FileUrlNotFoundInEntry { expected_url: StplUrl, entry: Box<LibraryEntry> },
+    #[error("cannot register file at {file_path:?} into library: {reason}")]
+    CannotRegisterFileIntoLibrary { file_path: PathBuf, reason: String },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -156,7 +158,11 @@ impl Job {
                     &config.library_database_path(),
                     destination_path,
                     worker_info,
-                );
+                )
+                .map_err(|e| Failure::CannotRegisterFileIntoLibrary {
+                    file_path: destination_path.to_owned(),
+                    reason: e.to_string(),
+                })?;
 
                 Ok(Success::CutVideo {
                     cloth: *source_proof_uuid,

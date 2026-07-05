@@ -5,7 +5,7 @@ use scoretracker::info_npr;
 use scoretracker::library::LibraryScanError;
 use scoretracker::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::util::cmd::AskError;
-use scoretracker::util::lockfile;
+use scoretracker::util::{file_ex, lockfile};
 use std::io::{self};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -50,12 +50,16 @@ pub enum Error {
     ConfigReadError(lockfile::Error),
     #[error("could not write config: {0}")]
     ConfigWriteError(lockfile::Error),
+    #[error("could not write library info: {0}")]
+    LibraryInfoWriteError(file_ex::Error),
     #[error("could not serialize config: {0}")]
     ConfigSerializationError(serde_json::Error),
     #[error("invalid config key: {0}")]
     InvalidConfigKey(String),
-    #[error("library rescan error: {0}")]
-    LibraryRescanError(#[from] LibraryScanError),
+    #[error("library scan error: {0}")]
+    LibraryScanError(#[from] LibraryScanError),
+    #[error("database read/write error: {0}")]
+    DatabaseError(lockfile::Error),
     #[error("could not create worker: {0}")]
     WorkerCreateError(#[from] WorkerCreateError),
     #[error("no game with id: {0}")]
@@ -65,6 +69,7 @@ pub enum Error {
 impl Error {
     pub fn exit_status(&self) -> ExitCode {
         match self {
+            #[allow(deprecated)]
             Self::UnknownError => ExitCode::from(1),
             Self::Help => ExitCode::from(2),
             Self::NoCommandProvided
@@ -77,9 +82,11 @@ impl Error {
             Self::IoError(..) => ExitCode::from(6),
             Self::ConfigReadError(..) => ExitCode::from(7),
             Self::ConfigWriteError(..) => ExitCode::from(8),
-            Self::LibraryRescanError(..) => ExitCode::from(9),
+            Self::LibraryScanError(..) => ExitCode::from(9),
             Self::WorkerCreateError(..) => ExitCode::from(10),
             Self::ConfigSerializationError(..) => ExitCode::from(11),
+            Self::LibraryInfoWriteError(..) => ExitCode::from(12),
+            Self::DatabaseError(..) => ExitCode::from(13),
             // _ => ExitCode::FAILURE,
         }
     }
@@ -188,19 +195,19 @@ pub fn handle_command(args: &[String]) -> Result<(), Error> {
             "init" => {
                 arg!(library_dir: PathBuf, "path of the library directory", fcn, args, 3);
                 arg!(library_domain_name: LibraryDomainName, "library domain name", fcn, args, 4);
-                cmd::library::init(&library_dir, library_domain_name).map_err(|_| E::UnknownError) // TODO
+                cmd::library::init(&library_dir, library_domain_name)
             },
             "rescan" => {
                 arg!(library_dir: PathBuf, "path of the library directory", fcn, args, 3);
-                cmd::library::rescan(&library_dir).map_err(E::LibraryRescanError)
+                cmd::library::rescan(&library_dir).map_err(E::LibraryScanError)
             },
             "rescan-default" => {
                 let config = Config::load().map_err(Error::ConfigReadError)?;
-                cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryRescanError)
+                cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryScanError)
             },
             "remove-domain" => {
                 arg!(library_domain: LibraryDomain, "library domain name", fcn, args, 3);
-                cmd::library::remove_domain(library_domain).map_err(|_| E::UnknownError) // TODO
+                cmd::library::remove_domain(library_domain).map_err(E::DatabaseError)
             }
         ),
         "hive" => cmd!(fcn, args, 2,

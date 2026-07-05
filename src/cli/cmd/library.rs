@@ -1,24 +1,16 @@
+use crate::cmd::Error;
 use scoretracker::config::Config;
 use scoretracker::library::database::LibraryDatabase;
 use scoretracker::library::info::LibraryInfo;
 use scoretracker::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::library::{LibraryScanError, remove_library_domain_from_db, scan_full};
-use scoretracker::util::file_ex::{self, FileEx};
+use scoretracker::util::file_ex::FileEx;
+use scoretracker::util::lockfile;
 use scoretracker::{log_fn_name, success_npr};
 use std::path::Path;
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum LibraryInitError {
-    #[error("could not write library info file: {0}")]
-    LibraryInfoWriteError(file_ex::Error),
-}
-
-pub fn init(library_dir: &Path, library_domain_name: LibraryDomainName) -> Result<(), LibraryInitError> {
-    log_fn_name!("initialize_library");
-
-    // let shared_data_repo_path = Config::load().unwrap().shared_data_repo_path;
-    // let library_db_path = shared_data_repo_path.join(LibraryDatabase::standard_path());
+pub fn init(library_dir: &Path, library_domain_name: LibraryDomainName) -> Result<(), Error> {
+    log_fn_name!("init");
 
     let info = LibraryInfo {
         domain: library_domain_name,
@@ -26,14 +18,14 @@ pub fn init(library_dir: &Path, library_domain_name: LibraryDomainName) -> Resul
     library_dir
         .join(LibraryInfo::STANDARD_FILENAME)
         .write_as_json_pretty(&info)
-        .map_err(LibraryInitError::LibraryInfoWriteError)?;
+        .map_err(Error::LibraryInfoWriteError)?;
 
     success_npr!("initialized library with domain '{}'", LibraryDomain::Local(info.domain));
     Ok(())
 }
 
 pub fn rescan(library_dir: &Path) -> Result<(), LibraryScanError> {
-    log_fn_name!("rescan_library");
+    log_fn_name!("rescan");
 
     let shared_data_repo_path = Config::load().unwrap().shared_data_repo_path;
     let library_db_path = shared_data_repo_path.join(LibraryDatabase::standard_path());
@@ -44,8 +36,8 @@ pub fn rescan(library_dir: &Path) -> Result<(), LibraryScanError> {
     Ok(())
 }
 
-pub fn remove_domain(library_domain: LibraryDomain) -> Result<(), ()> {
-    log_fn_name!("remove_library_from_db");
+pub fn remove_domain(library_domain: LibraryDomain) -> Result<(), lockfile::Error> {
+    log_fn_name!("remove_domain");
 
     let shared_data_repo_path = Config::load().unwrap().shared_data_repo_path;
     let library_db_path = shared_data_repo_path.join(LibraryDatabase::standard_path());

@@ -27,7 +27,7 @@ use crate::library::index::LibraryIndex;
 use crate::library::info::LibraryInfo;
 use crate::library::stpl_url::{LibraryDomain, StplUrl};
 use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
-use crate::util::lockfile;
+use crate::util::{file_ex, lockfile};
 use crate::util::{filelocked::FileLockableData, uuid::UuidString};
 use crate::{debug, info, log_fn_name, log_should_print_debug, warn};
 use relative_path::{PathExt, RelativePathBuf};
@@ -45,11 +45,14 @@ use walkdir::{DirEntry, WalkDir};
 ///
 /// # Examples
 /// ```
-/// #use scoretracker::library::Library;
-/// assert_eq!(path_within_library("/mnt/example/videos/library", "/mnt/example/videos/library/example_file_1.mp4"), "example_file_1.mp4");
-/// assert_eq!(path_within_library("/mnt/example/videos/library", "/mnt/example/videos/library/directory/example_file_2.mp4"), "directory/example_file_2.mp4");
-/// assert_eq!(path_within_library("../library", "../library/example_file_3.mp4"), "example_file_3.mp4");
-/// assert_eq!(path_within_library(r"C:\Videos\Proof Library", r"C:\Videos\Proof Library\Test Game 1\..\Test Game 2\example_file_4.mp4"), r"Test Game 2\example_file_4.mp4");
+/// # use scoretracker::library::path_within_library_dir;
+/// # use relative_path::RelativePathBuf;
+/// assert_eq!(path_within_library_dir("/mnt/example/videos/library", "/mnt/example/videos/library/example_file_1.mp4"), Some(RelativePathBuf::from("example_file_1.mp4")));
+/// assert_eq!(path_within_library_dir("/mnt/example/videos/library", "/mnt/example/videos/library/directory/example_file_2.mp4"), Some(RelativePathBuf::from("directory/example_file_2.mp4")));
+/// assert_eq!(path_within_library_dir("../library", "../library/example_file_3.mp4"), Some(RelativePathBuf::from("example_file_3.mp4")));
+/// assert_eq!(path_within_library_dir("/mnt/example/videos/library", "/mnt/example/videos/library/directory/inner/../example_file_4.mp4"), Some(RelativePathBuf::from("directory/example_file_4.mp4")));
+/// assert_eq!(path_within_library_dir("/mnt/example/videos/library", "/mnt/example/videos/library/directory/../../../../example_file_5.mp4"), None);
+/// //assert_eq!(path_within_library_dir(r"C:\Videos\Proof Library", r"C:\Videos\Proof Library\Test Game 1\..\Test Game 2\example_file_6.mp4"), Some(RelativePathBuf::from(r"Test Game 2\example_file_6.mp4")));
 /// ```
 pub fn path_within_library_dir<P1: AsRef<Path>, P2: AsRef<Path>>(library_dir: P1, target_file_path: P2) -> Option<RelativePathBuf> {
     let library_dir_path = path::absolute(library_dir.as_ref()).ok()?;
@@ -63,8 +66,23 @@ pub fn path_within_library_dir<P1: AsRef<Path>, P2: AsRef<Path>>(library_dir: P1
     }
 }
 
-#[derive(Debug, Clone, Error)]
-pub enum LibraryScanError {}
+#[derive(Debug, Error)]
+pub enum LibraryScanError {
+    #[error("cannot read library info: {0}")]
+    CannotReadInfo(file_ex::Error),
+    #[error("cannot write library index: {0}")]
+    CannotWriteIndex(file_ex::Error),
+    #[error("cannot write library index: {0}")]
+    CannotWriteIndexLockfile(lockfile::Error),
+    #[error("cannot read library cache: {0}")]
+    CannotReadCache(lockfile::Error),
+    #[error("cannot write library cache: {0}")]
+    CannotWriteCache(lockfile::Error),
+    #[error("cannot read library database: {0}")]
+    CannotReadDatabase(lockfile::Error),
+    #[error("cannot write library database: {0}")]
+    CannotWriteDatabase(lockfile::Error),
+}
 
 pub const VERBOSE_SCANNING: bool = false;
 
@@ -89,19 +107,19 @@ pub fn should_file_be_scanned(filename: &str) -> bool {
 /// 8. Synchronize with the database; iterate through *every* database entry, remove any existing proof URLs that have the domain of this database, and add fresh ones.
 pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<(), LibraryScanError> {
     // let info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("could not read library info");
+    type E = LibraryScanError;
 
     log_fn_name!("library:scan_full");
     log_should_print_debug!(VERBOSE_SCANNING);
 
     let scanning_start_timestamp = Instant::now();
 
-    let library_info =
-        LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("cannot read library info"); // TODO: error handling
+    let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = LibraryDomain::Local(library_info.domain);
 
     let mut index = LibraryIndex::default();
-    let mut cache = LibraryCache::lock_and_read_or_default(library_dir.join(LibraryCache::STANDARD_FILENAME), None)
-        .expect("could not read library cache"); // TODO: error handling
+    let mut cache =
+        LibraryCache::lock_and_read_or_default(library_dir.join(LibraryCache::STANDARD_FILENAME), None).map_err(E::CannotReadCache)?;
 
     let mut skipped = 0;
 
@@ -179,11 +197,11 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
         .collect();
 
     // Write all results to cache (if they haven't been already saved by the autosave)
-    cache.unlock_and_save().expect("cannot save cache"); // TODO: error handling
+    cache.unlock_and_save().map_err(E::CannotWriteCache)?;
 
     // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
     info!("[scan] getting uuids from database");
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).expect("cannot read db"); // TODO: error handling
+    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotReadDatabase)?;
     let len = sha256_hashes.len();
     for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
         let uuid = if let Some(existing_entry) = library_db.find_entry_by_sha256_hash(sha256_hash) {
@@ -207,11 +225,11 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
     }
     index
         .save(&library_dir.join(LibraryIndex::STANDARD_FILENAME))
-        .expect("cannot save index"); // TODO: error handling
+        .map_err(E::CannotWriteIndex)?;
 
     // Now sync all of the URLs within the index file with the database
     info!("[scan] syncing database");
-    sync_library_index_with_db_essence(library_dir, index, |_| Ok(library_db), library_domain, worker_info);
+    sync_library_index_with_db_essence(library_dir, index, |_| Ok(library_db), library_domain, worker_info)?;
 
     let scanning_end_timestamp = Instant::now();
     let scanning_duration = scanning_end_timestamp.duration_since(scanning_start_timestamp);
@@ -249,10 +267,10 @@ pub fn scan_register_removed_files(
     file_paths: Vec<&Path>,
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
+    type E = LibraryScanError;
     log_fn_name!("library:scan_register_removed_files");
 
-    let library_info =
-        LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("cannot read library info"); // TODO: error handling
+    let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = LibraryDomain::Local(library_info.domain);
 
     let mut library_index = LibraryIndex::lock_and_read(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info)
@@ -274,8 +292,8 @@ pub fn scan_register_removed_files(
         };
     }
 
-    library_index.unlock_and_save().expect("cannot write and close"); // TODO: error handling
-    library_db.unlock_and_save().expect("cannot write and close"); // TODO: error handling
+    library_index.unlock_and_save().map_err(E::CannotWriteIndexLockfile)?;
+    library_db.unlock_and_save().map_err(E::CannotWriteDatabase)?;
     Ok(())
 }
 
@@ -375,13 +393,13 @@ pub fn remove_library_domain_from_db(
     library_domain: LibraryDomain,
     library_db_path: &Path,
     worker_info: Option<&WorkerInfo>,
-) -> Result<(), ()> {
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).expect("cannot open database file"); // TODO: error handling
+) -> Result<(), lockfile::Error> {
+    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info)?;
 
     for entry in library_db.entries.iter_mut() {
         // Remove all old URLs that reference this library, without touching all of the other ones.
         entry.library_urls.retain(|url| url.domain != library_domain);
     }
-    library_db.unlock_and_save().expect("cannot write database file"); // TODO: error handling
+    library_db.unlock_and_save()?;
     Ok(())
 }
