@@ -13,7 +13,7 @@ pub enum StplUrlError {
     DomainNameContainsChar(char),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LibraryDomainName(String);
 
 impl TryFrom<String> for LibraryDomainName {
@@ -74,7 +74,7 @@ impl<'de> Deserialize<'de> for LibraryDomainName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LibraryDomain {
     Local(LibraryDomainName),
     Global(LibraryDomainName),
@@ -113,7 +113,7 @@ impl Display for LibraryDomain {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StplUrl {
     pub domain: LibraryDomain,
     pub path: Option<String>,

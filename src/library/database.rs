@@ -41,7 +41,7 @@ pub struct FileStat {
     /// Status change - when were the permissions(?) changed for this file?
     pub timestamp_status_change: NsTimestamp,
 
-    /// TimestaWhen was the file stat read? (This is not actually part of the `stat` command, and it is stored manually.)
+    /// Timestamp of when was the file stat was read (This is not actually part of the `stat` command, and it is stored manually.)
     pub last_check: NsTimestamp,
 }
 
@@ -178,10 +178,51 @@ pub enum LibraryEntryKind {
 
 pub type MediaMetadata = HashMap<String, String>;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClothInfo {
+    /// UUID of the cloth proof file.
+    pub uuid: UuidString,
+
+    /// Start point of the cut-out video within the cloth, in nanoseconds.
+    pub start_point: NsTimestamp,
+
+    /// End point of the cut-out video within the cloth, in nanoseconds.
+    pub end_point: NsTimestamp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Guess<T> {
+    prediction: T,
+    confidence: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Prediction<T> {
+    program_identifier: String,
+    timestamp: NsTimestamp,
+    guesses: Vec<Guess<T>>,
+}
+
+pub type AutomaticallyDetected<T> = Vec<Prediction<T>>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AutomaticContentDetectionInformation {
+    song_title: AutomaticallyDetected<String>,
+    song_artist: AutomaticallyDetected<String>,
+    song_id: AutomaticallyDetected<String>,
+    player_name: AutomaticallyDetected<String>,
+    instrument: AutomaticallyDetected<String>,
+    difficulty: AutomaticallyDetected<String>,
+    score: AutomaticallyDetected<f64>,
+    note_streak: AutomaticallyDetected<u64>,
+    note_hits: AutomaticallyDetected<u64>,
+    notes_total: AutomaticallyDetected<u64>,
+}
+
 /// An entry in the library database, containing information about proof videos and images, and other files inside of the library.
 ///
 /// Every unique file inside of the library should have exactly one library entry.
-/// Old files, which have been deleted, moved, or transcoded into other files, should not have their entries removed from the library.
+/// Old files, which have been deleted, moved, or transcoded into other files, should *not* have their entries removed from the library.
 /// This is to preserve information about the source files for processed and cut files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryEntry {
@@ -197,8 +238,12 @@ pub struct LibraryEntry {
     /// Is the media file linked to any performance? Will it be linked to a performance in the future? Or is this not a video of a performance at all?
     pub entry_kind: LibraryEntryKind,
 
-    /// Some information about the file from `stat`.
-    pub file_stat: Option<FileStat>,
+    /// Some information about the files on disk from `stat`.
+    ///
+    /// Since there may be multiple files on disk with the same sha256 hash and different file `stat`s, this is stored as a dictionary.
+    /// Each file gets an entry.
+    /// Note that even if a file may be present in `library_urls`, it doesn't have to be present here.
+    pub file_stat: HashMap<StplUrl, FileStat>,
 
     /// Metadata inside of the media file (creation_date, android version, video/audio stream count, other similar metadata).
     /// The exact contents depends on the type of the file.
@@ -219,8 +264,6 @@ pub struct LibraryEntry {
     /// Is this a full raw recording/stream vod, or is it cut already and shows only the relevant performance?
     ///
     /// Set this to [`None`] if it is unknown whether the video has been cut or not.
-    ///
-    /// TODO: should this neccessarily be here? maybe content_description is enough?
     pub cut: Option<bool>,
 
     /// Is the video raw, compressed, crumpled, or shredded?
@@ -229,7 +272,7 @@ pub struct LibraryEntry {
     /// An entry UUID of the source media file that this file was cut out from. Files cut out from the same file are said to be "cut from the same cloth".
     ///
     /// Set this to [`None`] if the cloth is not known, or the file is not cut.
-    pub cloth: Option<UuidString>,
+    pub cloth: Option<ClothInfo>,
 
     /// An entry UUID of the source media file that this file was processed from. Pre-processed files are "dry" and post-processed files are "wet".
     ///
@@ -248,8 +291,30 @@ pub struct LibraryEntry {
     /// User-added comment for this library entry.
     pub comment: Option<String>,
 
+    /// Timestamp (in nanoseconds) of the real-life time at the start of this recording.
+    ///
+    /// Set this to [`None`] if this information is not known or is not applicable (montages).
+    pub timestamp_start: Option<NsTimestamp>,
+
+    /// Timestamp (in nanoseconds) of the real-life time at the end of this recording.
+    ///
+    /// Set this to [`None`] if this information is not known or is not applicable (montages).
+    pub timestamp_end: Option<NsTimestamp>,
+
+    /// Duration of the (video) file.
+    ///
+    /// This may or may not be the same as the difference between [`Self::timestamp_start`] and [`Self::timestamp_end`].
+    /// Files that have fragments cut-out from the middle, files that are sped up or slowed down, and files resulting from a montage will not follow this rule.
+    ///
+    /// Set this to [`None`] if this information is not known.
+    /// Set this to 0 for singular images/frames.
+    pub duration: Option<NsTimestamp>,
+
     /// Timestamp (in nanoseconds) of when this file was added/scanned into the library.
     pub timestamp_added: NsTimestamp,
+
+    /// AutomaticContentDetectionInformation
+    pub automatic_content_detection_information: AutomaticContentDetectionInformation,
 }
 
 impl Default for LibraryEntry {
@@ -263,7 +328,7 @@ impl Default for LibraryEntry {
             sha256: String::new(),
             library_urls: Vec::new(),
             entry_kind: LibraryEntryKind::default(),
-            file_stat: None,
+            file_stat: HashMap::new(),
             metadata: None,
             media_category: MediaCategory::default(),
             content_description: ContentDescription::default(),
@@ -274,6 +339,10 @@ impl Default for LibraryEntry {
             clips: None,
             tags: HashSet::new(),
             comment: None,
+            timestamp_start: None,
+            timestamp_end: None,
+            duration: None,
+            automatic_content_detection_information: AutomaticContentDetectionInformation::default(),
         }
     }
 }
@@ -282,10 +351,6 @@ impl Default for LibraryEntry {
 pub struct LibraryDatabase {
     pub entries: Vec<LibraryEntry>,
 }
-
-// TODO
-// const UNKNOWN_DOMAIN: &str = "unknown.local";
-// const EXAMPLE_DOMAIN: &str = "library.example.com";
 
 impl LibraryDatabase {
     pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "library_database.jsonl"];
