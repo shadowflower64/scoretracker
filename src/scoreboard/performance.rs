@@ -1,5 +1,5 @@
 use crate::scoreboard::AnyValue;
-use crate::util::{cmd::AskError, uuid::UuidString};
+use crate::util::{command_line::AskError, uuid::UuidString};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 

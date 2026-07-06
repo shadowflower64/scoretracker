@@ -1,5 +1,5 @@
 use crate::cmd;
-use scoretracker::{game::game_instance_from_id, info_npr, log_fn_name, util::cmd::ask_yn};
+use scoretracker::{game::game_instance_from_id, info_npr, log_fn_name, util::command_line::ask_yn};
 
 pub fn add(game_id: String) -> Result<(), cmd::Error> {
     log_fn_name!("cmd:performance_add");

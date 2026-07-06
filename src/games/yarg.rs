@@ -2,7 +2,7 @@
 use crate::game::Game;
 use crate::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceMetadata, PerformanceTrait};
 use crate::songdb::song::{SongAlbumInfo, SongTrait};
-use crate::util::cmd::{AskError, ask_string, ask_u64, ask_uuid};
+use crate::util::command_line::{AskError, ask_string, ask_u64, ask_uuid};
 use crate::util::percentage::Percentage;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;

@@ -4,7 +4,7 @@ use scoretracker::hive::worker::WorkerCreateError;
 use scoretracker::info_npr;
 use scoretracker::library::LibraryScanError;
 use scoretracker::library::stpl_url::{LibraryDomain, LibraryDomainName};
-use scoretracker::util::cmd::AskError;
+use scoretracker::util::command_line::AskError;
 use scoretracker::util::{file_ex, lockfile};
 use std::io::{self};
 use std::path::PathBuf;
@@ -16,6 +16,7 @@ pub mod config;
 pub mod hive;
 pub mod library;
 pub mod performance;
+pub mod spreadsheet;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -178,6 +179,12 @@ pub fn handle_command(args: &[String]) -> Result<(), Error> {
             info_npr!("hello world!");
             Ok(())
         },
+        "spreadsheet" => cmd!(fcn, args, 2,
+            "import-legacy" => {
+                arg!(path: PathBuf, "path of the spreadsheet file", fcn, args, 3);
+                cmd::spreadsheet::import_legacy(&path)
+            },
+        ),
         "config" => cmd!(fcn, args, 2,
             "init" => {
                 cmd::config::init()

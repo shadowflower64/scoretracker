@@ -1,4 +1,4 @@
-use crate::{scoreboard::performance::PerformanceTrait, songdb::song::SongTrait, util::cmd::AskError};
+use crate::{scoreboard::performance::PerformanceTrait, songdb::song::SongTrait, util::command_line::AskError};
 use serde::Serialize;
 use std::{error::Error, fmt::Debug};
 use thiserror::Error;

@@ -1,6 +1,6 @@
 use crate::cmd::Error;
 use scoretracker::config::Config;
-use scoretracker::util::cmd::{ask_string, ask_yn};
+use scoretracker::util::command_line::{ask_string, ask_yn};
 use scoretracker::util::file_ex::FileEx;
 use scoretracker::util::filelocked::FileLockableDataWithDefaultPath;
 use scoretracker::util::lockfile;

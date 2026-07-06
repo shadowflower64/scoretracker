@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-pub mod cmd;
+pub mod command_line;
 pub mod dirs;
 pub mod file_ex;
 pub mod filelocked;
