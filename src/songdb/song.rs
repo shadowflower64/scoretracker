@@ -49,3 +49,5 @@ pub trait SongTrait: Debug {
         None
     }
 }
+
+pub type AnySong = Box<dyn SongTrait>;

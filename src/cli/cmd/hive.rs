@@ -1,7 +1,7 @@
-use crate::cmd;
+use crate::cmd::CmdError;
 use scoretracker::{error, hive::worker::Worker, info, log_fn_name, success};
 
-pub fn spawn_worker(persistent: bool) -> Result<(), cmd::Error> {
+pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
     log_fn_name!("cmd:spawn_worker");
 
     let worker = Worker::new_default()?;

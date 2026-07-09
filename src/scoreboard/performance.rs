@@ -25,24 +25,26 @@ pub struct CommonPerformanceInfo {
 
 #[typetag::serde(tag = "game")]
 pub trait PerformanceTrait: Debug {
-    fn common(&self) -> CommonPerformanceInfo;
-    fn uuid(&self) -> UuidString {
-        self.common().uuid
+    fn common(&self) -> &CommonPerformanceInfo;
+    fn uuid(&self) -> &UuidString {
+        &self.common().uuid
     }
-    fn player_uuid(&self) -> UuidString {
-        self.common().player_uuid
+    fn player_uuid(&self) -> &UuidString {
+        &self.common().player_uuid
     }
-    fn proof(&self) -> Vec<UuidString> {
-        self.common().proof
+    fn proof(&self) -> &Vec<UuidString> {
+        &self.common().proof
     }
-    fn comment(&self) -> Option<String> {
-        self.common().comment
+    fn comment(&self) -> &Option<String> {
+        &self.common().comment
     }
-    fn metadata(&self) -> PerformanceMetadata {
-        self.common().metadata
+    fn metadata(&self) -> &PerformanceMetadata {
+        &self.common().metadata
     }
     fn score(&self) -> f64;
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
         unimplemented!()
     }
 }
+
+pub type AnyPerformance = Box<dyn PerformanceTrait>;

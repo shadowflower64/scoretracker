@@ -4,6 +4,7 @@ use scoretracker::hive::worker::WorkerCreateError;
 use scoretracker::info_npr;
 use scoretracker::library::LibraryScanError;
 use scoretracker::library::stpl_url::{LibraryDomain, LibraryDomainName};
+use scoretracker::spreadsheet::SpreadsheetImportError;
 use scoretracker::util::command_line::AskError;
 use scoretracker::util::{file_ex, lockfile};
 use std::io::{self};
@@ -19,7 +20,7 @@ pub mod performance;
 pub mod spreadsheet;
 
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum CmdError {
     #[error("unknown error")]
     #[deprecated = "this should not be used, please define an actual error variant instead"]
     UnknownError,
@@ -65,9 +66,11 @@ pub enum Error {
     WorkerCreateError(#[from] WorkerCreateError),
     #[error("no game with id: {0}")]
     NoGameWithId(String),
+    #[error("spreadsheet import error: {0}")]
+    SpreadsheetImportError(#[from] SpreadsheetImportError),
 }
 
-impl Error {
+impl CmdError {
     pub fn exit_status(&self) -> ExitCode {
         match self {
             #[allow(deprecated)]
@@ -88,6 +91,7 @@ impl Error {
             Self::ConfigSerializationError(..) => ExitCode::from(11),
             Self::LibraryInfoWriteError(..) => ExitCode::from(12),
             Self::DatabaseError(..) => ExitCode::from(13),
+            Self::SpreadsheetImportError(..) => ExitCode::from(14),
             // _ => ExitCode::FAILURE,
         }
     }
@@ -105,10 +109,10 @@ macro_rules! cmd {
                     $code
                 }
             )+
-            Some(unknown_command) => Err(Error::UnknownCommand {
+            Some(unknown_command) => Err(CmdError::UnknownCommand {
                 cmd: unknown_command.to_string()
             }),
-            None => Err(Error::NoCommandProvided),
+            None => Err(CmdError::NoCommandProvided),
         }
     }};
     ($full_command_name: ident, $args: ident, $arg_num: literal, $($subcommand_name:literal => $code:stmt),+ $(,)?) => {{
@@ -120,11 +124,11 @@ macro_rules! cmd {
                     $code
                 }
             )+
-            Some(unknown_subcommand) => Err(Error::UnknownSubcommand{
+            Some(unknown_subcommand) => Err(CmdError::UnknownSubcommand{
                 cmd: $full_command_name.clone(),
                 subcmd: unknown_subcommand.to_string()
             }),
-            None => Err(Error::NoSubcommandProvided{
+            None => Err(CmdError::NoSubcommandProvided{
                 cmd: $full_command_name.clone()
             }),
         }
@@ -154,12 +158,12 @@ macro_rules! parse_arg {
 
 macro_rules! arg {
     ($arg_name: ident : $arg_type: tt, $description: literal, $full_command_name: ident, $args: ident, $arg_num: literal) => {
-        let $arg_name = $args.get($arg_num).ok_or(Error::ArgumentNotProvided {
+        let $arg_name = $args.get($arg_num).ok_or(CmdError::ArgumentNotProvided {
             cmd: $full_command_name.clone(),
             arg_name: stringify!($arg_name).to_string(),
             arg_desc: $description.to_string(),
         })?;
-        let $arg_name = parse_arg!($arg_type, $arg_name).map_err(|e| Error::WrongArgumentType {
+        let $arg_name = parse_arg!($arg_type, $arg_name).map_err(|e| CmdError::WrongArgumentType {
             cmd: $full_command_name.clone(),
             arg_name: stringify!($arg_name).to_string(),
             arg_desc: $description.to_string(),
@@ -170,8 +174,8 @@ macro_rules! arg {
 }
 
 #[allow(unused_assignments)]
-pub fn handle_command(args: &[String]) -> Result<(), Error> {
-    type E = Error;
+pub fn handle_command(args: &[String]) -> Result<(), CmdError> {
+    type E = CmdError;
     // fcn - full command name
     let mut fcn;
     cmd!(root fcn, args, 1,
@@ -180,9 +184,9 @@ pub fn handle_command(args: &[String]) -> Result<(), Error> {
             Ok(())
         },
         "spreadsheet" => cmd!(fcn, args, 2,
-            "import-legacy" => {
-                arg!(path: PathBuf, "path of the spreadsheet file", fcn, args, 3);
-                cmd::spreadsheet::import_legacy(&path)
+            "import-org-ods" => {
+                arg!(path: PathBuf, "path of the ods spreadsheet file", fcn, args, 3);
+                cmd::spreadsheet::import_org_ods(&path)
             },
         ),
         "config" => cmd!(fcn, args, 2,
@@ -209,7 +213,7 @@ pub fn handle_command(args: &[String]) -> Result<(), Error> {
                 cmd::library::rescan(&library_dir).map_err(E::LibraryScanError)
             },
             "rescan-default" => {
-                let config = Config::load().map_err(Error::ConfigReadError)?;
+                let config = Config::load().map_err(CmdError::ConfigReadError)?;
                 cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryScanError)
             },
             "remove-domain" => {

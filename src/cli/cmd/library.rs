@@ -1,4 +1,4 @@
-use crate::cmd::Error;
+use crate::cmd::CmdError;
 use scoretracker::config::Config;
 use scoretracker::library::database::LibraryDatabase;
 use scoretracker::library::info::LibraryInfo;
@@ -9,7 +9,7 @@ use scoretracker::util::lockfile;
 use scoretracker::{log_fn_name, success_npr};
 use std::path::Path;
 
-pub fn init(library_dir: &Path, library_domain_name: LibraryDomainName) -> Result<(), Error> {
+pub fn init(library_dir: &Path, library_domain_name: LibraryDomainName) -> Result<(), CmdError> {
     log_fn_name!("init");
 
     let info = LibraryInfo {
@@ -18,7 +18,7 @@ pub fn init(library_dir: &Path, library_domain_name: LibraryDomainName) -> Resul
     library_dir
         .join(LibraryInfo::STANDARD_FILENAME)
         .write_as_json_pretty(&info)
-        .map_err(Error::LibraryInfoWriteError)?;
+        .map_err(CmdError::LibraryInfoWriteError)?;
 
     success_npr!("initialized library with domain '{}'", LibraryDomain::Local(info.domain));
     Ok(())

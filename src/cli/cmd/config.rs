@@ -1,4 +1,4 @@
-use crate::cmd::Error;
+use crate::cmd::CmdError;
 use scoretracker::config::Config;
 use scoretracker::util::command_line::{ask_string, ask_yn};
 use scoretracker::util::file_ex::FileEx;
@@ -8,15 +8,15 @@ use scoretracker::{info_npr, success_npr, warn_npr};
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-fn display_config(config: &Config) -> Result<(), Error> {
+fn display_config(config: &Config) -> Result<(), CmdError> {
     let mut stdout = io::stdout();
-    serde_json::to_writer_pretty(&stdout, &config).map_err(Error::ConfigSerializationError)?;
+    serde_json::to_writer_pretty(&stdout, &config).map_err(CmdError::ConfigSerializationError)?;
     stdout.write_all(b"\n")?;
     stdout.flush()?;
     Ok(())
 }
 
-pub fn init() -> Result<(), Error> {
+pub fn init() -> Result<(), CmdError> {
     let path = Config::default_path();
     let has_to_confirm = match path.read_from_json() {
         Ok(Some(config)) => {
@@ -52,28 +52,28 @@ pub fn init() -> Result<(), Error> {
     };
     path.write_as_json_pretty(&config)
         .map_err(lockfile::Error::from)
-        .map_err(Error::ConfigWriteError)?;
+        .map_err(CmdError::ConfigWriteError)?;
 
     success_npr!("config written to file: {:?}", path);
     display_config(&config)
 }
 
-pub fn show() -> Result<(), Error> {
-    let config = Config::load().map_err(Error::ConfigReadError)?;
+pub fn show() -> Result<(), CmdError> {
+    let config = Config::load().map_err(CmdError::ConfigReadError)?;
     display_config(&config)
 }
 
-pub fn set(key: String, value: String) -> Result<(), Error> {
-    let mut config = Config::lock_default_and_read(None).map_err(Error::ConfigReadError)?;
+pub fn set(key: String, value: String) -> Result<(), CmdError> {
+    let mut config = Config::lock_default_and_read(None).map_err(CmdError::ConfigReadError)?;
 
     match key.as_str() {
         "domain_name" => config.inner.domain_name = value,
         "shared_data_repo_path" => config.inner.shared_data_repo_path = PathBuf::from(value),
         "default_library_dir_path" => config.inner.default_library_dir_path = PathBuf::from(value),
-        key => Err(Error::InvalidConfigKey(key.to_string()))?,
+        key => Err(CmdError::InvalidConfigKey(key.to_string()))?,
     }
 
-    config.unlock_and_save().map_err(Error::ConfigWriteError)?;
+    config.unlock_and_save().map_err(CmdError::ConfigWriteError)?;
     success_npr!("successfully updated config");
 
     Ok(())

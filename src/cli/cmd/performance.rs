@@ -1,10 +1,10 @@
-use crate::cmd;
+use crate::cmd::CmdError;
 use scoretracker::{game::game_instance_from_id, info_npr, log_fn_name, util::command_line::ask_yn};
 
-pub fn add(game_id: String) -> Result<(), cmd::Error> {
+pub fn add(game_id: String) -> Result<(), CmdError> {
     log_fn_name!("cmd:performance_add");
 
-    let game = game_instance_from_id(&game_id).ok_or(cmd::Error::NoGameWithId(game_id))?;
+    let game = game_instance_from_id(&game_id).ok_or(CmdError::NoGameWithId(game_id))?;
     info_npr!("adding new performance for {}", game.pretty_name());
 
     let mut performance = game.ask_for_performance_new()?;

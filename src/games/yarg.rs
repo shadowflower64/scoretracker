@@ -1,10 +1,9 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
 use crate::game::Game;
-use crate::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceMetadata, PerformanceTrait};
+use crate::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceTrait};
 use crate::songdb::song::{SongAlbumInfo, SongTrait};
 use crate::util::command_line::{AskError, ask_string, ask_u64, ask_uuid};
 use crate::util::percentage::Percentage;
-use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -70,12 +69,12 @@ pub enum Modifier {
 /// A YARG performance - a performance of one player playing on one instrument on a specific chart.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Performance {
+    pub common: CommonPerformanceInfo,
+
     ///// Who played what and when. /////
     /// Timestamp of the performance - specifically, the timestamp of the first frame of the end screen. Can be approximate.
-    pub timestamp: NsTimestamp,
-
-    /// Player UUID.
-    pub player_uuid: UuidString,
+    // this should be moved to Match
+    // pub timestamp: NsTimestamp,
 
     /// Named ID of the song.
     pub song_id: String,
@@ -112,37 +111,18 @@ pub struct Performance {
     ///// Game settings and information. /////
     /// String of the game version that was played on for this performance.
     pub game_version: String,
-
-    ///// Stuff outside of the game. /////
-    /// List of library entry UUIDs that are proof of this performance.
-    pub proof: Vec<UuidString>,
-
-    /// Optional user comment.
-    pub comment: Option<String>,
-
-    /// Any additional performance metadata.
-    pub metadata: PerformanceMetadata,
 }
 
 #[typetag::serde(name = "yarg")]
 impl PerformanceTrait for Performance {
-    fn common(&self) -> CommonPerformanceInfo {
-        todo!()
+    fn common(&self) -> &CommonPerformanceInfo {
+        &self.common
     }
     fn score(&self) -> f64 {
         self.score as f64
     }
-    fn proof(&self) -> Vec<UuidString> {
-        self.proof.clone()
-    }
-    fn comment(&self) -> Option<String> {
-        self.comment.clone()
-    }
-    fn metadata(&self) -> PerformanceMetadata {
-        self.metadata.clone()
-    }
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
-        self.comment = Some(ask_string("comment", self.comment())?);
+        self.common.comment = Some(ask_string("comment", self.comment().clone())?);
         Ok(())
     }
 }
@@ -188,7 +168,14 @@ impl Game for YARG {
 
     fn ask_for_performance_new(&self) -> Result<Box<dyn performance::PerformanceTrait>, AskError> {
         Ok(Box::new(Performance {
-            player_uuid: ask_uuid("player uuid", None)?.into(),
+            common: CommonPerformanceInfo {
+                uuid: Uuid::now_v7().into(),
+                player_uuid: ask_uuid("player uuid", None)?.into(),
+                proof: Vec::new(),
+                // timestamp: NsTimestamp::now(),
+                comment: None,
+                metadata: HashMap::new(),
+            },
             song_id: ask_string("song id", None)?,
             instrument: Instrument::LeadGuitar,
             difficulty: Difficulty::Expert,
@@ -200,10 +187,6 @@ impl Game for YARG {
             song_speed: Percentage::from_percentage(ask_u64("song speed", Some(100))? as f64),
             modifiers: Vec::new(),
             game_version: ask_string("game version", Some(String::new()))?,
-            proof: Vec::new(),
-            timestamp: NsTimestamp::now(),
-            comment: None,
-            metadata: HashMap::new(),
         }))
     }
 }

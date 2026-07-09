@@ -11,3 +11,5 @@ pub enum AnyValue {
     Number(f64),
     Bool(bool),
 }
+
+pub type SongId = String;

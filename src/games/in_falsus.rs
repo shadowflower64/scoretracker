@@ -164,8 +164,8 @@ pub struct Performance {
 
 #[typetag::serde(name = "in_falsus")]
 impl PerformanceTrait for Performance {
-    fn common(&self) -> CommonPerformanceInfo {
-        self.common.clone()
+    fn common(&self) -> &CommonPerformanceInfo {
+        &self.common
     }
     fn score(&self) -> f64 {
         self.results.score as f64
@@ -180,8 +180,8 @@ pub struct Match {
 
 #[typetag::serde(name = "in_falsus")]
 impl MatchTrait for Match {
-    fn common(&self) -> CommonMatchInfo {
-        self.common.clone()
+    fn common(&self) -> &CommonMatchInfo {
+        &self.common
     }
     fn score(&self) -> f64 {
         unimplemented!()

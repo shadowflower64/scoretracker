@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 pub type MatchMetadata = HashMap<String, AnyValue>;
 
+pub type SongId = String;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CommonMatchInfo {
     /// UUID of the match.
@@ -13,7 +15,7 @@ pub struct CommonMatchInfo {
     pub timestamp: NsTimestamp,
 
     /// Named ID of the song.
-    pub song_id: String,
+    pub song_id: SongId,
 
     /// Performances belonging to this match.
     pub performance_ids: Vec<UuidString>,
@@ -30,30 +32,32 @@ pub struct CommonMatchInfo {
 
 #[typetag::serde(tag = "game")]
 pub trait MatchTrait: Debug {
-    fn common(&self) -> CommonMatchInfo;
-    fn uuid(&self) -> UuidString {
-        self.common().uuid
+    fn common(&self) -> &CommonMatchInfo;
+    fn uuid(&self) -> &UuidString {
+        &self.common().uuid
     }
-    fn timestamp(&self) -> NsTimestamp {
-        self.common().timestamp
+    fn timestamp(&self) -> &NsTimestamp {
+        &self.common().timestamp
     }
-    fn song_id(&self) -> String {
-        self.common().song_id
+    fn song_id(&self) -> &String {
+        &self.common().song_id
     }
-    fn performance_ids(&self) -> Vec<UuidString> {
-        self.common().performance_ids
+    fn performance_ids(&self) -> &Vec<UuidString> {
+        &self.common().performance_ids
     }
-    fn proof(&self) -> Vec<UuidString> {
-        self.common().proof
+    fn proof(&self) -> &Vec<UuidString> {
+        &self.common().proof
     }
-    fn comment(&self) -> Option<String> {
-        self.common().comment
+    fn comment(&self) -> &Option<String> {
+        &self.common().comment
     }
-    fn metadata(&self) -> MatchMetadata {
-        self.common().metadata
+    fn metadata(&self) -> &MatchMetadata {
+        &self.common().metadata
     }
     fn score(&self) -> f64;
     fn ask_for_match_edit(&mut self) -> Result<(), AskError> {
         unimplemented!()
     }
 }
+
+pub type AnyMatch = Box<dyn MatchTrait>;

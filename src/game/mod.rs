@@ -1,38 +1,29 @@
-use crate::{scoreboard::performance::PerformanceTrait, songdb::song::SongTrait, util::command_line::AskError};
+use crate::scoreboard::r#match::AnyMatch;
+use crate::scoreboard::performance::AnyPerformance;
+use crate::songdb::song::AnySong;
+use crate::spreadsheet::{Record, SpreadsheetRecordImportError};
+use crate::util::command_line::AskError;
 use serde::Serialize;
-use std::{error::Error, fmt::Debug};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum SpreadsheetParseError {
-    #[error("not implemented")]
-    NotImplemented,
-    #[error("not implemented yet")]
-    NotImplementedYet,
-    #[error("{0}")]
-    CustomMessage(String),
-    #[error("{0}")]
-    Custom(Box<dyn Error>),
-}
+use std::fmt::Debug;
 
 #[typetag::serde(tag = "game")]
 pub trait Game: Debug {
     fn pretty_name(&self) -> &'static str;
     fn url_shortname(&self) -> &'static str;
 
-    fn ask_for_performance_new(&self) -> Result<Box<dyn PerformanceTrait>, AskError> {
+    fn ask_for_performance_new(&self) -> Result<AnyPerformance, AskError> {
         unimplemented!()
     }
 
-    fn create_performance_from_spreadsheet_row(
+    fn create_match_and_performance_from_spreadsheet_record(
         &self,
-        _row: Vec<(String, String)>,
-    ) -> Result<Box<dyn PerformanceTrait>, SpreadsheetParseError> {
-        Err(SpreadsheetParseError::NotImplemented)
+        _record: &Record,
+    ) -> Result<(AnyMatch, Vec<AnyPerformance>), SpreadsheetRecordImportError> {
+        Err(SpreadsheetRecordImportError::NotImplemented)
     }
 
-    fn create_song_from_spreadsheet_row(&self, _row: Vec<(String, String)>) -> Result<Box<dyn SongTrait>, SpreadsheetParseError> {
-        Err(SpreadsheetParseError::NotImplemented)
+    fn create_song_from_spreadsheet_record(&self, _record: &Record) -> Result<AnySong, SpreadsheetRecordImportError> {
+        Err(SpreadsheetRecordImportError::NotImplemented)
     }
 }
 
