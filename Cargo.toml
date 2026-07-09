@@ -35,3 +35,4 @@ calamine = "0.35.0"
 iso8601-duration = { version = "0.2.0", features = ["chrono"] }
 indexmap = "2.14.0"
 regex = "1.12.4"
+chrono-tz = "0.10.4"

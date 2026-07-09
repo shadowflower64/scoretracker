@@ -148,7 +148,7 @@ impl Game for ADOFAI {
             common: CommonPerformanceInfo {
                 uuid: Uuid::now_v7().into(),
                 player_uuid: find_player_uuid_by_name(&record.string("player")?).expect("todo"),
-                proof: vec![get_or_insert_proof_by_youtube_url(&record.hyperlink("youtube")?)],
+                proof: vec![get_or_insert_proof_by_youtube_url(&record.hyperlink("video")?)],
                 comment: record.string_opt("comment")?,
                 metadata: HashMap::new(),
             },

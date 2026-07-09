@@ -6,7 +6,10 @@ use crate::util::uuid::UuidString;
 use crate::{info, log_fn_name, success, util::timestamp::NsTimestamp, warn};
 use calamine::Data::{self};
 use calamine::{Ods, OdsError, Range, Reader, open_workbook};
-use chrono::{DateTime, NaiveDate, NaiveDateTime};
+use chrono::offset::LocalResult;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono_tz::Europe::Warsaw;
+use chrono_tz::Tz;
 use indexmap::IndexMap;
 use std::error::Error;
 use std::fmt::Display;
@@ -177,12 +180,37 @@ impl Record {
         let Some(value) = self.0.get(&path) else {
             return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
         };
-        let FieldValue::DateTime(timestamp) = value else {
-            return Err(SpreadsheetRecordImportError::NotATimestamp(path, value.to_owned()));
-        };
-        // TODO: also load naive dates as timestamp
+        match value {
+            FieldValue::DateTimeWithMsNoTz(naive) | FieldValue::DateTimeNoTz(naive) => {
+                let naive = *naive;
+                let tz = Warsaw; // all legacy sheet times use Europe/Warsaw timezone
+                match tz.from_local_datetime(&naive) {
+                    LocalResult::Single(converted) => Ok(NsTimestamp::from(converted)),
+                    LocalResult::Ambiguous(earliest, latest) => Err(SpreadsheetRecordImportError::LocalDateIsAmbiguous {
+                        naive,
+                        path,
+                        tz,
+                        earliest: earliest.to_utc(),
+                        latest: latest.to_utc(),
+                    }),
+                    LocalResult::None => Err(SpreadsheetRecordImportError::LocalDateIsInGap { naive, path, tz }),
+                }
+            }
+            FieldValue::DateTime(timestamp) => Ok(*timestamp),
+            FieldValue::DateOnlyNoTz(_) => Err(SpreadsheetRecordImportError::NotATimestamp(path, value.to_owned())), // this is too imprecise to use as a "timestamp"
+            _ => Err(SpreadsheetRecordImportError::NotATimestamp(path, value.to_owned())),
+        }
+    }
 
-        Ok(timestamp.to_owned())
+    pub fn date_only<K: Into<FieldPath>>(&self, key: K) -> Result<NaiveDate, SpreadsheetRecordImportError> {
+        let path = key.into();
+        let Some(value) = self.0.get(&path) else {
+            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+        };
+        match value {
+            FieldValue::DateOnlyNoTz(naive) => Ok(*naive),
+            _ => Err(SpreadsheetRecordImportError::NotADate(path, value.to_owned())),
+        }
     }
 
     pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<String, SpreadsheetRecordImportError> {
@@ -190,7 +218,7 @@ impl Record {
         let Some(value) = self.0.get(&path) else {
             return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
         };
-
+        // return Ok("https://www.youtube.com/watch?v=dQw4w9WgXcQ".to_string());
         todo!("{:?}", value);
     }
 }
@@ -335,10 +363,12 @@ pub struct SpreadsheetImportResults {
 }
 
 pub fn get_or_insert_proof_by_youtube_url(_youtube_url: &str) -> UuidString {
+    // return Uuid::now_v7().into();
     todo!()
 }
 
 pub fn find_player_uuid_by_name(_player_name: &str) -> Option<UuidString> {
+    // return Some(Uuid::now_v7().into());
     todo!()
 }
 
@@ -360,6 +390,18 @@ pub enum SpreadsheetRecordImportError {
     NotABool(FieldPath, FieldValue),
     #[error("field '{0}' not a timestamp: {1:?}")]
     NotATimestamp(FieldPath, FieldValue),
+    #[error("field '{0}' not a date: {1:?}")]
+    NotADate(FieldPath, FieldValue),
+    #[error("field '{path}' date {naive} is ambiguous in timezone {tz} (date is in a fold): it could be from {earliest} to {latest}")]
+    LocalDateIsAmbiguous {
+        path: FieldPath,
+        naive: NaiveDateTime,
+        tz: Tz,
+        earliest: DateTime<Utc>,
+        latest: DateTime<Utc>,
+    },
+    #[error("field '{path}' date {naive} is in a gap in timezone {tz}")]
+    LocalDateIsInGap { path: FieldPath, naive: NaiveDateTime, tz: Tz },
     #[error("{0}")]
     CustomMessage(String),
     #[error("{0}")]
