@@ -167,7 +167,7 @@ impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common
     }
-    fn score(&self) -> f64 {
+    fn sorting_key(&self) -> f64 {
         self.results.score as f64
     }
 }
@@ -183,8 +183,8 @@ impl MatchTrait for Match {
     fn common(&self) -> &CommonMatchInfo {
         &self.common
     }
-    fn score(&self) -> f64 {
-        unimplemented!()
+    fn sorting_key(&self) -> f64 {
+        todo!()
     }
 }
 

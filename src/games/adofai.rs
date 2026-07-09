@@ -1,6 +1,4 @@
 //! Data structures for A Dance of Fire and Ice
-use std::collections::HashMap;
-
 use crate::game::Game;
 use crate::scoreboard::r#match::CommonMatchInfo;
 use crate::scoreboard::r#match::MatchTrait;
@@ -13,6 +11,7 @@ use crate::spreadsheet::find_player_uuid_by_name;
 use crate::spreadsheet::get_or_insert_proof_by_youtube_url;
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 pub type JudgementCount = u32;
 
@@ -26,7 +25,7 @@ impl MatchTrait for Match {
     fn common(&self) -> &CommonMatchInfo {
         &self.common
     }
-    fn score(&self) -> f64 {
+    fn sorting_key(&self) -> f64 {
         todo!()
     }
 }
@@ -47,7 +46,7 @@ pub struct Performance {
     pub common: CommonPerformanceInfo,
     pub lamp: Lamp,
     pub misses: JudgementCount,
-    pub overhits: JudgementCount,
+    pub overload: JudgementCount,
     pub too_early: JudgementCount,
     pub early: JudgementCount,
     pub late: JudgementCount,
@@ -57,13 +56,56 @@ pub struct Performance {
     pub checkpoints_used: u32,
 }
 
+impl Performance {
+    pub fn total_tiles(&self) -> JudgementCount {
+        self.misses + self.early + self.late + self.early_perfect + self.late_perfect + self.perfect
+    }
+
+    pub fn accuracy(&self) -> f64 {
+        let all_judgements = self.misses
+            + self.overload
+            + self.too_early
+            + self.early
+            + self.late
+            + self.early_perfect
+            + self.late_perfect
+            + self.perfect
+            + self.misses // TODO: misses and overloads are added twice, i think this is intentional??? This is how it is in the original sheet
+            + self.overload;
+        if all_judgements == 0 {
+            0.0
+        } else {
+            let all_perfects = self.early_perfect + self.late_perfect + self.perfect;
+            let base_percentage = (all_perfects as f64) / (all_judgements as f64);
+            let bonus_percentage = (self.perfect as f64) * 0.0001f64;
+            base_percentage + bonus_percentage
+        }
+    }
+
+    pub fn x_accuracy(&self) -> f64 {
+        let all_judgements =
+            self.misses + self.overload + self.too_early + self.early + self.late + self.early_perfect + self.late_perfect + self.perfect;
+        if all_judgements == 0 {
+            0.0
+        } else {
+            let base_percentage = ((self.perfect as f64 * 1.0f64)
+                + ((self.early_perfect + self.late_perfect) as f64 * 0.75f64)
+                + ((self.early + self.late) as f64 * 0.4f64)
+                + (self.too_early as f64 * 0.2f64))
+                / all_judgements as f64;
+            let checkpoint_factor = 0.9875f64.powi(self.checkpoints_used as i32);
+            base_percentage * checkpoint_factor
+        }
+    }
+}
+
 #[typetag::serde(name = "adofai")]
 impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common
     }
-    fn score(&self) -> f64 {
-        todo!()
+    fn sorting_key(&self) -> f64 {
+        self.x_accuracy()
     }
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
         todo!()
@@ -112,7 +154,7 @@ impl Game for ADOFAI {
             },
             lamp,
             misses: record.int("misses")?,
-            overhits: record.int("overhits")?,
+            overload: record.int("overhits")?,
             too_early: record.int("too_early")?,
             early: record.int("early")?,
             late: record.int("late")?,

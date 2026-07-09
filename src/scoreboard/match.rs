@@ -54,10 +54,10 @@ pub trait MatchTrait: Debug {
     fn metadata(&self) -> &MatchMetadata {
         &self.common().metadata
     }
-    fn score(&self) -> f64;
     fn ask_for_match_edit(&mut self) -> Result<(), AskError> {
         unimplemented!()
     }
+    fn sorting_key(&self) -> f64;
 }
 
 pub type AnyMatch = Box<dyn MatchTrait>;

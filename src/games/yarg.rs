@@ -2,7 +2,8 @@
 use crate::game::Game;
 use crate::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceTrait};
 use crate::songdb::song::{SongAlbumInfo, SongTrait};
-use crate::util::command_line::{AskError, ask_string, ask_u64, ask_uuid};
+use crate::util::command_line::{AskError, ask_string, ask_u64, ask_uuid, ask_yn};
+use crate::util::normalize_unsigned_to_unit_range;
 use crate::util::percentage::Percentage;
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
@@ -101,6 +102,9 @@ pub struct Performance {
     /// The amount of extra erroneous inputs.
     pub overhits: u64,
 
+    /// Was the health meter drained, was the song failed?
+    pub failed: bool,
+
     ///// Additional song settings. /////
     /// Speed of the song, as a percentage. This is not a normal `f64` to avoid rounding errors.
     pub song_speed: Percentage,
@@ -118,12 +122,12 @@ impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common
     }
-    fn score(&self) -> f64 {
-        self.score as f64
-    }
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
         self.common.comment = Some(ask_string("comment", self.comment().clone())?);
         Ok(())
+    }
+    fn sorting_key(&self) -> f64 {
+        normalize_unsigned_to_unit_range(self.score) + (self.failed as u8 as f64)
     }
 }
 
@@ -184,6 +188,7 @@ impl Game for YARG {
             notes_hit: ask_u64("notes hit", None)?,
             max_streak: ask_u64("max streak", None)?,
             overhits: ask_u64("overhits", None)?,
+            failed: ask_yn("failed", None)?,
             song_speed: Percentage::from_percentage(ask_u64("song speed", Some(100))? as f64),
             modifiers: Vec::new(),
             game_version: ask_string("game version", Some(String::new()))?,

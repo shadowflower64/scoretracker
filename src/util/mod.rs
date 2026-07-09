@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::LazyLock};
+use std::{ops::Neg, path::PathBuf, sync::LazyLock};
 
 use regex::Regex;
 
@@ -59,4 +59,13 @@ pub fn youtube_id(url: &str) -> Option<String> {
     let captures = REGEX.captures(url)?;
     let capture_match = captures.get(1)?.as_str().to_owned();
     Some(capture_match)
+}
+
+/// Normalizes an [`u64`] (or any value greater than or equal to 0) to the range [0..1).
+pub fn normalize_unsigned_to_unit_range(uint: u64) -> f64 {
+    let x = uint as f64 + 1.0; // in range [1..inf), inf is the highest value
+    let x = x.recip(); // in range (0..1], 0 is the highest value
+    let x = x.neg(); // in range [-1..0), 0 is the highest value
+    let x = x + 1.0; // in range [0..1), 1 is the highest value
+    x
 }

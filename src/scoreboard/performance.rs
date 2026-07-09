@@ -41,10 +41,10 @@ pub trait PerformanceTrait: Debug {
     fn metadata(&self) -> &PerformanceMetadata {
         &self.common().metadata
     }
-    fn score(&self) -> f64;
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
         unimplemented!()
     }
+    fn sorting_key(&self) -> f64;
 }
 
 pub type AnyPerformance = Box<dyn PerformanceTrait>;
