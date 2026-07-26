@@ -1,6 +1,6 @@
-use crate::game::Game;
-use crate::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::game::Game;
+use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
+use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
 use serde::{Deserialize, Serialize};
 
 /// Judgement count split between early/late, shown on mouse hover

@@ -1,9 +1,9 @@
+use crate::data::library::aux_data::LibraryAuxData;
+use crate::data::library::cache::LibraryCache;
+use crate::data::library::database::LibraryDatabase;
+use crate::data::library::index::LibraryIndex;
 use crate::hive::queue::TaskQueue;
 use crate::hive::worker::WorkerInfo;
-use crate::library::aux_data::LibraryAuxData;
-use crate::library::cache::LibraryCache;
-use crate::library::database::LibraryDatabase;
-use crate::library::index::LibraryIndex;
 use crate::util::dirs::config_dir;
 use crate::util::filelocked::{FileLockableDataJson, FileLockableDataWithDefaultPath};
 use crate::util::lockfile::{self};

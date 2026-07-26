@@ -1,5 +1,5 @@
 //! Data structures for Guitar Hero III: Legends of Rock.
-use crate::game::Game;
+use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 
 /// A playable part in the chart.

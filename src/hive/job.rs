@@ -2,13 +2,13 @@
 //!
 //! A job is one action that has to be done by a [`crate::hive::worker`].
 //! One worker may take on a job, and then report a success, or a failure.
+use crate::data::library::database::LibraryEntry;
+use crate::data::library::scan_register_added_file;
+use crate::data::library::stpl_url::StplUrl;
 use crate::ffmpeg::ffmpeg_cut_video;
-use crate::library::database::LibraryEntry;
-use crate::library::scan_register_added_file;
-use crate::library::stpl_url::StplUrl;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableDataDefault};
 use crate::util::uuid::UuidString;
-use crate::{config::Config, hive::worker::WorkerInfo, info, library::database::LibraryDatabase, log_fn_name};
+use crate::{config::Config, data::library::database::LibraryDatabase, hive::worker::WorkerInfo, info, log_fn_name};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::{path::PathBuf, thread::sleep, time::Duration};

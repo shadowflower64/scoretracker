@@ -1,9 +1,9 @@
 use crate::cmd::{self};
 use scoretracker::config::Config;
+use scoretracker::data::library::LibraryScanError;
+use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::hive::worker::WorkerCreateError;
 use scoretracker::info_npr;
-use scoretracker::library::LibraryScanError;
-use scoretracker::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::spreadsheet::SpreadsheetImportError;
 use scoretracker::util::command_line::AskError;
 use scoretracker::util::{file_ex, lockfile};

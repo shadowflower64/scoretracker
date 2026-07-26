@@ -6,7 +6,7 @@
 //! While a library cache does not contain any important data and can be safely removed, doing so will significantly increase the
 //! next library scan duration. Scanning a 3,000-file library without a cache may take several hours to complete.
 //! Therefore, this file should not be deleted often, or at all - in fact, you might want to make backups of this file.
-use crate::library::VERBOSE_SCANNING;
+use crate::data::library::VERBOSE_SCANNING;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::filelocked::{FileLockableData, FileLocked};
 use crate::util::timestamp::NsTimestamp;

@@ -2,7 +2,7 @@
 //!
 //! A "library info file" is a file that contains basic information about the library.
 //! For example, this file contains the domain name for this library dir.
-use crate::library::stpl_url::LibraryDomainName;
+use crate::data::library::stpl_url::LibraryDomainName;
 use crate::util::{file_ex, filelocked::FileLockableData};
 use serde::{Deserialize, Serialize};
 

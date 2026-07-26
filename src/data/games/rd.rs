@@ -1,5 +1,5 @@
 //! Data structures for Rhythm Doctor
-use crate::game::Game;
+use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]

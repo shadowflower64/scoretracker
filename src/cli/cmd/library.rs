@@ -1,9 +1,9 @@
 use crate::cmd::CmdError;
 use scoretracker::config::Config;
-use scoretracker::library::database::LibraryDatabase;
-use scoretracker::library::info::LibraryInfo;
-use scoretracker::library::stpl_url::{LibraryDomain, LibraryDomainName};
-use scoretracker::library::{LibraryScanError, remove_library_domain_from_db, scan_full};
+use scoretracker::data::library::database::LibraryDatabase;
+use scoretracker::data::library::info::LibraryInfo;
+use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
+use scoretracker::data::library::{LibraryScanError, remove_library_domain_from_db, scan_full};
 use scoretracker::util::file_ex::FileEx;
 use scoretracker::util::lockfile;
 use scoretracker::{log_fn_name, success_npr};

@@ -1,12 +1,12 @@
 use ctrlc::{self};
 use scoretracker::config::Config;
-use scoretracker::game::game_instance_from_id;
+use scoretracker::data::game::game_instance_from_id;
+use scoretracker::data::library::scan_full;
 use scoretracker::hive::job::Job;
 use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::{Task, TaskState};
 use scoretracker::hive::worker::WorkerInfo;
 use scoretracker::info;
-use scoretracker::library::scan_full;
 use scoretracker::log_fn_name;
 use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::util::{file_ex::FileEx, lockfile::LockfileHandle, timestamp::NsTimestamp};

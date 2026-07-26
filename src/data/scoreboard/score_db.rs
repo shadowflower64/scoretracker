@@ -1,4 +1,4 @@
-use crate::scoreboard::{r#match::MatchTrait, performance::PerformanceTrait};
+use crate::data::scoreboard::{r#match::MatchTrait, performance::PerformanceTrait};
 use serde::{Deserialize, Serialize};
 
 // TODO

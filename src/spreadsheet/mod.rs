@@ -1,7 +1,7 @@
-use crate::game::game_instance_from_id;
-use crate::scoreboard::r#match::AnyMatch;
-use crate::scoreboard::performance::AnyPerformance;
-use crate::songdb::song::AnySong;
+use crate::data::game::game_instance_from_id;
+use crate::data::scoreboard::r#match::AnyMatch;
+use crate::data::scoreboard::performance::AnyPerformance;
+use crate::data::songdb::song::AnySong;
 use crate::util::uuid::UuidString;
 use crate::{info, log_fn_name, success, util::timestamp::NsTimestamp, warn};
 use calamine::Data::{self};
@@ -436,7 +436,9 @@ pub enum SpreadsheetImportError {
 
 pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_ods");
+    info!("loading workbook from path: {ods_path:?}");
     let mut workbook: Ods<_> = open_workbook(ods_path)?;
+    info!("loading workbook from path done");
 
     let mut worksheets = workbook.worksheets();
     let total_worksheets = worksheets.len();

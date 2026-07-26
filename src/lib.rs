@@ -33,13 +33,9 @@
 //! - **Song** - A song in a rhythm game. One song can have multiple charts (for example, different difficulties, or different instruments).
 
 pub mod config;
+pub mod data;
 pub mod ffmpeg;
-pub mod game;
-pub mod games;
 pub mod hive;
-pub mod library;
-pub mod scoreboard;
-pub mod songdb;
 pub mod spreadsheet;
 pub mod tests;
 pub mod util;
