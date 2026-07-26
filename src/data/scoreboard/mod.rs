@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod r#match;
 pub mod performance;
+pub mod player;
 pub mod score_db;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

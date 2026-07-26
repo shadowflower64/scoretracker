@@ -2,13 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use uuid::Uuid;
 
-#[derive(Deserialize, Serialize)]
-pub struct SongDatabase<Song: SongTrait> {
-    pub format_version: i32,
-    pub game: String,
-    pub songs: Vec<Song>,
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SongAlbumInfo {
     Single,
