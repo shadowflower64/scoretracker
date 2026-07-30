@@ -1,7 +1,9 @@
 //! Data structures for A Dance of Fire and Ice
 use crate::data::game::Game;
+use crate::data::game::ImportMatchResult;
+use crate::data::game::ImportSongResult;
+use crate::data::game::IncompleteOrCritical::Critical;
 use crate::data::game::SpreadsheetContext;
-use crate::data::game::song::SongTrait;
 use crate::data::scoreboard::r#match::CommonMatchInfo;
 use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::CommonPerformanceInfo;
@@ -10,8 +12,6 @@ use crate::spreadsheet::Record;
 use crate::spreadsheet::SpreadsheetRecordImportError;
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use uuid::Uuid;
 pub type JudgementCount = u32;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -123,11 +123,7 @@ impl Game for ADOFAI {
         "adofai"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(
-        &self,
-        record: &Record,
-        ctx: &mut SpreadsheetContext,
-    ) -> Result<(Box<dyn MatchTrait>, Vec<Box<dyn PerformanceTrait>>), SpreadsheetRecordImportError> {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
         let mut lamp = Lamp::None;
         if record.bool("c")? {
             lamp = Lamp::Clear;
@@ -145,7 +141,7 @@ impl Game for ADOFAI {
             lamp = Lamp::StrictPurePerfectFC;
         }
         let performance_data = Performance {
-            common: ctx.create_common(record)?,
+            common: ctx.create_common_p(record)?,
             lamp,
             misses: record.int("misses")?,
             overload: record.int("overhits")?,
@@ -158,24 +154,12 @@ impl Game for ADOFAI {
             checkpoints_used: record.int("checkpoints_used")?,
         };
         let match_data = Match {
-            common: CommonMatchInfo {
-                uuid: Uuid::now_v7().into(),
-                timestamp: record.timestamp("timestamp", ctx.tz)?,
-                song_id: record.string("song_id")?,
-                performance_ids: vec![*performance_data.uuid()],
-                proof: Vec::new(),
-                comment: record.string_opt("comment")?,
-                metadata: HashMap::new(),
-            },
+            common: ctx.create_common_m(record, &[&performance_data])?,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(
-        &self,
-        _record: &Record,
-        _ctx: &mut SpreadsheetContext,
-    ) -> Result<Box<dyn SongTrait>, SpreadsheetRecordImportError> {
-        Err(SpreadsheetRecordImportError::NotImplemented)
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
+        Err(Critical(SpreadsheetRecordImportError::NotImplemented))
     }
 }

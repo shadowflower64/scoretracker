@@ -1,11 +1,12 @@
 pub mod song;
 
+use crate::data::game::IncompleteOrCritical::Critical;
 use crate::data::game::song::AnySong;
 use crate::data::library::database::{LibraryDatabase, LibraryEntry};
-use crate::data::scoreboard::r#match::AnyMatch;
-use crate::data::scoreboard::performance::{AnyPerformance, CommonPerformanceInfo};
+use crate::data::scoreboard::r#match::{AnyMatch, CommonMatchInfo};
+use crate::data::scoreboard::performance::{AnyPerformance, CommonPerformanceInfo, PerformanceTrait};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
-use crate::spreadsheet::{Record, SpreadsheetRecordImportError};
+use crate::spreadsheet::{FieldValue, Record, SpreadsheetRecordImportError};
 use crate::util::command_line::AskError;
 use crate::util::uuid::UuidString;
 use crate::util::youtube_id;
@@ -67,13 +68,29 @@ impl SpreadsheetContext<'_> {
         }
     }
 
-    pub fn create_common(&mut self, record: &Record) -> Result<CommonPerformanceInfo, SpreadsheetRecordImportError> {
-        let proof = if let Some(hyperlink) = record.hyperlink_opt("video")? {
-            let proof_uuid = self.get_or_insert_proof_by_hyperlink(&hyperlink)?;
-            vec![proof_uuid]
-        } else {
-            Vec::new()
+    pub fn create_common_p(&mut self, record: &Record) -> Result<CommonPerformanceInfo, SpreadsheetRecordImportError> {
+        let proof = match record.field_opt("video") {
+            Some(FieldValue::String(a)) if a == ":(" => {
+                // Proof got corrupted before it could be uploaded :(
+                Vec::new()
+            }
+            Some(FieldValue::Hyperlink(hyperlink)) => {
+                let proof_uuid = self.get_or_insert_proof_by_hyperlink(&hyperlink)?;
+                vec![proof_uuid]
+            }
+            None => {
+                // Cell is empty
+                Vec::new()
+            }
+            Some(value) => {
+                // Invalid cell contents
+                return Err(SpreadsheetRecordImportError::NotAHyperlink(
+                    "video".into(),
+                    Box::new(value.to_owned()),
+                ));
+            }
         };
+
         Ok(CommonPerformanceInfo {
             uuid: Uuid::now_v7().into(),
             player_uuid: self.find_player_by_name(&record.string("player")?)?.uuid,
@@ -82,7 +99,48 @@ impl SpreadsheetContext<'_> {
             metadata: IndexMap::new(),
         })
     }
+
+    pub fn create_common_m<P: PerformanceTrait>(&mut self, record: &Record, performances: &[&P]) -> RecordImportResult<CommonMatchInfo> {
+        Ok(CommonMatchInfo {
+            uuid: Uuid::now_v7().into(),
+            timestamp: record.timestamp("timestamp", self.tz).incomplete()?,
+            song_id: record.string("song_id")?,
+            performance_ids: performances.iter().map(|x| *x.uuid()).collect(),
+            proof: Vec::new(),
+            comment: record.string_opt("comment")?,
+            metadata: IndexMap::new(),
+        })
+    }
 }
+
+pub enum IncompleteOrCritical<E> {
+    Incomplete(E),
+    Critical(E),
+}
+pub type RecordImportResult<T> = Result<T, IncompleteOrCritical<SpreadsheetRecordImportError>>;
+
+pub trait IncompleteOrCriticalResultTrait<T> {
+    fn incomplete(self) -> RecordImportResult<T>;
+    fn crit(self) -> RecordImportResult<T>;
+}
+
+impl<T> IncompleteOrCriticalResultTrait<T> for Result<T, SpreadsheetRecordImportError> {
+    fn crit(self) -> RecordImportResult<T> {
+        self.map_err(IncompleteOrCritical::Critical)
+    }
+    fn incomplete(self) -> RecordImportResult<T> {
+        self.map_err(IncompleteOrCritical::Incomplete)
+    }
+}
+
+impl From<SpreadsheetRecordImportError> for IncompleteOrCritical<SpreadsheetRecordImportError> {
+    fn from(value: SpreadsheetRecordImportError) -> Self {
+        IncompleteOrCritical::Critical(value)
+    }
+}
+
+pub type ImportMatchResult = RecordImportResult<(AnyMatch, Vec<AnyPerformance>)>;
+pub type ImportSongResult = RecordImportResult<AnySong>;
 
 #[typetag::serde(tag = "game")]
 pub trait Game: Debug {
@@ -93,20 +151,12 @@ pub trait Game: Debug {
         unimplemented!()
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(
-        &self,
-        _record: &Record,
-        _ctx: &mut SpreadsheetContext,
-    ) -> Result<(AnyMatch, Vec<AnyPerformance>), SpreadsheetRecordImportError> {
-        Err(SpreadsheetRecordImportError::NotImplemented)
+    fn create_match_and_performance_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportMatchResult {
+        Err(Critical(SpreadsheetRecordImportError::NotImplemented))
     }
 
-    fn create_song_from_spreadsheet_record(
-        &self,
-        _record: &Record,
-        _ctx: &mut SpreadsheetContext,
-    ) -> Result<AnySong, SpreadsheetRecordImportError> {
-        Err(SpreadsheetRecordImportError::NotImplemented)
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
+        Err(Critical(SpreadsheetRecordImportError::NotImplemented))
     }
 }
 

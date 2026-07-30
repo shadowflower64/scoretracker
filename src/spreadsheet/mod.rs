@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::data::game::IncompleteOrCritical::{Critical, Incomplete};
 use crate::data::game::song::AnySong;
 use crate::data::game::{Game, SpreadsheetContext, game_instance_from_id};
 use crate::data::library::database::LibraryDatabase;
@@ -73,6 +74,25 @@ impl Record {
 
     fn new() -> Self {
         Default::default()
+    }
+
+    pub fn field<K: Into<FieldPath>>(&self, key: K) -> Result<&FieldValue, SpreadsheetRecordImportError> {
+        let path = key.into();
+        let Some(value) = self.0.get(&path) else {
+            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+        };
+        Ok(value)
+    }
+
+    pub fn field_opt<K: Into<FieldPath>>(&self, key: K) -> Option<&FieldValue> {
+        let path = key.into();
+
+        let Some(value) = self.0.get(&path) else { return None };
+        if matches!(value, FieldValue::Empty) {
+            return None;
+        }
+
+        Some(value)
     }
 
     pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<String, SpreadsheetRecordImportError> {
@@ -244,6 +264,22 @@ impl Record {
         };
 
         Ok(Some(hyperlink.to_owned()))
+    }
+
+    pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str>>(&self, key: K) -> Result<T, SpreadsheetRecordImportError> {
+        let path = key.into();
+        let Some(value) = self.0.get(&path) else {
+            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+        };
+        let FieldValue::String(string) = value else {
+            return Err(SpreadsheetRecordImportError::NotAString(path, Box::new(value.to_owned())));
+        };
+
+        let Ok(enum_variant) = T::try_from(string.as_str()) else {
+            return Err(SpreadsheetRecordImportError::NotAValidEnumVariant(path, string.to_owned()));
+        };
+
+        Ok(enum_variant)
     }
 }
 
@@ -462,6 +498,8 @@ pub enum SpreadsheetRecordImportError {
     NotADate(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a hyperlink: {1:?}")]
     NotAHyperlink(FieldPath, Box<FieldValue>),
+    #[error("field '{0}' not a valid enum variant: {1:?}")]
+    NotAValidEnumVariant(FieldPath, String),
     #[error("field '{path}' date {naive} is ambiguous in timezone {tz} (date is in a fold): it could be from {earliest} to {latest}")]
     LocalDateIsAmbiguous {
         path: FieldPath,
@@ -481,7 +519,7 @@ pub enum SpreadsheetRecordImportError {
     #[error("{0}")]
     CustomMessage(String),
     #[error("{0}")]
-    Custom(Box<dyn Error>),
+    Custom(#[from] Box<dyn Error>),
 }
 
 #[derive(Debug, Error)]
@@ -509,6 +547,12 @@ pub enum SpreadsheetImportError {
         record: Record,
         error: Box<SpreadsheetRecordImportError>,
     },
+    #[error("could not create performance for game '{game_id}' from spreadsheet row {row}: {error}")]
+    ParsePerformanceErrorQuieter {
+        game_id: String,
+        row: usize,
+        error: Box<SpreadsheetRecordImportError>,
+    },
     #[error("could not create song for game '{game_id}' from spreadsheet row {row}: {error};\nrecord = {record}")]
     ParseSongError {
         game_id: String,
@@ -516,10 +560,18 @@ pub enum SpreadsheetImportError {
         record: Record,
         error: Box<SpreadsheetRecordImportError>,
     },
+    #[error("could not create song for game '{game_id}' from spreadsheet row {row}: {error}")]
+    ParseSongErrorQuieter {
+        game_id: String,
+        row: usize,
+        error: Box<SpreadsheetRecordImportError>,
+    },
 }
 
-pub const VERBOSE: bool = false;
-pub const WARNINGS_AS_ERRORS: bool = true;
+// TODO: rework these verbocity levels
+pub const VERBOSE_COMPLETE: bool = false;
+pub const VERBOSE_INCOMPLETE: bool = true;
+pub const QUIETER_WARNINGS: bool = true;
 
 fn import_org_spreadsheet_matches(
     game: Box<dyn Game>,
@@ -531,15 +583,30 @@ fn import_org_spreadsheet_matches(
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_matches");
 
+    let make_throwable = |i: usize, record: Record, e: SpreadsheetRecordImportError, quieter: bool| {
+        if quieter {
+            SpreadsheetImportError::ParsePerformanceErrorQuieter {
+                game_id: game_id.to_owned(),
+                row: i + 2,
+                error: Box::new(e),
+            }
+        } else {
+            SpreadsheetImportError::ParsePerformanceError {
+                game_id: game_id.to_owned(),
+                row: i + 2,
+                record,
+                error: Box::new(e),
+            }
+        }
+    };
+
     for (i, record) in records.iter().enumerate() {
         match game.create_match_and_performance_from_spreadsheet_record(record, ctx) {
             Ok((match_data, performance_data)) => {
-                if VERBOSE {
+                if VERBOSE_COMPLETE {
                     success!(
-                        "successfully created match from record for game '{game_id}', row: {}: {:?}, {:?}",
-                        i + 2,
-                        match_data,
-                        performance_data
+                        "{game_id}:{} | match parsed successfully: {match_data:?} + {performance_data:?}",
+                        i + 2
                     );
                 } else {
                     success!("{game_id}:{} | match parsed successfully ", i + 2);
@@ -547,22 +614,16 @@ fn import_org_spreadsheet_matches(
                 matches.push(match_data);
                 performances.extend(performance_data);
             }
-            Err(e) => {
-                let throwable = SpreadsheetImportError::ParsePerformanceError {
-                    game_id: game_id.to_owned(),
-                    row: i + 2,
-                    record: record.to_owned(),
-                    error: Box::new(e),
-                };
-                if WARNINGS_AS_ERRORS {
-                    return Err(throwable);
-                }
-
-                if VERBOSE {
-                    warn!("error while creating match from record: {throwable}; ignoring for now");
+            Err(Incomplete(e)) => {
+                if VERBOSE_INCOMPLETE {
+                    let e = make_throwable(i, record.to_owned(), e, QUIETER_WARNINGS);
+                    warn!("{game_id}:{} | incomplete match record: {e}; ignoring", i + 2);
                 } else {
-                    warn!("{game_id}:{} | could not parse match; ignoring", i + 2);
+                    warn!("{game_id}:{} | incomplete match record; ignoring", i + 2);
                 }
+            }
+            Err(Critical(e)) => {
+                return Err(make_throwable(i, record.to_owned(), e, false));
             }
         }
     }
@@ -578,38 +639,44 @@ fn import_org_spreadsheet_songs(
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_songs");
 
+    let make_throwable = |i: usize, record: Record, e: SpreadsheetRecordImportError, quieter: bool| {
+        if quieter {
+            SpreadsheetImportError::ParseSongErrorQuieter {
+                game_id: game_id.to_owned(),
+                row: i + 2,
+                error: Box::new(e),
+            }
+        } else {
+            SpreadsheetImportError::ParseSongError {
+                game_id: game_id.to_owned(),
+                row: i + 2,
+                record,
+                error: Box::new(e),
+            }
+        }
+    };
+
     let mut song_list: Vec<AnySong> = Vec::new();
     for (i, record) in records.iter().enumerate() {
         match game.create_song_from_spreadsheet_record(record, ctx) {
             Ok(song) => {
-                if VERBOSE {
-                    success!(
-                        "successfully created song from record for game '{game_id}', row: {}: {:?}",
-                        i + 2,
-                        song,
-                    );
+                if VERBOSE_COMPLETE {
+                    success!("{game_id}:{} | song parsed successfully: {song:?}", i + 2);
                 } else {
-                    success!("{game_id}:{} | song parsed successfully ", i + 2);
+                    success!("{game_id}:{} | song parsed successfully", i + 2);
                 }
                 song_list.push(song);
             }
-            Err(e) => {
-                let throwable = SpreadsheetImportError::ParseSongError {
-                    game_id: game_id.to_owned(),
-                    row: i + 2,
-                    record: record.to_owned(),
-                    error: Box::new(e),
-                };
-                if WARNINGS_AS_ERRORS {
-                    return Err(throwable);
-                }
-
-                if VERBOSE {
-                    warn!("error while creating song from record: {throwable}; ignoring for now");
+            Err(Incomplete(e)) => {
+                if VERBOSE_INCOMPLETE {
+                    let e = make_throwable(i, record.to_owned(), e, QUIETER_WARNINGS);
+                    warn!("{game_id}:{} | incomplete song record: {e}; ignoring", i + 2);
                 } else {
-                    warn!("{game_id}:{} | could not parse song; ignoring", i + 2);
+                    warn!("{game_id}:{} | incomplete song record; ignoring", i + 2);
                 }
-                // Err(throwable)?
+            }
+            Err(Critical(e)) => {
+                return Err(make_throwable(i, record.to_owned(), e, false));
             }
         }
     }

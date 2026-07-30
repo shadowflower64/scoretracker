@@ -1,8 +1,9 @@
 use crate::data::scoreboard::AnyValue;
 use crate::util::{command_line::AskError, timestamp::NsTimestamp, uuid::UuidString};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
-pub type MatchMetadata = HashMap<String, AnyValue>;
+use std::fmt::Debug;
+pub type MatchMetadata = IndexMap<String, AnyValue>;
 
 pub type SongId = String;
 
