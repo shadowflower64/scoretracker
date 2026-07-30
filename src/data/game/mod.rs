@@ -1,4 +1,3 @@
-pub mod game_song_list;
 pub mod song;
 
 use crate::data::game::song::AnySong;

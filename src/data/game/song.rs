@@ -44,3 +44,10 @@ pub trait SongTrait: Debug {
 }
 
 pub type AnySong = Box<dyn SongTrait>;
+
+#[derive(Deserialize, Serialize)]
+pub struct GameSongList<Song: SongTrait> {
+    pub format_version: i32,
+    pub game_id: String,
+    pub songs: Vec<Song>,
+}
