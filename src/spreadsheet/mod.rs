@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::data::game::song::AnySong;
-use crate::data::game::{SpreadsheetContext, game_instance_from_id};
+use crate::data::game::{Game, SpreadsheetContext, game_instance_from_id};
 use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
@@ -518,6 +518,105 @@ pub enum SpreadsheetImportError {
     },
 }
 
+pub const VERBOSE: bool = false;
+pub const WARNINGS_AS_ERRORS: bool = true;
+
+fn import_org_spreadsheet_matches(
+    game: Box<dyn Game>,
+    game_id: &str,
+    records: Vec<Record>,
+    matches: &mut Vec<AnyMatch>,
+    performances: &mut Vec<AnyPerformance>,
+    ctx: &mut SpreadsheetContext,
+) -> Result<(), SpreadsheetImportError> {
+    log_fn_name!("import_org_spreadsheet_matches");
+
+    for (i, record) in records.iter().enumerate() {
+        match game.create_match_and_performance_from_spreadsheet_record(record, ctx) {
+            Ok((match_data, performance_data)) => {
+                if VERBOSE {
+                    success!(
+                        "successfully created match from record for game '{game_id}', row: {}: {:?}, {:?}",
+                        i + 2,
+                        match_data,
+                        performance_data
+                    );
+                } else {
+                    success!("{game_id}:{} | match parsed successfully ", i + 2);
+                }
+                matches.push(match_data);
+                performances.extend(performance_data);
+            }
+            Err(e) => {
+                let throwable = SpreadsheetImportError::ParsePerformanceError {
+                    game_id: game_id.to_owned(),
+                    row: i + 2,
+                    record: record.to_owned(),
+                    error: Box::new(e),
+                };
+                if WARNINGS_AS_ERRORS {
+                    return Err(throwable);
+                }
+
+                if VERBOSE {
+                    warn!("error while creating match from record: {throwable}; ignoring for now");
+                } else {
+                    warn!("{game_id}:{} | could not parse match; ignoring", i + 2);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn import_org_spreadsheet_songs(
+    game: Box<dyn Game>,
+    game_id: &str,
+    records: Vec<Record>,
+    song_lists: &mut Vec<Vec<AnySong>>,
+    ctx: &mut SpreadsheetContext,
+) -> Result<(), SpreadsheetImportError> {
+    log_fn_name!("import_org_spreadsheet_songs");
+
+    let mut song_list: Vec<AnySong> = Vec::new();
+    for (i, record) in records.iter().enumerate() {
+        match game.create_song_from_spreadsheet_record(record, ctx) {
+            Ok(song) => {
+                if VERBOSE {
+                    success!(
+                        "successfully created song from record for game '{game_id}', row: {}: {:?}",
+                        i + 2,
+                        song,
+                    );
+                } else {
+                    success!("{game_id}:{} | song parsed successfully ", i + 2);
+                }
+                song_list.push(song);
+            }
+            Err(e) => {
+                let throwable = SpreadsheetImportError::ParseSongError {
+                    game_id: game_id.to_owned(),
+                    row: i + 2,
+                    record: record.to_owned(),
+                    error: Box::new(e),
+                };
+                if WARNINGS_AS_ERRORS {
+                    return Err(throwable);
+                }
+
+                if VERBOSE {
+                    warn!("error while creating song from record: {throwable}; ignoring for now");
+                } else {
+                    warn!("{game_id}:{} | could not parse song; ignoring", i + 2);
+                }
+                // Err(throwable)?
+            }
+        }
+    }
+    song_lists.push(song_list);
+    Ok(())
+}
+
 pub fn import_org_spreadsheet_generic<F>(
     mut worksheets: Vec<(String, Range<Data>)>,
     mut read_hyperlinks: F,
@@ -526,8 +625,6 @@ where
     F: FnMut(&str) -> Vec<Hyperlink>,
 {
     log_fn_name!("import_org_spreadsheet_generic");
-    pub const VERBOSE: bool = false;
-    pub const WARNINGS_AS_ERRORS: bool = true;
 
     let total_worksheets = worksheets.len();
     worksheets.retain(|(name, _)| name.starts_with("j."));
@@ -558,7 +655,7 @@ where
             .map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
         let library_database = LibraryDatabase::lock_and_read(config.library_database_path(), None)
             .map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
-        let mut context = SpreadsheetContext {
+        let mut ctx = SpreadsheetContext {
             player_database: &player_database,
             library_database: &library_database,
             proofs_to_insert: Vec::new(),
@@ -570,79 +667,10 @@ where
 
         match table_type.as_str() {
             "matches" => {
-                for (i, record) in records.iter().enumerate() {
-                    match game.create_match_and_performance_from_spreadsheet_record(record, &mut context) {
-                        Ok((match_data, performance_data)) => {
-                            if VERBOSE {
-                                success!(
-                                    "successfully created match from record for game '{game_id}', row: {}: {:?}, {:?}",
-                                    i + 2,
-                                    match_data,
-                                    performance_data
-                                );
-                            } else {
-                                success!("{game_id}:{} | match parsed successfully ", i + 2);
-                            }
-                            matches.push(match_data);
-                            performances.extend(performance_data);
-                        }
-                        Err(e) => {
-                            let throwable = SpreadsheetImportError::ParsePerformanceError {
-                                game_id: game_id.to_owned(),
-                                row: i + 2,
-                                record: record.to_owned(),
-                                error: Box::new(e),
-                            };
-                            if WARNINGS_AS_ERRORS {
-                                return Err(throwable);
-                            }
-
-                            if VERBOSE {
-                                warn!("error while creating match from record: {throwable}; ignoring for now");
-                            } else {
-                                warn!("{game_id}:{} | could not parse match; ignoring", i + 2);
-                            }
-                        }
-                    }
-                }
+                import_org_spreadsheet_matches(game, game_id, records, &mut matches, &mut performances, &mut ctx)?;
             }
             "songs" => {
-                let mut song_list = Vec::new();
-                for (i, record) in records.iter().enumerate() {
-                    match game.create_song_from_spreadsheet_record(record, &mut context) {
-                        Ok(song) => {
-                            if VERBOSE {
-                                success!(
-                                    "successfully created song from record for game '{game_id}', row: {}: {:?}",
-                                    i + 2,
-                                    song,
-                                );
-                            } else {
-                                success!("{game_id}:{} | song parsed successfully ", i + 2);
-                            }
-                            song_list.push(song);
-                        }
-                        Err(e) => {
-                            let throwable = SpreadsheetImportError::ParseSongError {
-                                game_id: game_id.to_owned(),
-                                row: i + 2,
-                                record: record.to_owned(),
-                                error: Box::new(e),
-                            };
-                            if WARNINGS_AS_ERRORS {
-                                return Err(throwable);
-                            }
-
-                            if VERBOSE {
-                                warn!("error while creating song from record: {throwable}; ignoring for now");
-                            } else {
-                                warn!("{game_id}:{} | could not parse song; ignoring", i + 2);
-                            }
-                            // Err(throwable)?
-                        }
-                    }
-                }
-                song_lists.push(song_list);
+                import_org_spreadsheet_songs(game, game_id, records, &mut song_lists, &mut ctx)?;
             }
             a => Err(SpreadsheetImportError::InvalidTableType(a.to_owned()))?,
         }
