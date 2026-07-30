@@ -17,6 +17,7 @@ pub mod config;
 pub mod hive;
 pub mod library;
 pub mod performance;
+pub mod player;
 pub mod spreadsheet;
 
 #[derive(Debug, Error)]
@@ -188,6 +189,10 @@ pub fn handle_command(args: &[String]) -> Result<(), CmdError> {
                 arg!(path: PathBuf, "path of the ods spreadsheet file", fcn, args, 3);
                 cmd::spreadsheet::import_org_ods(&path)
             },
+            "import-org-xlsx" => {
+                arg!(path: PathBuf, "path of the xlsx spreadsheet file", fcn, args, 3);
+                cmd::spreadsheet::import_org_xlsx(&path)
+            },
         ),
         "config" => cmd!(fcn, args, 2,
             "init" => {
@@ -233,6 +238,12 @@ pub fn handle_command(args: &[String]) -> Result<(), CmdError> {
             "add" => {
                 arg!(game_id: String, "id of the game to add a performance for", fcn, args, 3);
                 cmd::performance::add(game_id)
+            }
+        ),
+        "player" => cmd!(fcn, args, 2,
+            "add" => {
+                arg!(name: String, "name of the player", fcn, args, 3);
+                cmd::player::add(name)
             }
         )
     )

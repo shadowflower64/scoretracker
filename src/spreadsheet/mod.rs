@@ -4,12 +4,13 @@ use crate::data::game::{SpreadsheetContext, game_instance_from_id};
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::data::scoreboard::player::PlayerDatabase;
+use crate::error;
 use crate::util::filelocked::FileLockableData;
 use crate::util::uuid::UuidString;
 use crate::util::{file_ex, lockfile};
 use crate::{info, log_fn_name, success, util::timestamp::NsTimestamp, warn};
 use calamine::Data::{self};
-use calamine::{Ods, OdsError, Range, Reader, open_workbook};
+use calamine::{ExcelDateTime, Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_workbook};
 use chrono::offset::LocalResult;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Europe::Warsaw;
@@ -18,6 +19,7 @@ use indexmap::IndexMap;
 use std::error::Error;
 use std::fmt::Display;
 use std::path::Path;
+use std::time::Duration;
 use thiserror::Error;
 
 /// A dot-separated field name.
@@ -58,6 +60,7 @@ pub enum FieldValue {
     DateOnlyNoTz(NaiveDate),
     DateTimeNoTz(NaiveDateTime),
     DateTimeWithMsNoTz(NaiveDateTime),
+    Hyperlink(Hyperlink),
 }
 
 #[derive(Default, Debug, Clone)]
@@ -217,13 +220,16 @@ impl Record {
         }
     }
 
-    pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<String, SpreadsheetRecordImportError> {
+    pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<Hyperlink, SpreadsheetRecordImportError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
             return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
         };
-        // return Ok("https://www.youtube.com/watch?v=dQw4w9WgXcQ".to_string());
-        todo!("{:?}", value);
+        let FieldValue::Hyperlink(hyperlink) = value else {
+            return Err(SpreadsheetRecordImportError::NotAHyperlink(path, value.to_owned()));
+        };
+
+        Ok(hyperlink.to_owned())
     }
 }
 
@@ -254,17 +260,46 @@ impl Display for Record {
     }
 }
 
-fn parse_cell_value(cell: &Data, log_prefix: Option<&str>) -> FieldValue {
+fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bool, log_prefix: Option<&str>) -> FieldValue {
     log_fn_name!("parse_cell_value");
 
     let log_prefix = log_prefix.map(|x| format!("{x}; ")).unwrap_or_default();
+    let parse_excel_date_time = |cell: &ExcelDateTime| {
+        let (year, month, day, hour, minute, second, millisecond) = cell.to_ymd_hms_milli();
+        if cell.is_datetime() {
+            if let Some(datetime) = NaiveDate::from_ymd_opt(year as i32, month as u32, day as u32)
+                .and_then(|x| x.and_hms_milli_opt(hour as u32, minute as u32, second as u32, millisecond as u32))
+            {
+                success!(
+                    "{log_prefix}parsing as naive datetime with ms, success: {}",
+                    datetime.format("%Y-%m-%dT%H:%M:%S%.3f")
+                );
+                return FieldValue::DateTimeWithMsNoTz(datetime);
+            } else {
+                error!("{log_prefix}parsing as naive datetime with ms, fail: cannot create NaiveDate");
+            }
+        }
+        if cell.is_duration() {
+            let iso_duration =
+                iso8601_duration::Duration::new(year as f32, month as f32, day as f32, hour as f32, minute as f32, second as f32);
+
+            if let Some(duration) = iso_duration.to_std() {
+                success!("{log_prefix}parsing duration, success: {iso_duration} (millis: {millisecond})");
+                let duration = duration + Duration::from_millis(millisecond as u64);
+                return FieldValue::Duration(NsTimestamp::from(duration));
+            } else {
+                error!("{log_prefix}parsing duration, fail: {iso_duration} (millis: {millisecond}): cannot convert to std duration");
+            }
+        }
+        FieldValue::Empty
+    };
     let parse_date_time = |cell: &str| {
         if cell.len() == "YYYY-MM-DD".len() {
             // Attempt to parse YYYY-MM-DD - date only, no timezone
             let result = NaiveDate::parse_from_str(cell, "%Y-%m-%d");
-            if let Ok(a) = result {
-                success!("{log_prefix}parsing as naive date only, success: {a}");
-                return FieldValue::DateOnlyNoTz(a);
+            if let Ok(date) = result {
+                success!("{log_prefix}parsing as naive date only, success: {date}");
+                return FieldValue::DateOnlyNoTz(date);
             } else {
                 warn!("{log_prefix}parsing as naive date only, fail: {result:?}");
             }
@@ -273,9 +308,9 @@ fn parse_cell_value(cell: &Data, log_prefix: Option<&str>) -> FieldValue {
         if cell.len() == "YYYY-MM-DDTHH:MM:SS".len() {
             // Attempt to parse YYYY-MM-DDTHH:MM:SS - date+time, no timezone
             let result = NaiveDateTime::parse_from_str(cell, "%Y-%m-%dT%H:%M:%S");
-            if let Ok(a) = result {
-                success!("{log_prefix}parsing as naive datetime, success: {a}");
-                return FieldValue::DateTimeNoTz(a);
+            if let Ok(datetime) = result {
+                success!("{log_prefix}parsing as naive datetime, success: {datetime}");
+                return FieldValue::DateTimeNoTz(datetime);
             } else {
                 warn!("{log_prefix}parsing as naive datetime, fail: {result:?}");
             }
@@ -287,18 +322,21 @@ fn parse_cell_value(cell: &Data, log_prefix: Option<&str>) -> FieldValue {
         {
             // Attempt to parse YYYY-MM-DDTHH:MM:SS.mmm - date+time+ms, no timezone
             let result = NaiveDateTime::parse_from_str(cell, "%Y-%m-%dT%H:%M:%S%.f");
-            if let Ok(a) = result {
-                success!("{log_prefix}parsing as naive datetime with ms, success: {a}");
-                return FieldValue::DateTimeWithMsNoTz(a);
+            if let Ok(datetime) = result {
+                success!(
+                    "{log_prefix}parsing as naive datetime with ms, success: {}",
+                    datetime.format("%Y-%m-%dT%H:%M:%S%.3f")
+                );
+                return FieldValue::DateTimeWithMsNoTz(datetime);
             } else {
                 warn!("{log_prefix}parsing as naive datetime with ms, fail: {result:?}");
             }
         }
 
         let result = DateTime::parse_from_rfc3339(cell);
-        if let Ok(a) = result {
-            success!("{log_prefix}parsing as rfc3339 datetime, success: {a}");
-            return FieldValue::DateTime(NsTimestamp::from(a));
+        if let Ok(datetime) = result {
+            success!("{log_prefix}parsing as rfc3339 datetime, success: {datetime}");
+            return FieldValue::DateTime(NsTimestamp::from(datetime));
         } else {
             warn!("{log_prefix}parsing as rfc3339 datetime, fail: {result:?}");
         }
@@ -306,35 +344,40 @@ fn parse_cell_value(cell: &Data, log_prefix: Option<&str>) -> FieldValue {
     };
     let parse_duration = |cell: &str| {
         let result = iso8601_duration::Duration::parse(cell);
-        if let Ok(a) = result {
-            success!("{log_prefix}parsing duration, success: {a}");
-            return FieldValue::Duration(NsTimestamp::from(a.to_std().expect("todo")));
+        if let Ok(duration) = result {
+            success!("{log_prefix}parsing duration, success: {duration}");
+            return FieldValue::Duration(NsTimestamp::from(duration.to_std().expect("todo")));
         } else {
             warn!("{log_prefix}parsing duration, fail: {result:?}");
         }
         FieldValue::Empty
     };
 
-    match cell {
-        Data::String(a) => FieldValue::String(a.to_owned()),
-        Data::Bool(a) => FieldValue::Bool(*a),
-        Data::Int(a) => FieldValue::Int(*a),
-        Data::Float(a) => FieldValue::Float(*a),
-        Data::DateTimeIso(a) => parse_date_time(a),
-        Data::DurationIso(a) => parse_duration(a),
-        Data::Empty => FieldValue::Empty,
-
-        a => unimplemented!("spreadsheet value: {a:?}"),
+    match (cell, hyperlink) {
+        (_, Some(hyperlink)) => FieldValue::Hyperlink(hyperlink.clone()),
+        (Data::String(a), _) => FieldValue::String(a.to_owned()),
+        (Data::Bool(a), _) => FieldValue::Bool(*a),
+        (Data::Int(a), _) => FieldValue::Int(*a),
+        (Data::Float(a), _) => FieldValue::Float(*a),
+        (Data::DateTime(a), _) => parse_excel_date_time(a),
+        (Data::DateTimeIso(a), _) => parse_date_time(a),
+        (Data::DurationIso(a), _) => parse_duration(a),
+        (Data::Empty, _) => FieldValue::Empty,
+        (Data::Error(a), _) => {
+            if !formula_mode {
+                warn!("{log_prefix}cell with error read: {a:?}; treating as an empty cell");
+            }
+            FieldValue::Empty
+        }
     }
 }
 
 pub type Records = Vec<Record>;
 
-pub fn parse_records(sheet_name: &str, range: Range<Data>) -> Records {
+pub fn parse_records(sheet_name: &str, range: Range<Data>, hyperlinks: Vec<Hyperlink>) -> Records {
     log_fn_name!("parse_records");
 
     info!("parsing sheet: {sheet_name}");
-
     let mut rows = range.rows();
     let Some(header_row) = rows.next() else {
         return Vec::new();
@@ -342,15 +385,21 @@ pub fn parse_records(sheet_name: &str, range: Range<Data>) -> Records {
     let header_row = header_row.iter().map(|x| x.to_string()).collect::<Vec<_>>();
 
     let mut records = Vec::new();
-    for (i, row) in rows.enumerate() {
+    for (y, row) in rows.enumerate() {
         let mut record = Record::new();
-        for (field_name, cell) in header_row.iter().zip(row) {
+        for (x, (field_name, cell)) in header_row.iter().zip(row).enumerate() {
             // Skip fields that start with `.`
-            if field_name.starts_with(".") {
+            if field_name.starts_with('.') {
                 continue;
             }
-            let prefix = format!("sheet: '{sheet_name}', row: {}, field: '{field_name}', value: '{cell}'", i + 2);
-            let field_value = parse_cell_value(cell, Some(&prefix));
+            // Fields that start with `$` contain formulas, which may or may not work. If they don't work, ignore the errors.
+            // We don't really care about the formula cells; we will have our own functions for calculating those values.
+            let formula_mode = field_name.starts_with('$');
+            let hyperlink = hyperlinks
+                .iter()
+                .find(|hyperlink| hyperlink.range.contains((y + 1) as u32, x as u32));
+            let prefix = format!("sheet: '{sheet_name}', row: {}, field: '{field_name}', value: '{cell}'", y + 2);
+            let field_value = parse_cell_value(cell, hyperlink, formula_mode, Some(&prefix));
             record.as_mut().insert(field_name.into(), field_value);
         }
         records.push(record);
@@ -368,11 +417,6 @@ pub struct SpreadsheetImportResults {
 
 pub fn get_or_insert_proof_by_youtube_url(_youtube_url: &str) -> UuidString {
     // return Uuid::now_v7().into();
-    todo!()
-}
-
-pub fn find_player_uuid_by_name(_player_name: &str) -> Option<UuidString> {
-    // return Some(Uuid::now_v7().into());
     todo!()
 }
 
@@ -396,6 +440,8 @@ pub enum SpreadsheetRecordImportError {
     NotATimestamp(FieldPath, FieldValue),
     #[error("field '{0}' not a date: {1:?}")]
     NotADate(FieldPath, FieldValue),
+    #[error("field '{0}' not a hyperlink: {1:?}")]
+    NotAHyperlink(FieldPath, FieldValue),
     #[error("field '{path}' date {naive} is ambiguous in timezone {tz} (date is in a fold): it could be from {earliest} to {latest}")]
     LocalDateIsAmbiguous {
         path: FieldPath,
@@ -416,8 +462,10 @@ pub enum SpreadsheetRecordImportError {
 
 #[derive(Debug, Error)]
 pub enum SpreadsheetImportError {
-    #[error("cannot open file: {0}")]
-    CannotOpen(#[from] OdsError),
+    #[error("cannot open ods file: {0}")]
+    CannotOpenOds(#[from] OdsError),
+    #[error("cannot open xlsx file: {0}")]
+    CannotOpenXlsx(#[from] XlsxError),
     #[error("unknown game id: {0}")]
     UnknownGame(String),
     #[error("invalid sheet name: {0}")]
@@ -444,25 +492,26 @@ pub enum SpreadsheetImportError {
     },
 }
 
-pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
-    log_fn_name!("import_org_spreadsheet_ods");
-    info!("loading workbook from path: {ods_path:?}");
-    let mut workbook: Ods<_> = open_workbook(ods_path)?;
-    info!("loading workbook from path done");
+pub fn import_org_spreadsheet_generic(
+    mut worksheets: Vec<(String, Range<Data>, Vec<Hyperlink>)>,
+) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
+    log_fn_name!("import_org_spreadsheet_generic");
 
-    let mut worksheets = workbook.worksheets();
     let total_worksheets = worksheets.len();
-    worksheets.retain(|(name, _range)| name.starts_with("j."));
+    worksheets.retain(|(name, _, _)| name.starts_with("j."));
     let filtered_worksheets = worksheets.len();
 
-    let names: Vec<_> = worksheets.iter().map(|(name, _range)| name.to_string()).collect();
+    let names: Vec<_> = worksheets.iter().map(|(name, _, _)| name.to_string()).collect();
     info!("total worksheets: {total_worksheets}, filtered worksheets: {filtered_worksheets}, names: {names:?}");
 
     let mut song_lists = Vec::new();
     let mut matches = Vec::new();
     let mut performances = Vec::new();
 
-    for (sheet_name, range) in worksheets {
+    for (sheet_name, range, hyperlinks) in worksheets {
+        if sheet_name != "j.matches.adofai" {
+            continue; // TODO: DEBUG
+        }
         let sheet_name_split = FieldPath::from(&sheet_name);
         let table_type = sheet_name_split
             .0
@@ -473,7 +522,7 @@ pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportRe
             .get(2)
             .ok_or_else(|| SpreadsheetImportError::InvalidSheetName(sheet_name.to_owned()))?;
 
-        let records = parse_records(&sheet_name, range);
+        let records = parse_records(&sheet_name, range, hyperlinks);
         // println!("{records:#?}");
 
         let game = game_instance_from_id(game_id.as_str()).ok_or_else(|| SpreadsheetImportError::UnknownGame(game_id.to_owned()))?;
@@ -524,4 +573,43 @@ pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportRe
         matches,
         performances,
     })
+}
+
+pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
+    log_fn_name!("import_org_spreadsheet_ods");
+    info!("loading workbook from path: {ods_path:?}");
+    let mut workbook: Ods<_> = open_workbook(ods_path)?;
+    info!("loading workbook from path done");
+
+    info!("fetching worksheets...");
+    let worksheets = workbook.worksheets();
+    info!("fetched worksheets successfully");
+
+    let mut worksheet_data = Vec::new();
+    for (name, range) in worksheets {
+        worksheet_data.push((name, range, Vec::new()));
+    }
+    import_org_spreadsheet_generic(worksheet_data)
+}
+
+pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
+    log_fn_name!("import_org_spreadsheet_xlsx");
+    info!("loading workbook from path: {xlsx_path:?}");
+    let mut workbook: Xlsx<_> = open_workbook(xlsx_path)?;
+    info!("loading workbook from path done");
+
+    info!("fetching worksheets...");
+    let worksheets = workbook.worksheets();
+    info!("fetched worksheets successfully");
+
+    let mut worksheet_data = Vec::new();
+    for (name, range) in worksheets {
+        info!("reading hyperlinks for worksheet '{name}'...");
+        let hyperlinks = workbook.hyperlinks_by_sheet_name(&name).unwrap();
+        worksheet_data.push((
+            name, range, hyperlinks, // TODO: error handling
+        ));
+    }
+    info!("read hyperlinks successfully");
+    import_org_spreadsheet_generic(worksheet_data)
 }
