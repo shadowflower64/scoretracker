@@ -1,6 +1,6 @@
-use crate::util::{file_ex::FileEx, filelocked::FileLockableData, path_from_segments, uuid::UuidString};
+use crate::util::{file_ex::FileEx, filelocked::FileLockableData, relative_path_from_segments, uuid::UuidString};
+use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use uuid::Uuid;
 
@@ -18,8 +18,8 @@ pub struct PlayerDatabase {
 impl PlayerDatabase {
     pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "players.jsonl"];
 
-    pub fn standard_path() -> &'static Path {
-        static CACHE: LazyLock<PathBuf> = LazyLock::new(|| path_from_segments(&PlayerDatabase::STANDARD_PATH_SEGMENTS));
+    pub fn path_within_shared_repo() -> &'static RelativePath {
+        static CACHE: LazyLock<RelativePathBuf> = LazyLock::new(|| relative_path_from_segments(&PlayerDatabase::STANDARD_PATH_SEGMENTS));
         &CACHE
     }
 

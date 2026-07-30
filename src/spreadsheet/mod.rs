@@ -1,8 +1,12 @@
-use crate::data::game::game_instance_from_id;
+use crate::config::Config;
 use crate::data::game::song::AnySong;
+use crate::data::game::{SpreadsheetContext, game_instance_from_id};
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
+use crate::data::scoreboard::player::PlayerDatabase;
+use crate::util::filelocked::FileLockableData;
 use crate::util::uuid::UuidString;
+use crate::util::{file_ex, lockfile};
 use crate::{info, log_fn_name, success, util::timestamp::NsTimestamp, warn};
 use calamine::Data::{self};
 use calamine::{Ods, OdsError, Range, Reader, open_workbook};
@@ -402,6 +406,8 @@ pub enum SpreadsheetRecordImportError {
     },
     #[error("field '{path}' date {naive} is in a gap in timezone {tz}")]
     LocalDateIsInGap { path: FieldPath, naive: NaiveDateTime, tz: Tz },
+    #[error("player '{name}' does not exist")]
+    PlayerDoesNotExist { name: String },
     #[error("{0}")]
     CustomMessage(String),
     #[error("{0}")]
@@ -418,6 +424,10 @@ pub enum SpreadsheetImportError {
     InvalidSheetName(String),
     #[error("invalid table type: {0}")]
     InvalidTableType(String),
+    #[error("cannot read config: {0}")]
+    CannotReadConfig(lockfile::Error), // TODO: this should actually be file_ex::Error, because the config is not open for writing
+    #[error("cannot read player database: {0}")]
+    CannotReadPlayerDatabase(file_ex::Error),
     #[error("could not create performance for game '{game_id}' from spreadsheet row {row}: {error};\nrecord = {record}")]
     ParsePerformanceError {
         game_id: String,
@@ -467,17 +477,24 @@ pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportRe
         // println!("{records:#?}");
 
         let game = game_instance_from_id(game_id.as_str()).ok_or_else(|| SpreadsheetImportError::UnknownGame(game_id.to_owned()))?;
+
+        let config = Config::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
+        let player_database = PlayerDatabase::read_without_locking(config.player_database_path())
+            .map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
+        let context = SpreadsheetContext {
+            player_database: &player_database,
+        };
+
         match table_type.as_str() {
             "matches" => {
                 for (i, record) in records.iter().enumerate() {
-                    let (match_data, performance_data) =
-                        game.create_match_and_performance_from_spreadsheet_record(record).map_err(|error| {
-                            SpreadsheetImportError::ParsePerformanceError {
-                                game_id: game_id.to_owned(),
-                                row: i + 2,
-                                record: record.to_owned(),
-                                error: Box::new(error),
-                            }
+                    let (match_data, performance_data) = game
+                        .create_match_and_performance_from_spreadsheet_record(record, context)
+                        .map_err(|error| SpreadsheetImportError::ParsePerformanceError {
+                            game_id: game_id.to_owned(),
+                            row: i + 2,
+                            record: record.to_owned(),
+                            error: Box::new(error),
                         })?;
                     matches.push(match_data);
                     performances.extend(performance_data);
@@ -486,14 +503,14 @@ pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportRe
             "songs" => {
                 let mut song_list = Vec::new();
                 for (i, record) in records.iter().enumerate() {
-                    let song =
-                        game.create_song_from_spreadsheet_record(record)
-                            .map_err(|error| SpreadsheetImportError::ParseSongError {
-                                game_id: game_id.to_owned(),
-                                row: i + 2,
-                                record: record.to_owned(),
-                                error: Box::new(error),
-                            })?;
+                    let song = game.create_song_from_spreadsheet_record(record, context).map_err(|error| {
+                        SpreadsheetImportError::ParseSongError {
+                            game_id: game_id.to_owned(),
+                            row: i + 2,
+                            record: record.to_owned(),
+                            error: Box::new(error),
+                        }
+                    })?;
                     song_list.push(song)
                 }
                 song_lists.push(song_list);

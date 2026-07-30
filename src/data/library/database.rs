@@ -6,13 +6,12 @@
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
 use crate::util::file_ex::FileEx;
 use crate::util::filelocked::FileLockableData;
-use crate::util::path_from_segments;
+use crate::util::relative_path_from_segments;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
-use relative_path::RelativePath;
+use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use uuid::Uuid;
 
@@ -355,8 +354,8 @@ pub struct LibraryDatabase {
 impl LibraryDatabase {
     pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "library_database.jsonl"];
 
-    pub fn standard_path() -> &'static Path {
-        static CACHE: LazyLock<PathBuf> = LazyLock::new(|| path_from_segments(&LibraryDatabase::STANDARD_PATH_SEGMENTS));
+    pub fn path_within_shared_repo() -> &'static RelativePath {
+        static CACHE: LazyLock<RelativePathBuf> = LazyLock::new(|| relative_path_from_segments(&LibraryDatabase::STANDARD_PATH_SEGMENTS));
         &CACHE
     }
 

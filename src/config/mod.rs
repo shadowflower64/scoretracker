@@ -2,6 +2,7 @@ use crate::data::library::aux_data::LibraryAuxData;
 use crate::data::library::cache::LibraryCache;
 use crate::data::library::database::LibraryDatabase;
 use crate::data::library::index::LibraryIndex;
+use crate::data::scoreboard::player::PlayerDatabase;
 use crate::hive::queue::TaskQueue;
 use crate::hive::worker::WorkerInfo;
 use crate::util::dirs::config_dir;
@@ -25,11 +26,16 @@ impl Config {
 
     pub fn load_with_worker(_worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
         // TODO: decide on whether this should actually be locking or not
+        // TODO: cont. - this should actually be split into two functions. FileLocked exists now, maybe that should be used here?
         Ok(Config::read_default_without_locking()?)
     }
 
     pub fn library_database_path(&self) -> PathBuf {
-        self.shared_data_repo_path.join(LibraryDatabase::standard_path())
+        LibraryDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
+    }
+
+    pub fn player_database_path(&self) -> PathBuf {
+        PlayerDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
     }
 
     pub fn task_queue_path(&self) -> PathBuf {

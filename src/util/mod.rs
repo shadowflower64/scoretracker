@@ -1,6 +1,7 @@
-use std::{ops::Neg, path::PathBuf, sync::LazyLock};
+use std::{ops::Neg, sync::LazyLock};
 
 use regex::Regex;
+use relative_path::RelativePathBuf;
 
 pub mod command_line;
 pub mod dirs;
@@ -13,21 +14,21 @@ pub mod terminal_colors;
 pub mod timestamp;
 pub mod uuid;
 
-/// Create a [`PathBuf`] from individual str segments.
+/// Create a [`RelativePathBuf`] from individual str segments.
 ///
 /// This function can be used to create a path with os-dependent path separators.
 ///
 /// # Examples
 /// ```
 /// # use scoretracker::util::path_from_segments;
-/// # use std::path::PathBuf;
+/// # use relative_path::RelativePathBuf;
 /// #[cfg(target_family = "unix")]
-/// assert_eq!(path_from_segments(&["directory", "file.txt"]), PathBuf::from("directory/file.txt"));
+/// assert_eq!(relative_path_from_segments(&["directory", "file.txt"]), RelativePathBuf::from("directory/file.txt"));
 /// #[cfg(target_family = "windows")]
-/// assert_eq!(path_from_segments(&["directory", "file.txt"]), PathBuf::from(r"directory\file.txt"));
+/// assert_eq!(relative_path_from_segments(&["directory", "file.txt"]), RelativePathBuf::from(r"directory\file.txt"));
 /// ```
-pub fn path_from_segments(segments: &[&str]) -> PathBuf {
-    let mut path = PathBuf::new();
+pub fn relative_path_from_segments(segments: &[&str]) -> RelativePathBuf {
+    let mut path = RelativePathBuf::new();
     for segment in segments {
         path = path.join(segment);
     }

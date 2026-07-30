@@ -3,10 +3,24 @@ pub mod song;
 use crate::data::game::song::AnySong;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
+use crate::data::scoreboard::player::{Player, PlayerDatabase};
 use crate::spreadsheet::{Record, SpreadsheetRecordImportError};
 use crate::util::command_line::AskError;
 use serde::Serialize;
 use std::fmt::Debug;
+
+#[derive(Clone, Copy)]
+pub struct SpreadsheetContext<'a> {
+    pub player_database: &'a PlayerDatabase,
+}
+
+impl SpreadsheetContext<'_> {
+    pub fn find_player_by_name(&self, name: &str) -> Result<&Player, SpreadsheetRecordImportError> {
+        self.player_database
+            .find_player_by_name(name)
+            .ok_or_else(|| SpreadsheetRecordImportError::PlayerDoesNotExist { name: name.to_owned() })
+    }
+}
 
 #[typetag::serde(tag = "game")]
 pub trait Game: Debug {
@@ -20,11 +34,16 @@ pub trait Game: Debug {
     fn create_match_and_performance_from_spreadsheet_record(
         &self,
         _record: &Record,
+        _ctx: SpreadsheetContext,
     ) -> Result<(AnyMatch, Vec<AnyPerformance>), SpreadsheetRecordImportError> {
         Err(SpreadsheetRecordImportError::NotImplemented)
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record) -> Result<AnySong, SpreadsheetRecordImportError> {
+    fn create_song_from_spreadsheet_record(
+        &self,
+        _record: &Record,
+        _ctx: SpreadsheetContext,
+    ) -> Result<AnySong, SpreadsheetRecordImportError> {
         Err(SpreadsheetRecordImportError::NotImplemented)
     }
 }

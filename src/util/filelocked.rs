@@ -20,11 +20,11 @@ pub trait FileLockableData: Sized {
     fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()>;
 
     fn read_without_locking<P: AsRef<Path>>(path: P) -> file_ex::Result<Self> {
-        Self::_inner_read(path.as_ref())?.ok_or(file_ex::Error::file_not_found())
+        Self::_inner_read(path.as_ref())?.ok_or_else(|| file_ex::Error::file_not_found(path.as_ref().to_path_buf()))
     }
     fn lock_and_read<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
-        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
-        let inner = Self::_inner_read(&lockfile)?.ok_or(file_ex::Error::file_not_found())?;
+        let lockfile = LockfileHandle::acquire_wait(&path, worker_info)?;
+        let inner = Self::_inner_read(&lockfile)?.ok_or_else(|| file_ex::Error::file_not_found(path.as_ref().to_path_buf()))?;
         Ok(FileLocked {
             inner,
             lockfile,

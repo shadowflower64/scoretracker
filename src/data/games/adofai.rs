@@ -1,5 +1,6 @@
 //! Data structures for A Dance of Fire and Ice
 use crate::data::game::Game;
+use crate::data::game::SpreadsheetContext;
 use crate::data::game::song::SongTrait;
 use crate::data::scoreboard::r#match::CommonMatchInfo;
 use crate::data::scoreboard::r#match::MatchTrait;
@@ -7,7 +8,6 @@ use crate::data::scoreboard::performance::CommonPerformanceInfo;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::spreadsheet::Record;
 use crate::spreadsheet::SpreadsheetRecordImportError;
-use crate::spreadsheet::find_player_uuid_by_name;
 use crate::spreadsheet::get_or_insert_proof_by_youtube_url;
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
@@ -127,6 +127,7 @@ impl Game for ADOFAI {
     fn create_match_and_performance_from_spreadsheet_record(
         &self,
         record: &Record,
+        ctx: SpreadsheetContext,
     ) -> Result<(Box<dyn MatchTrait>, Vec<Box<dyn PerformanceTrait>>), SpreadsheetRecordImportError> {
         let mut lamp = Lamp::None;
         if record.bool("c")? {
@@ -147,7 +148,7 @@ impl Game for ADOFAI {
         let performance_data = Performance {
             common: CommonPerformanceInfo {
                 uuid: Uuid::now_v7().into(),
-                player_uuid: find_player_uuid_by_name(&record.string("player")?).expect("todo"),
+                player_uuid: ctx.find_player_by_name(&record.string("player")?)?.uuid,
                 proof: vec![get_or_insert_proof_by_youtube_url(&record.hyperlink("video")?)],
                 comment: record.string_opt("comment")?,
                 metadata: HashMap::new(),
@@ -177,7 +178,11 @@ impl Game for ADOFAI {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record) -> Result<Box<dyn SongTrait>, SpreadsheetRecordImportError> {
+    fn create_song_from_spreadsheet_record(
+        &self,
+        _record: &Record,
+        _ctx: SpreadsheetContext,
+    ) -> Result<Box<dyn SongTrait>, SpreadsheetRecordImportError> {
         Err(SpreadsheetRecordImportError::NotImplemented)
     }
 }
