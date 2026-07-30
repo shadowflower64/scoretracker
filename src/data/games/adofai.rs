@@ -160,7 +160,7 @@ impl Game for ADOFAI {
         let match_data = Match {
             common: CommonMatchInfo {
                 uuid: Uuid::now_v7().into(),
-                timestamp: record.timestamp("timestamp")?,
+                timestamp: record.timestamp("timestamp", ctx.tz)?,
                 song_id: record.string("song_id")?,
                 performance_ids: vec![*performance_data.uuid()],
                 proof: Vec::new(),

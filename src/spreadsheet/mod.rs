@@ -5,10 +5,10 @@ use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::data::scoreboard::player::PlayerDatabase;
-use crate::error;
 use crate::util::filelocked::FileLockableData;
 use crate::util::{file_ex, lockfile};
-use crate::{info, log_fn_name, success, util::timestamp::NsTimestamp, warn};
+use crate::{debug, error, log_should_print_debug, success};
+use crate::{info, log_fn_name, util::timestamp::NsTimestamp, warn};
 use calamine::Data::{self};
 use calamine::{ExcelDateTime, Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_workbook};
 use chrono::offset::LocalResult;
@@ -184,7 +184,7 @@ impl Record {
         }
     }
 
-    pub fn timestamp<K: Into<FieldPath>>(&self, key: K) -> Result<NsTimestamp, SpreadsheetRecordImportError> {
+    pub fn timestamp<K: Into<FieldPath>>(&self, key: K, tz: Tz) -> Result<NsTimestamp, SpreadsheetRecordImportError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
             return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
@@ -192,7 +192,6 @@ impl Record {
         match value {
             FieldValue::DateTimeWithMsNoTz(naive) | FieldValue::DateTimeNoTz(naive) => {
                 let naive = *naive;
-                let tz = Warsaw; // all legacy sheet times use Europe/Warsaw timezone
                 match tz.from_local_datetime(&naive) {
                     LocalResult::Single(converted) => Ok(NsTimestamp::from(converted)),
                     LocalResult::Ambiguous(earliest, latest) => Err(SpreadsheetRecordImportError::LocalDateIsAmbiguous {
@@ -277,6 +276,7 @@ impl Display for Record {
 
 fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bool, log_prefix: Option<&str>) -> FieldValue {
     log_fn_name!("parse_cell_value");
+    log_should_print_debug!(false);
 
     let log_prefix = log_prefix.map(|x| format!("{x}; ")).unwrap_or_default();
     let parse_excel_date_time = |cell: &ExcelDateTime| {
@@ -285,7 +285,7 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
             if let Some(datetime) = NaiveDate::from_ymd_opt(year as i32, month as u32, day as u32)
                 .and_then(|x| x.and_hms_milli_opt(hour as u32, minute as u32, second as u32, millisecond as u32))
             {
-                success!(
+                debug!(
                     "{log_prefix}parsing as naive datetime with ms, success: {}",
                     datetime.format("%Y-%m-%dT%H:%M:%S%.3f")
                 );
@@ -299,7 +299,7 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
                 iso8601_duration::Duration::new(year as f32, month as f32, day as f32, hour as f32, minute as f32, second as f32);
 
             if let Some(duration) = iso_duration.to_std() {
-                success!("{log_prefix}parsing duration, success: {iso_duration} (millis: {millisecond})");
+                debug!("{log_prefix}parsing duration, success: {iso_duration} (millis: {millisecond})");
                 let duration = duration + Duration::from_millis(millisecond as u64);
                 return FieldValue::Duration(NsTimestamp::from(duration));
             } else {
@@ -313,7 +313,7 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
             // Attempt to parse YYYY-MM-DD - date only, no timezone
             let result = NaiveDate::parse_from_str(cell, "%Y-%m-%d");
             if let Ok(date) = result {
-                success!("{log_prefix}parsing as naive date only, success: {date}");
+                debug!("{log_prefix}parsing as naive date only, success: {date}");
                 return FieldValue::DateOnlyNoTz(date);
             } else {
                 warn!("{log_prefix}parsing as naive date only, fail: {result:?}");
@@ -324,7 +324,7 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
             // Attempt to parse YYYY-MM-DDTHH:MM:SS - date+time, no timezone
             let result = NaiveDateTime::parse_from_str(cell, "%Y-%m-%dT%H:%M:%S");
             if let Ok(datetime) = result {
-                success!("{log_prefix}parsing as naive datetime, success: {datetime}");
+                debug!("{log_prefix}parsing as naive datetime, success: {datetime}");
                 if datetime.format("%H:%M:%S").to_string() == "00:00:00" || datetime.format("%H:%M:%S").to_string().len() != 8 {
                     panic!(
                         "there is no time in this datetime... so this cannot be stored as just a nstimestamp without extra information without losing any information."
@@ -343,7 +343,7 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
             // Attempt to parse YYYY-MM-DDTHH:MM:SS.mmm - date+time+ms, no timezone
             let result = NaiveDateTime::parse_from_str(cell, "%Y-%m-%dT%H:%M:%S%.f");
             if let Ok(datetime) = result {
-                success!(
+                debug!(
                     "{log_prefix}parsing as naive datetime with ms, success: {}",
                     datetime.format("%Y-%m-%dT%H:%M:%S%.3f")
                 );
@@ -360,7 +360,7 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
 
         let result = DateTime::parse_from_rfc3339(cell);
         if let Ok(datetime) = result {
-            success!("{log_prefix}parsing as rfc3339 datetime, success: {datetime}");
+            debug!("{log_prefix}parsing as rfc3339 datetime, success: {datetime}");
             return FieldValue::DateTime(NsTimestamp::from(datetime));
         } else {
             warn!("{log_prefix}parsing as rfc3339 datetime, fail: {result:?}");
@@ -370,7 +370,7 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
     let parse_duration = |cell: &str| {
         let result = iso8601_duration::Duration::parse(cell);
         if let Ok(duration) = result {
-            success!("{log_prefix}parsing duration, success: {duration}");
+            debug!("{log_prefix}parsing duration, success: {duration}");
             return FieldValue::Duration(NsTimestamp::from(duration.to_std().expect("todo")));
         } else {
             warn!("{log_prefix}parsing duration, fail: {result:?}");
@@ -539,9 +539,6 @@ where
     let mut performances = Vec::new();
 
     for (sheet_name, range) in worksheets {
-        if sheet_name != "j.matches.adofai" {
-            continue; // TODO: DEBUG
-        }
         let sheet_name_split = FieldPath::from(&sheet_name);
         let table_type = sheet_name_split
             .0
@@ -563,6 +560,7 @@ where
             player_database: &player_database,
             library_database: &library_database,
             proofs_to_insert: Vec::new(),
+            tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
         };
 
         let records = parse_records(&sheet_name, range, read_hyperlinks(&sheet_name));
@@ -571,30 +569,48 @@ where
         match table_type.as_str() {
             "matches" => {
                 for (i, record) in records.iter().enumerate() {
-                    let (match_data, performance_data) = game
-                        .create_match_and_performance_from_spreadsheet_record(record, &mut context)
-                        .map_err(|error| SpreadsheetImportError::ParsePerformanceError {
-                            game_id: game_id.to_owned(),
-                            row: i + 2,
-                            record: record.to_owned(),
-                            error: Box::new(error),
-                        })?;
-                    matches.push(match_data);
-                    performances.extend(performance_data);
+                    match game.create_match_and_performance_from_spreadsheet_record(record, &mut context) {
+                        Ok((match_data, performance_data)) => {
+                            success!(
+                                "successfully created match from record for game '{game_id}', row: {}: {:?}, {:?}",
+                                i + 2,
+                                match_data,
+                                performance_data
+                            );
+                            matches.push(match_data);
+                            performances.extend(performance_data);
+                        }
+                        Err(e) => {
+                            let throwable = SpreadsheetImportError::ParsePerformanceError {
+                                game_id: game_id.to_owned(),
+                                row: i + 2,
+                                record: record.to_owned(),
+                                error: Box::new(e),
+                            };
+                            warn!("error while creating match from record: {throwable}; ignoring for now");
+                            // Err(throwable)?
+                        }
+                    }
                 }
             }
             "songs" => {
                 let mut song_list = Vec::new();
                 for (i, record) in records.iter().enumerate() {
-                    let song = game.create_song_from_spreadsheet_record(record, &mut context).map_err(|error| {
-                        SpreadsheetImportError::ParseSongError {
-                            game_id: game_id.to_owned(),
-                            row: i + 2,
-                            record: record.to_owned(),
-                            error: Box::new(error),
+                    match game.create_song_from_spreadsheet_record(record, &mut context) {
+                        Ok(song) => {
+                            song_list.push(song);
                         }
-                    })?;
-                    song_list.push(song)
+                        Err(e) => {
+                            let throwable = SpreadsheetImportError::ParseSongError {
+                                game_id: game_id.to_owned(),
+                                row: i + 2,
+                                record: record.to_owned(),
+                                error: Box::new(e),
+                            };
+                            warn!("error while creating song from record: {throwable}; ignoring for now");
+                            // Err(throwable)?
+                        }
+                    }
                 }
                 song_lists.push(song_list);
             }

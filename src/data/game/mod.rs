@@ -10,6 +10,7 @@ use crate::util::command_line::AskError;
 use crate::util::uuid::UuidString;
 use crate::util::youtube_id;
 use calamine::Hyperlink;
+use chrono_tz::Tz;
 use indexmap::IndexMap;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -20,6 +21,7 @@ pub struct SpreadsheetContext<'a> {
     pub player_database: &'a PlayerDatabase,
     pub library_database: &'a LibraryDatabase,
     pub proofs_to_insert: Vec<LibraryEntry>,
+    pub tz: Tz,
 }
 
 impl SpreadsheetContext<'_> {
