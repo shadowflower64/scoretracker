@@ -81,7 +81,7 @@ impl Record {
             return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
         };
         let FieldValue::String(string) = value else {
-            return Err(SpreadsheetRecordImportError::NotAString(path, value.to_owned()));
+            return Err(SpreadsheetRecordImportError::NotAString(path, Box::new(value.to_owned())));
         };
 
         Ok(string.to_owned())
@@ -94,7 +94,7 @@ impl Record {
             return Ok(None);
         }
         let FieldValue::String(string) = value else {
-            return Err(SpreadsheetRecordImportError::NotAString(path, value.to_owned()));
+            return Err(SpreadsheetRecordImportError::NotAString(path, Box::new(value.to_owned())));
         };
 
         Ok(Some(string.to_owned()))
@@ -108,11 +108,11 @@ impl Record {
         let int = match value {
             FieldValue::Int(int) => *int,
             FieldValue::Float(float) if *float == float.round() && Self::ALLOW_FLOATS_AS_INTS => float.round() as i64,
-            _ => return Err(SpreadsheetRecordImportError::NotAnInt(path, value.to_owned())),
+            _ => return Err(SpreadsheetRecordImportError::NotAnInt(path, Box::new(value.to_owned()))),
         };
 
         let Ok(requested_int) = int.try_into() else {
-            return Err(SpreadsheetRecordImportError::NotAnIntSubtype(path, value.to_owned()));
+            return Err(SpreadsheetRecordImportError::NotAnIntSubtype(path, Box::new(value.to_owned())));
         };
 
         Ok(requested_int)
@@ -154,13 +154,14 @@ impl Record {
         };
         match value {
             FieldValue::Int(int) => {
-                Ok(Self::try_int_as_bool(*int).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, value.to_owned()))?)
+                Ok(Self::try_int_as_bool(*int).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
             }
             FieldValue::Float(float) => {
-                Ok(Self::try_float_as_bool(*float).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, value.to_owned()))?)
+                Ok(Self::try_float_as_bool(*float)
+                    .ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
             }
             FieldValue::Bool(bool) => Ok(*bool),
-            _ => Err(SpreadsheetRecordImportError::NotABool(path, value.to_owned())),
+            _ => Err(SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned()))),
         }
     }
 
@@ -171,14 +172,15 @@ impl Record {
         };
         match value {
             FieldValue::Int(int) => {
-                Ok(Self::try_int_as_bool(*int).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, value.to_owned()))?)
+                Ok(Self::try_int_as_bool(*int).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
             }
             FieldValue::Float(float) => {
-                Ok(Self::try_float_as_bool(*float).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, value.to_owned()))?)
+                Ok(Self::try_float_as_bool(*float)
+                    .ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
             }
             FieldValue::Bool(bool) => Ok(*bool),
             FieldValue::Empty => Ok(value_if_empty),
-            _ => Err(SpreadsheetRecordImportError::NotABool(path, value.to_owned())),
+            _ => Err(SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned()))),
         }
     }
 
@@ -204,8 +206,8 @@ impl Record {
                 }
             }
             FieldValue::DateTime(timestamp) => Ok(*timestamp),
-            FieldValue::DateOnlyNoTz(_) => Err(SpreadsheetRecordImportError::NotATimestamp(path, value.to_owned())), // this is too imprecise to use as a "timestamp"
-            _ => Err(SpreadsheetRecordImportError::NotATimestamp(path, value.to_owned())),
+            FieldValue::DateOnlyNoTz(_) => Err(SpreadsheetRecordImportError::NotATimestamp(path, Box::new(value.to_owned()))), // this is too imprecise to use as a "timestamp"
+            _ => Err(SpreadsheetRecordImportError::NotATimestamp(path, Box::new(value.to_owned()))),
         }
     }
 
@@ -216,7 +218,7 @@ impl Record {
         };
         match value {
             FieldValue::DateOnlyNoTz(naive) => Ok(*naive),
-            _ => Err(SpreadsheetRecordImportError::NotADate(path, value.to_owned())),
+            _ => Err(SpreadsheetRecordImportError::NotADate(path, Box::new(value.to_owned()))),
         }
     }
 
@@ -226,10 +228,23 @@ impl Record {
             return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
         };
         let FieldValue::Hyperlink(hyperlink) = value else {
-            return Err(SpreadsheetRecordImportError::NotAHyperlink(path, value.to_owned()));
+            return Err(SpreadsheetRecordImportError::NotAHyperlink(path, Box::new(value.to_owned())));
         };
 
         Ok(hyperlink.to_owned())
+    }
+
+    pub fn hyperlink_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<Hyperlink>, SpreadsheetRecordImportError> {
+        let path = key.into();
+        let Some(value) = self.0.get(&path) else { return Ok(None) };
+        if matches!(value, FieldValue::Empty) {
+            return Ok(None);
+        }
+        let FieldValue::Hyperlink(hyperlink) = value else {
+            return Err(SpreadsheetRecordImportError::NotAHyperlink(path, Box::new(value.to_owned())));
+        };
+
+        Ok(Some(hyperlink.to_owned()))
     }
 }
 
@@ -434,19 +449,19 @@ pub enum SpreadsheetRecordImportError {
     #[error("field not present: '{0}'")]
     FieldNotPresent(FieldPath),
     #[error("field '{0}' not a string: {1:?}")]
-    NotAString(FieldPath, FieldValue),
+    NotAString(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not an int: {1:?}")]
-    NotAnInt(FieldPath, FieldValue),
+    NotAnInt(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not an int subtype: {1:?}")]
-    NotAnIntSubtype(FieldPath, FieldValue),
+    NotAnIntSubtype(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a bool: {1:?}")]
-    NotABool(FieldPath, FieldValue),
+    NotABool(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a timestamp: {1:?}")]
-    NotATimestamp(FieldPath, FieldValue),
+    NotATimestamp(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a date: {1:?}")]
-    NotADate(FieldPath, FieldValue),
+    NotADate(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a hyperlink: {1:?}")]
-    NotAHyperlink(FieldPath, FieldValue),
+    NotAHyperlink(FieldPath, Box<FieldValue>),
     #[error("field '{path}' date {naive} is ambiguous in timezone {tz} (date is in a fold): it could be from {earliest} to {latest}")]
     LocalDateIsAmbiguous {
         path: FieldPath,
@@ -544,9 +559,10 @@ where
             .map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
         let library_database = LibraryDatabase::lock_and_read(config.library_database_path(), None)
             .map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
-        let context = SpreadsheetContext {
+        let mut context = SpreadsheetContext {
             player_database: &player_database,
             library_database: &library_database,
+            proofs_to_insert: Vec::new(),
         };
 
         let records = parse_records(&sheet_name, range, read_hyperlinks(&sheet_name));
@@ -556,7 +572,7 @@ where
             "matches" => {
                 for (i, record) in records.iter().enumerate() {
                     let (match_data, performance_data) = game
-                        .create_match_and_performance_from_spreadsheet_record(record, context)
+                        .create_match_and_performance_from_spreadsheet_record(record, &mut context)
                         .map_err(|error| SpreadsheetImportError::ParsePerformanceError {
                             game_id: game_id.to_owned(),
                             row: i + 2,
@@ -570,7 +586,7 @@ where
             "songs" => {
                 let mut song_list = Vec::new();
                 for (i, record) in records.iter().enumerate() {
-                    let song = game.create_song_from_spreadsheet_record(record, context).map_err(|error| {
+                    let song = game.create_song_from_spreadsheet_record(record, &mut context).map_err(|error| {
                         SpreadsheetImportError::ParseSongError {
                             game_id: game_id.to_owned(),
                             row: i + 2,
@@ -619,9 +635,9 @@ pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<SpreadsheetImport
     let read_hyperlinks = |name: &str| {
         log_fn_name!("import_org_spreadsheet_xlsx:read_hyperlinks");
         info!("reading hyperlinks for worksheet '{name}'...");
-        let hyperlinks = workbook.hyperlinks_by_sheet_name(&name).expect("todo");
+        let hyperlinks = workbook.hyperlinks_by_sheet_name(name).expect("todo");
         info!("reading hyperlinks for worksheet '{name}'... done");
-        return hyperlinks;
+        hyperlinks
     };
     import_org_spreadsheet_generic(worksheets, read_hyperlinks)
 }

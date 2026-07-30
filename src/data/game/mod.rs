@@ -15,10 +15,11 @@ use serde::Serialize;
 use std::fmt::Debug;
 use uuid::Uuid;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct SpreadsheetContext<'a> {
     pub player_database: &'a PlayerDatabase,
     pub library_database: &'a LibraryDatabase,
+    pub proofs_to_insert: Vec<LibraryEntry>,
 }
 
 impl SpreadsheetContext<'_> {
@@ -28,30 +29,53 @@ impl SpreadsheetContext<'_> {
             .ok_or_else(|| SpreadsheetRecordImportError::PlayerDoesNotExist { name: name.to_owned() })
     }
 
-    pub fn find_proof_by_youtube_url(&self, url: &str) -> Result<&LibraryEntry, SpreadsheetRecordImportError> {
+    pub fn find_proof_by_youtube_id(&self, youtube_id: &str) -> Result<&LibraryEntry, SpreadsheetRecordImportError> {
+        if let Some(proof) = self
+            .proofs_to_insert
+            .iter()
+            .find(|x| x.youtube_id.as_ref().is_some_and(|id| id == youtube_id))
+        {
+            return Ok(proof);
+        }
+
+        if let Some(proof) = self.library_database.find_entry_by_youtube_id(youtube_id) {
+            return Ok(proof);
+        }
+
+        Err(SpreadsheetRecordImportError::ProofDoesNotExist {
+            youtube_id: youtube_id.to_owned(),
+        })
+    }
+
+    pub fn get_or_insert_proof_by_hyperlink(&mut self, hyperlink: &Hyperlink) -> Result<UuidString, SpreadsheetRecordImportError> {
+        let url = hyperlink.target.as_ref().expect("todo");
         let Some(youtube_id) = youtube_id(url) else {
             return Err(SpreadsheetRecordImportError::InvalidYouTubeUrl { url: url.to_owned() });
         };
-        self.library_database
-            .find_entry_by_youtube_id(&youtube_id)
-            .ok_or_else(|| SpreadsheetRecordImportError::ProofDoesNotExist {
-                youtube_id: youtube_id.to_owned(),
-            })
-    }
-
-    pub fn get_or_insert_proof_by_hyperlink(&self, hyperlink: &Hyperlink) -> Result<UuidString, SpreadsheetRecordImportError> {
-        if let Ok(proof) = self.find_proof_by_youtube_url(hyperlink.target.as_ref().expect("todo")) {
+        if let Ok(proof) = self.find_proof_by_youtube_id(&youtube_id) {
             Ok(proof.uuid)
         } else {
-            todo!("insert proof here")
+            let proof = LibraryEntry {
+                youtube_id: Some(youtube_id),
+                ..Default::default()
+            };
+            let uuid = proof.uuid;
+            self.proofs_to_insert.push(proof);
+            Ok(uuid)
         }
     }
 
-    pub fn create_common(&self, record: &Record) -> Result<CommonPerformanceInfo, SpreadsheetRecordImportError> {
+    pub fn create_common(&mut self, record: &Record) -> Result<CommonPerformanceInfo, SpreadsheetRecordImportError> {
+        let proof = if let Some(hyperlink) = record.hyperlink_opt("video")? {
+            let proof_uuid = self.get_or_insert_proof_by_hyperlink(&hyperlink)?;
+            vec![proof_uuid]
+        } else {
+            Vec::new()
+        };
         Ok(CommonPerformanceInfo {
             uuid: Uuid::now_v7().into(),
             player_uuid: self.find_player_by_name(&record.string("player")?)?.uuid,
-            proof: vec![self.get_or_insert_proof_by_hyperlink(&record.hyperlink("video")?)?],
+            proof,
             comment: record.string_opt("comment")?,
             metadata: IndexMap::new(),
         })
@@ -70,7 +94,7 @@ pub trait Game: Debug {
     fn create_match_and_performance_from_spreadsheet_record(
         &self,
         _record: &Record,
-        _ctx: SpreadsheetContext,
+        _ctx: &mut SpreadsheetContext,
     ) -> Result<(AnyMatch, Vec<AnyPerformance>), SpreadsheetRecordImportError> {
         Err(SpreadsheetRecordImportError::NotImplemented)
     }
@@ -78,7 +102,7 @@ pub trait Game: Debug {
     fn create_song_from_spreadsheet_record(
         &self,
         _record: &Record,
-        _ctx: SpreadsheetContext,
+        _ctx: &mut SpreadsheetContext,
     ) -> Result<AnySong, SpreadsheetRecordImportError> {
         Err(SpreadsheetRecordImportError::NotImplemented)
     }

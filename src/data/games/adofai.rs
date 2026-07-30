@@ -126,7 +126,7 @@ impl Game for ADOFAI {
     fn create_match_and_performance_from_spreadsheet_record(
         &self,
         record: &Record,
-        ctx: SpreadsheetContext,
+        ctx: &mut SpreadsheetContext,
     ) -> Result<(Box<dyn MatchTrait>, Vec<Box<dyn PerformanceTrait>>), SpreadsheetRecordImportError> {
         let mut lamp = Lamp::None;
         if record.bool("c")? {
@@ -174,7 +174,7 @@ impl Game for ADOFAI {
     fn create_song_from_spreadsheet_record(
         &self,
         _record: &Record,
-        _ctx: SpreadsheetContext,
+        _ctx: &mut SpreadsheetContext,
     ) -> Result<Box<dyn SongTrait>, SpreadsheetRecordImportError> {
         Err(SpreadsheetRecordImportError::NotImplemented)
     }
