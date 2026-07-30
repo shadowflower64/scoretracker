@@ -1,6 +1,6 @@
 //! Data structures for Guitar Hero III: Legends of Rock.
 use crate::data::game::IncompleteOrCritical::Incomplete;
-use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SpreadsheetContext};
+use crate::data::game::{Game, ImportMatchResult, ImportSongResult, IncompleteOrCriticalResultTrait, SpreadsheetContext};
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
 use crate::spreadsheet::{Record, SpreadsheetRecordImportError};
@@ -206,7 +206,7 @@ impl Game for GuitarHero3 {
             instrument: record.string_enum("instrument")?,
             difficulty: record.string_enum("difficulty")?,
             lamp,
-            score: record.int("score")?,
+            score: record.int("score").incomplete()?,
             notes_hit: record.int("hit_notes")?,
             notes_total: record.int("total_notes")?,
             max_streak: record.int("note_streak")?,
