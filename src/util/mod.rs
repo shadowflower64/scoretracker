@@ -20,7 +20,7 @@ pub mod uuid;
 ///
 /// # Examples
 /// ```
-/// # use scoretracker::util::path_from_segments;
+/// # use scoretracker::util::relative_path_from_segments;
 /// # use relative_path::RelativePathBuf;
 /// #[cfg(target_family = "unix")]
 /// assert_eq!(relative_path_from_segments(&["directory", "file.txt"]), RelativePathBuf::from("directory/file.txt"));
@@ -52,10 +52,11 @@ pub fn relative_path_from_segments(segments: &[&str]) -> RelativePathBuf {
 /// assert_eq!(youtube_id("www.youtube.com/watch?v=DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 8");
 /// assert_eq!(youtube_id("youtube.com/watch?v=DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 9");
 /// assert_eq!(youtube_id("DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 10");
+/// assert_eq!(youtube_id("https://youtu.be/AaBb190_-Zz"), Some("AaBb190_-Zz".to_string()), "test 11");
 /// ```
 pub fn youtube_id(url: &str) -> Option<String> {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"^(?:(?:https?:\/\/)?(?:(?:(?:www.)?youtube\.com\/watch\?v=)|(?:youtu\.be\/)))?([a-zA-Z0-9-=]{11})(?:[#&?]|$).*")
+        Regex::new(r"^(?:(?:https?:\/\/)?(?:(?:(?:www.)?youtube\.com\/watch\?v=)|(?:youtu\.be\/)))?([a-zA-Z0-9-_]{11})(?:[#&?]|$).*")
             .expect("could not parse regex")
     });
     let captures = REGEX.captures(url)?;

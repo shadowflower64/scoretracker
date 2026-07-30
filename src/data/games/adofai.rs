@@ -8,7 +8,6 @@ use crate::data::scoreboard::performance::CommonPerformanceInfo;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::spreadsheet::Record;
 use crate::spreadsheet::SpreadsheetRecordImportError;
-use crate::spreadsheet::get_or_insert_proof_by_youtube_url;
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -146,15 +145,7 @@ impl Game for ADOFAI {
             lamp = Lamp::StrictPurePerfectFC;
         }
         let performance_data = Performance {
-            common: CommonPerformanceInfo {
-                uuid: Uuid::now_v7().into(),
-                player_uuid: ctx.find_player_by_name(&record.string("player")?)?.uuid,
-                proof: vec![get_or_insert_proof_by_youtube_url(
-                    &record.hyperlink("video")?.target.expect("todo"),
-                )],
-                comment: record.string_opt("comment")?,
-                metadata: HashMap::new(),
-            },
+            common: ctx.create_common(record)?,
             lamp,
             misses: record.int("misses")?,
             overload: record.int("overhits")?,

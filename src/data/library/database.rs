@@ -234,6 +234,9 @@ pub struct LibraryEntry {
     /// Known library locations of the file. Updated on rescan.
     pub library_urls: Vec<StplUrl>,
 
+    /// ID of this video file on YouTube
+    pub youtube_id: Option<String>,
+
     /// Is the media file linked to any performance? Will it be linked to a performance in the future? Or is this not a video of a performance at all?
     pub entry_kind: LibraryEntryKind,
 
@@ -283,13 +286,6 @@ pub struct LibraryEntry {
     /// Set this to `Some(Vec::new())` if the clips are not known. Set this to [`None`] if this is not a montage.
     pub clips: Option<Vec<UuidString>>,
 
-    /// List of tags that are assigned to this library entry by the user.
-    #[serde(default)]
-    pub tags: HashSet<Tag>,
-
-    /// User-added comment for this library entry.
-    pub comment: Option<String>,
-
     /// Timestamp (in nanoseconds) of the real-life time at the start of this recording.
     ///
     /// Set this to [`None`] if this information is not known or is not applicable (montages).
@@ -309,11 +305,18 @@ pub struct LibraryEntry {
     /// Set this to 0 for singular images/frames.
     pub duration: Option<NsTimestamp>,
 
+    /// AutomaticContentDetectionInformation
+    pub automatic_content_detection_information: Option<AutomaticContentDetectionInformation>,
+
+    /// List of tags that are assigned to this library entry by the user.
+    #[serde(default)]
+    pub tags: HashSet<Tag>,
+
+    /// User-added comment for this library entry.
+    pub comment: Option<String>,
+
     /// Timestamp (in nanoseconds) of when this file was added/scanned into the library.
     pub timestamp_added: NsTimestamp,
-
-    /// AutomaticContentDetectionInformation
-    pub automatic_content_detection_information: AutomaticContentDetectionInformation,
 }
 
 impl Default for LibraryEntry {
@@ -324,6 +327,7 @@ impl Default for LibraryEntry {
             timestamp_added: NsTimestamp::now(),
 
             // Default values for other fields
+            youtube_id: None,
             sha256: String::new(),
             library_urls: Vec::new(),
             entry_kind: LibraryEntryKind::default(),
@@ -341,7 +345,7 @@ impl Default for LibraryEntry {
             timestamp_start: None,
             timestamp_end: None,
             duration: None,
-            automatic_content_detection_information: AutomaticContentDetectionInformation::default(),
+            automatic_content_detection_information: None,
         }
     }
 }
@@ -359,16 +363,22 @@ impl LibraryDatabase {
         &CACHE
     }
 
-    pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
-        self.entries.iter().find(|x| x.sha256 == sha256)
-    }
-
     pub fn find_entry_by_uuid(&self, uuid: UuidString) -> Option<&LibraryEntry> {
         self.entries.iter().find(|x| x.uuid == uuid)
     }
 
     pub fn find_entry_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut LibraryEntry> {
         self.entries.iter_mut().find(|x| x.uuid == uuid)
+    }
+
+    pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
+        self.entries.iter().find(|x| x.sha256 == sha256)
+    }
+
+    pub fn find_entry_by_youtube_id(&self, youtube_id: &str) -> Option<&LibraryEntry> {
+        self.entries
+            .iter()
+            .find(|x| x.youtube_id.as_ref().is_some_and(|id| id == youtube_id))
     }
 
     pub fn add(&mut self, relative_path: &RelativePath, sha256: String, domain: LibraryDomain) -> Uuid {

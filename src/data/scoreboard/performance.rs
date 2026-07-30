@@ -1,9 +1,10 @@
 use crate::data::scoreboard::AnyValue;
 use crate::util::{command_line::AskError, uuid::UuidString};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
-pub type PerformanceMetadata = HashMap<String, AnyValue>;
+pub type PerformanceMetadata = IndexMap<String, AnyValue>;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CommonPerformanceInfo {

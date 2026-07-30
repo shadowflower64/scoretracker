@@ -1,12 +1,12 @@
 use crate::config::Config;
 use crate::data::game::song::AnySong;
 use crate::data::game::{SpreadsheetContext, game_instance_from_id};
+use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::data::scoreboard::player::PlayerDatabase;
 use crate::error;
 use crate::util::filelocked::FileLockableData;
-use crate::util::uuid::UuidString;
 use crate::util::{file_ex, lockfile};
 use crate::{info, log_fn_name, success, util::timestamp::NsTimestamp, warn};
 use calamine::Data::{self};
@@ -425,11 +425,6 @@ pub struct SpreadsheetImportResults {
     pub performances: Vec<AnyPerformance>,
 }
 
-pub fn get_or_insert_proof_by_youtube_url(_youtube_url: &str) -> UuidString {
-    // return Uuid::now_v7().into();
-    todo!()
-}
-
 #[derive(Debug, Error)]
 pub enum SpreadsheetRecordImportError {
     #[error("not implemented")]
@@ -464,6 +459,10 @@ pub enum SpreadsheetRecordImportError {
     LocalDateIsInGap { path: FieldPath, naive: NaiveDateTime, tz: Tz },
     #[error("player '{name}' does not exist")]
     PlayerDoesNotExist { name: String },
+    #[error("proof with youtube id '{youtube_id}' does not exist")]
+    ProofDoesNotExist { youtube_id: String },
+    #[error("invalid youtube url: {url}")]
+    InvalidYouTubeUrl { url: String }, // video ID not found
     #[error("{0}")]
     CustomMessage(String),
     #[error("{0}")]
@@ -486,6 +485,8 @@ pub enum SpreadsheetImportError {
     CannotReadConfig(lockfile::Error), // TODO: this should actually be file_ex::Error, because the config is not open for writing
     #[error("cannot read player database: {0}")]
     CannotReadPlayerDatabase(file_ex::Error),
+    #[error("cannot read library database: {0}")]
+    CannotReadLibraryDatabase(lockfile::Error),
     #[error("could not create performance for game '{game_id}' from spreadsheet row {row}: {error};\nrecord = {record}")]
     ParsePerformanceError {
         game_id: String,
@@ -541,8 +542,11 @@ where
         let config = Config::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
         let player_database = PlayerDatabase::read_without_locking(config.player_database_path())
             .map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
+        let library_database = LibraryDatabase::lock_and_read(config.library_database_path(), None)
+            .map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
         let context = SpreadsheetContext {
             player_database: &player_database,
+            library_database: &library_database,
         };
 
         let records = parse_records(&sheet_name, range, read_hyperlinks(&sheet_name));
