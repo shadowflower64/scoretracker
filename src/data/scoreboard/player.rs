@@ -1,8 +1,59 @@
-use crate::util::uuid::UuidString;
+use crate::util::{file_ex::FileEx, filelocked::FileLockableData, path_from_segments, uuid::UuidString};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+use uuid::Uuid;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Player {
     pub uuid: UuidString,
     pub name: String,
+}
+
+#[derive(Debug, Default)]
+pub struct PlayerDatabase {
+    pub entries: Vec<Player>,
+}
+
+impl PlayerDatabase {
+    pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "players.jsonl"];
+
+    pub fn standard_path() -> &'static Path {
+        static CACHE: LazyLock<PathBuf> = LazyLock::new(|| path_from_segments(&PlayerDatabase::STANDARD_PATH_SEGMENTS));
+        &CACHE
+    }
+
+    pub fn find_player_by_name(&self, name: &str) -> Option<&Player> {
+        self.entries.iter().find(|x| x.name == name)
+    }
+
+    pub fn find_player_by_uuid(&self, uuid: UuidString) -> Option<&Player> {
+        self.entries.iter().find(|x| x.uuid == uuid)
+    }
+
+    pub fn find_player_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut Player> {
+        self.entries.iter_mut().find(|x| x.uuid == uuid)
+    }
+
+    pub fn add(&mut self, name: &str) -> Result<Uuid, Uuid> {
+        if let Some(old_player) = self.find_player_by_name(name) {
+            Err(old_player.uuid.into())
+        } else {
+            let uuid = Uuid::now_v7();
+            self.entries.push(Player {
+                uuid: uuid.into(),
+                name: name.to_owned(),
+            });
+            Ok(uuid)
+        }
+    }
+}
+
+impl FileLockableData for PlayerDatabase {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> crate::util::file_ex::Result<Option<Self>> {
+        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { entries: y }))
+    }
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> crate::util::file_ex::Result<()> {
+        file_ex.write_as_jsonlines(&self.entries)
+    }
 }

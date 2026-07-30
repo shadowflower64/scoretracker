@@ -45,7 +45,7 @@ use walkdir::{DirEntry, WalkDir};
 ///
 /// # Examples
 /// ```
-/// # use scoretracker::library::path_within_library_dir;
+/// # use scoretracker::data::library::path_within_library_dir;
 /// # use relative_path::RelativePathBuf;
 /// assert_eq!(path_within_library_dir("/mnt/example/videos/library", "/mnt/example/videos/library/example_file_1.mp4"), Some(RelativePathBuf::from("example_file_1.mp4")));
 /// assert_eq!(path_within_library_dir("/mnt/example/videos/library", "/mnt/example/videos/library/directory/example_file_2.mp4"), Some(RelativePathBuf::from("directory/example_file_2.mp4")));

@@ -1,7 +1,5 @@
-use crate::data::songs::song::SongTrait;
+use crate::data::game::song::SongTrait;
 use serde::{Deserialize, Serialize};
-
-pub mod song;
 
 #[derive(Deserialize, Serialize)]
 pub struct GameSongList<Song: SongTrait> {

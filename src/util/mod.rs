@@ -41,19 +41,20 @@ pub fn path_from_segments(segments: &[&str]) -> PathBuf {
 /// # Examples
 /// ```
 /// # use scoretracker::util::youtube_id;
-/// assert_eq!(youtube_id("https://youtu.be/DRi4vpCkPa0"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("https://youtu.be/DRi4vpCkPa0?si=yuArVYcjmKA3_P4e"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("https://www.youtube.com/watch?v=DRi4vpCkPa0"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("https://www.youtube.com/watch?v=DRi4vpCkPa0&feature=youtu.be"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("http://youtu.be/DRi4vpCkPa0"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("http://www.youtube.com/watch?v=DRi4vpCkPa0"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("youtu.be/DRi4vpCkPa0"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("www.youtube.com/watch?v=DRi4vpCkPa0"), "DRi4vpCkPa0")
-/// assert_eq!(youtube_id("youtube.com/watch?v=DRi4vpCkPa0"), "DRi4vpCkPa0")
+/// assert_eq!(youtube_id("https://youtu.be/DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 1");
+/// assert_eq!(youtube_id("https://youtu.be/DRi4vpCkPa0?si=yuArVYcjmKA3_P4e"), Some("DRi4vpCkPa0".to_string()), "test 2");
+/// assert_eq!(youtube_id("https://www.youtube.com/watch?v=DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 3");
+/// assert_eq!(youtube_id("https://www.youtube.com/watch?v=DRi4vpCkPa0&feature=youtu.be"), Some("DRi4vpCkPa0".to_string()), "test 4");
+/// assert_eq!(youtube_id("http://youtu.be/DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 5");
+/// assert_eq!(youtube_id("http://www.youtube.com/watch?v=DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 6");
+/// assert_eq!(youtube_id("youtu.be/DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 7");
+/// assert_eq!(youtube_id("www.youtube.com/watch?v=DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 8");
+/// assert_eq!(youtube_id("youtube.com/watch?v=DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 9");
+/// assert_eq!(youtube_id("DRi4vpCkPa0"), Some("DRi4vpCkPa0".to_string()), "test 10");
 /// ```
 pub fn youtube_id(url: &str) -> Option<String> {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"^(?:https?:\/\/)?(?:(?:(?:www.)?youtube\.com\/watch\?v=)|(?:youtu\.be\/))([a-zA-Z0-9-=]{11})(?:[#&]|$).*")
+        Regex::new(r"^(?:(?:https?:\/\/)?(?:(?:(?:www.)?youtube\.com\/watch\?v=)|(?:youtu\.be\/)))?([a-zA-Z0-9-=]{11})(?:[#&?]|$).*")
             .expect("could not parse regex")
     });
     let captures = REGEX.captures(url)?;

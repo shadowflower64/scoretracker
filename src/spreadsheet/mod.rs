@@ -1,7 +1,7 @@
 use crate::data::game::game_instance_from_id;
+use crate::data::game::song::AnySong;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
-use crate::data::songs::song::AnySong;
 use crate::util::uuid::UuidString;
 use crate::{info, log_fn_name, success, util::timestamp::NsTimestamp, warn};
 use calamine::Data::{self};
@@ -23,9 +23,9 @@ use thiserror::Error;
 /// # Examples
 /// ```
 /// # use scoretracker::spreadsheet::FieldPath;
-/// assert_eq!(FieldPath::from("song_id"), FieldPath { segments: vec!["song_id".to_string()] });
-/// assert_eq!(FieldPath::from("chart.x.total_notes"), FieldPath { segments: vec!["chart".to_string(), "x".to_string(), "total_notes".to_string()] });
-/// assert_eq!(FieldPath { segments: vec!["chart".to_string(), "x".to_string(), "total_notes".to_string()] }.to_string().as_str(), "chart.x.total_notes");
+/// assert_eq!(FieldPath::from("song_id"), FieldPath(vec!["song_id".to_string()]));
+/// assert_eq!(FieldPath::from("chart.x.total_notes"), FieldPath(vec!["chart".to_string(), "x".to_string(), "total_notes".to_string()]));
+/// assert_eq!(FieldPath(vec!["chart".to_string(), "x".to_string(), "total_notes".to_string()]).to_string().as_str(), "chart.x.total_notes");
 /// ```
 #[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct FieldPath(pub Vec<String>);
