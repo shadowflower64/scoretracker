@@ -526,6 +526,8 @@ where
     F: FnMut(&str) -> Vec<Hyperlink>,
 {
     log_fn_name!("import_org_spreadsheet_generic");
+    pub const VERBOSE: bool = false;
+    pub const WARNINGS_AS_ERRORS: bool = true;
 
     let total_worksheets = worksheets.len();
     worksheets.retain(|(name, _)| name.starts_with("j."));
@@ -571,12 +573,16 @@ where
                 for (i, record) in records.iter().enumerate() {
                     match game.create_match_and_performance_from_spreadsheet_record(record, &mut context) {
                         Ok((match_data, performance_data)) => {
-                            success!(
-                                "successfully created match from record for game '{game_id}', row: {}: {:?}, {:?}",
-                                i + 2,
-                                match_data,
-                                performance_data
-                            );
+                            if VERBOSE {
+                                success!(
+                                    "successfully created match from record for game '{game_id}', row: {}: {:?}, {:?}",
+                                    i + 2,
+                                    match_data,
+                                    performance_data
+                                );
+                            } else {
+                                success!("{game_id}:{} | match parsed successfully ", i + 2);
+                            }
                             matches.push(match_data);
                             performances.extend(performance_data);
                         }
@@ -587,8 +593,15 @@ where
                                 record: record.to_owned(),
                                 error: Box::new(e),
                             };
-                            warn!("error while creating match from record: {throwable}; ignoring for now");
-                            // Err(throwable)?
+                            if WARNINGS_AS_ERRORS {
+                                return Err(throwable);
+                            }
+
+                            if VERBOSE {
+                                warn!("error while creating match from record: {throwable}; ignoring for now");
+                            } else {
+                                warn!("{game_id}:{} | could not parse match; ignoring", i + 2);
+                            }
                         }
                     }
                 }
@@ -598,6 +611,15 @@ where
                 for (i, record) in records.iter().enumerate() {
                     match game.create_song_from_spreadsheet_record(record, &mut context) {
                         Ok(song) => {
+                            if VERBOSE {
+                                success!(
+                                    "successfully created song from record for game '{game_id}', row: {}: {:?}",
+                                    i + 2,
+                                    song,
+                                );
+                            } else {
+                                success!("{game_id}:{} | song parsed successfully ", i + 2);
+                            }
                             song_list.push(song);
                         }
                         Err(e) => {
@@ -607,7 +629,15 @@ where
                                 record: record.to_owned(),
                                 error: Box::new(e),
                             };
-                            warn!("error while creating song from record: {throwable}; ignoring for now");
+                            if WARNINGS_AS_ERRORS {
+                                return Err(throwable);
+                            }
+
+                            if VERBOSE {
+                                warn!("error while creating song from record: {throwable}; ignoring for now");
+                            } else {
+                                warn!("{game_id}:{} | could not parse song; ignoring", i + 2);
+                            }
                             // Err(throwable)?
                         }
                     }
