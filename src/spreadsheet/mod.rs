@@ -310,6 +310,11 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
             let result = NaiveDateTime::parse_from_str(cell, "%Y-%m-%dT%H:%M:%S");
             if let Ok(datetime) = result {
                 success!("{log_prefix}parsing as naive datetime, success: {datetime}");
+                if datetime.format("%H:%M:%S").to_string() == "00:00:00" || datetime.format("%H:%M:%S").to_string().len() != 8 {
+                    panic!(
+                        "there is no time in this datetime... so this cannot be stored as just a nstimestamp without extra information without losing any information."
+                    );
+                }
                 return FieldValue::DateTimeNoTz(datetime);
             } else {
                 warn!("{log_prefix}parsing as naive datetime, fail: {result:?}");
@@ -327,6 +332,11 @@ fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bo
                     "{log_prefix}parsing as naive datetime with ms, success: {}",
                     datetime.format("%Y-%m-%dT%H:%M:%S%.3f")
                 );
+                if datetime.format("%.3f").to_string() == ".000" || datetime.format("%.3f").to_string().len() != 4 {
+                    panic!(
+                        "there are no ms in this datetime... so this cannot be stored as just a nstimestamp without extra information without losing any information."
+                    );
+                }
                 return FieldValue::DateTimeWithMsNoTz(datetime);
             } else {
                 warn!("{log_prefix}parsing as naive datetime with ms, fail: {result:?}");
@@ -492,23 +502,27 @@ pub enum SpreadsheetImportError {
     },
 }
 
-pub fn import_org_spreadsheet_generic(
-    mut worksheets: Vec<(String, Range<Data>, Vec<Hyperlink>)>,
-) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
+pub fn import_org_spreadsheet_generic<F>(
+    mut worksheets: Vec<(String, Range<Data>)>,
+    mut read_hyperlinks: F,
+) -> Result<SpreadsheetImportResults, SpreadsheetImportError>
+where
+    F: FnMut(&str) -> Vec<Hyperlink>,
+{
     log_fn_name!("import_org_spreadsheet_generic");
 
     let total_worksheets = worksheets.len();
-    worksheets.retain(|(name, _, _)| name.starts_with("j."));
+    worksheets.retain(|(name, _)| name.starts_with("j."));
     let filtered_worksheets = worksheets.len();
 
-    let names: Vec<_> = worksheets.iter().map(|(name, _, _)| name.to_string()).collect();
+    let names: Vec<_> = worksheets.iter().map(|(name, _)| name.to_string()).collect();
     info!("total worksheets: {total_worksheets}, filtered worksheets: {filtered_worksheets}, names: {names:?}");
 
     let mut song_lists = Vec::new();
     let mut matches = Vec::new();
     let mut performances = Vec::new();
 
-    for (sheet_name, range, hyperlinks) in worksheets {
+    for (sheet_name, range) in worksheets {
         if sheet_name != "j.matches.adofai" {
             continue; // TODO: DEBUG
         }
@@ -522,9 +536,6 @@ pub fn import_org_spreadsheet_generic(
             .get(2)
             .ok_or_else(|| SpreadsheetImportError::InvalidSheetName(sheet_name.to_owned()))?;
 
-        let records = parse_records(&sheet_name, range, hyperlinks);
-        // println!("{records:#?}");
-
         let game = game_instance_from_id(game_id.as_str()).ok_or_else(|| SpreadsheetImportError::UnknownGame(game_id.to_owned()))?;
 
         let config = Config::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
@@ -533,6 +544,9 @@ pub fn import_org_spreadsheet_generic(
         let context = SpreadsheetContext {
             player_database: &player_database,
         };
+
+        let records = parse_records(&sheet_name, range, read_hyperlinks(&sheet_name));
+        // println!("{records:#?}");
 
         match table_type.as_str() {
             "matches" => {
@@ -585,11 +599,7 @@ pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportRe
     let worksheets = workbook.worksheets();
     info!("fetched worksheets successfully");
 
-    let mut worksheet_data = Vec::new();
-    for (name, range) in worksheets {
-        worksheet_data.push((name, range, Vec::new()));
-    }
-    import_org_spreadsheet_generic(worksheet_data)
+    import_org_spreadsheet_generic(worksheets, |_| Vec::new())
 }
 
 pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
@@ -602,14 +612,12 @@ pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<SpreadsheetImport
     let worksheets = workbook.worksheets();
     info!("fetched worksheets successfully");
 
-    let mut worksheet_data = Vec::new();
-    for (name, range) in worksheets {
+    let read_hyperlinks = |name: &str| {
+        log_fn_name!("import_org_spreadsheet_xlsx:read_hyperlinks");
         info!("reading hyperlinks for worksheet '{name}'...");
-        let hyperlinks = workbook.hyperlinks_by_sheet_name(&name).unwrap();
-        worksheet_data.push((
-            name, range, hyperlinks, // TODO: error handling
-        ));
-    }
-    info!("read hyperlinks successfully");
-    import_org_spreadsheet_generic(worksheet_data)
+        let hyperlinks = workbook.hyperlinks_by_sheet_name(&name).expect("todo");
+        info!("reading hyperlinks for worksheet '{name}'... done");
+        return hyperlinks;
+    };
+    import_org_spreadsheet_generic(worksheets, read_hyperlinks)
 }
