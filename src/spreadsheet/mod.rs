@@ -87,7 +87,7 @@ impl Record {
     pub fn field_opt<K: Into<FieldPath>>(&self, key: K) -> Option<&FieldValue> {
         let path = key.into();
 
-        let Some(value) = self.0.get(&path) else { return None };
+        let value = self.0.get(&path)?;
         if matches!(value, FieldValue::Empty) {
             return None;
         }

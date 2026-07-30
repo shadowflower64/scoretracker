@@ -1,6 +1,6 @@
 //! Data structures for Guitar Hero III: Legends of Rock.
 use crate::data::game::IncompleteOrCritical::Incomplete;
-use crate::data::game::{Game, ImportMatchResult, ImportSongResult, IncompleteOrCriticalResultTrait, SpreadsheetContext};
+use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
 use crate::spreadsheet::{Record, SpreadsheetRecordImportError};
@@ -79,9 +79,9 @@ pub enum Instrument {
 #[error("not an instrument: {0}")]
 pub struct NotAnInstrument(String);
 
-impl Into<SpreadsheetRecordImportError> for NotAnInstrument {
-    fn into(self) -> SpreadsheetRecordImportError {
-        SpreadsheetRecordImportError::Custom(Box::new(self))
+impl From<NotAnInstrument> for SpreadsheetRecordImportError {
+    fn from(value: NotAnInstrument) -> Self {
+        Self::Custom(Box::new(value))
     }
 }
 
@@ -111,9 +111,9 @@ pub enum Difficulty {
 #[error("not a difficulty: {0}")]
 pub struct NotADifficulty(String);
 
-impl Into<SpreadsheetRecordImportError> for NotADifficulty {
-    fn into(self) -> SpreadsheetRecordImportError {
-        SpreadsheetRecordImportError::Custom(Box::new(self))
+impl From<NotADifficulty> for SpreadsheetRecordImportError {
+    fn from(value: NotADifficulty) -> Self {
+        Self::Custom(Box::new(value))
     }
 }
 
@@ -206,7 +206,7 @@ impl Game for GuitarHero3 {
             instrument: record.string_enum("instrument")?,
             difficulty: record.string_enum("difficulty")?,
             lamp,
-            score: record.int("score").incomplete()?,
+            score: record.int("score").or_skip()?,
             notes_hit: record.int("hit_notes")?,
             notes_total: record.int("total_notes")?,
             max_streak: record.int("note_streak")?,

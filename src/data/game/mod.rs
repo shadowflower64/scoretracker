@@ -75,7 +75,7 @@ impl SpreadsheetContext<'_> {
                 Vec::new()
             }
             Some(FieldValue::Hyperlink(hyperlink)) => {
-                let proof_uuid = self.get_or_insert_proof_by_hyperlink(&hyperlink)?;
+                let proof_uuid = self.get_or_insert_proof_by_hyperlink(hyperlink)?;
                 vec![proof_uuid]
             }
             None => {
@@ -103,7 +103,7 @@ impl SpreadsheetContext<'_> {
     pub fn create_common_m<P: PerformanceTrait>(&mut self, record: &Record, performances: &[&P]) -> RecordImportResult<CommonMatchInfo> {
         Ok(CommonMatchInfo {
             uuid: Uuid::now_v7().into(),
-            timestamp: record.timestamp("timestamp", self.tz).incomplete()?,
+            timestamp: record.timestamp("timestamp", self.tz).or_skip()?,
             song_id: record.string("song_id")?,
             performance_ids: performances.iter().map(|x| *x.uuid()).collect(),
             proof: Vec::new(),
@@ -119,16 +119,16 @@ pub enum IncompleteOrCritical<E> {
 }
 pub type RecordImportResult<T> = Result<T, IncompleteOrCritical<SpreadsheetRecordImportError>>;
 
-pub trait IncompleteOrCriticalResultTrait<T> {
-    fn incomplete(self) -> RecordImportResult<T>;
-    fn crit(self) -> RecordImportResult<T>;
+pub trait SkipOrQuit<T> {
+    fn or_skip(self) -> RecordImportResult<T>;
+    fn or_quit(self) -> RecordImportResult<T>;
 }
 
-impl<T> IncompleteOrCriticalResultTrait<T> for Result<T, SpreadsheetRecordImportError> {
-    fn crit(self) -> RecordImportResult<T> {
+impl<T> SkipOrQuit<T> for Result<T, SpreadsheetRecordImportError> {
+    fn or_quit(self) -> RecordImportResult<T> {
         self.map_err(IncompleteOrCritical::Critical)
     }
-    fn incomplete(self) -> RecordImportResult<T> {
+    fn or_skip(self) -> RecordImportResult<T> {
         self.map_err(IncompleteOrCritical::Incomplete)
     }
 }
