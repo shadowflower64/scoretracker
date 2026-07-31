@@ -8,7 +8,7 @@ use crate::data::scoreboard::r#match::CommonMatchInfo;
 use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::CommonPerformanceInfo;
 use crate::data::scoreboard::performance::PerformanceTrait;
-use crate::spreadsheet::SpreadsheetRecordImportError;
+use crate::spreadsheet::RecordError;
 use crate::spreadsheet::record::Record;
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
@@ -162,6 +162,6 @@ impl Game for ADOFAI {
     }
 
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Critical(SpreadsheetRecordImportError::NotImplemented))
+        Err(Critical(RecordError::NotImplemented))
     }
 }

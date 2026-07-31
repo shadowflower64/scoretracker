@@ -7,7 +7,7 @@ use crate::data::scoreboard::r#match::{AnyMatch, CommonMatchInfo};
 use crate::data::scoreboard::performance::{AnyPerformance, CommonPerformanceInfo, PerformanceTrait};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
 use crate::spreadsheet::field_value::FieldValue;
-use crate::spreadsheet::{SpreadsheetRecordImportError, record::Record};
+use crate::spreadsheet::{RecordError, record::Record};
 use crate::util::command_line::AskError;
 use crate::util::uuid::UuidString;
 use crate::util::youtube_id;
@@ -27,13 +27,13 @@ pub struct SpreadsheetContext<'a> {
 }
 
 impl SpreadsheetContext<'_> {
-    pub fn find_player_by_name(&self, name: &str) -> Result<&Player, SpreadsheetRecordImportError> {
+    pub fn find_player_by_name(&self, name: &str) -> Result<&Player, RecordError> {
         self.player_database
             .find_player_by_name(name)
-            .ok_or_else(|| SpreadsheetRecordImportError::PlayerDoesNotExist { name: name.to_owned() })
+            .ok_or_else(|| RecordError::PlayerDoesNotExist { name: name.to_owned() })
     }
 
-    pub fn find_proof_by_youtube_id(&self, youtube_id: &str) -> Result<&LibraryEntry, SpreadsheetRecordImportError> {
+    pub fn find_proof_by_youtube_id(&self, youtube_id: &str) -> Result<&LibraryEntry, RecordError> {
         if let Some(proof) = self
             .proofs_to_insert
             .iter()
@@ -46,15 +46,15 @@ impl SpreadsheetContext<'_> {
             return Ok(proof);
         }
 
-        Err(SpreadsheetRecordImportError::ProofDoesNotExist {
+        Err(RecordError::ProofDoesNotExist {
             youtube_id: youtube_id.to_owned(),
         })
     }
 
-    pub fn get_or_insert_proof_by_hyperlink(&mut self, hyperlink: &Hyperlink) -> Result<UuidString, SpreadsheetRecordImportError> {
+    pub fn get_or_insert_proof_by_hyperlink(&mut self, hyperlink: &Hyperlink) -> Result<UuidString, RecordError> {
         let url = hyperlink.target.as_ref().expect("todo");
         let Some(youtube_id) = youtube_id(url) else {
-            return Err(SpreadsheetRecordImportError::InvalidYouTubeUrl { url: url.to_owned() });
+            return Err(RecordError::InvalidYouTubeUrl { url: url.to_owned() });
         };
         if let Ok(proof) = self.find_proof_by_youtube_id(&youtube_id) {
             Ok(proof.uuid)
@@ -69,7 +69,7 @@ impl SpreadsheetContext<'_> {
         }
     }
 
-    pub fn create_common_p(&mut self, record: &Record) -> Result<CommonPerformanceInfo, SpreadsheetRecordImportError> {
+    pub fn create_common_p(&mut self, record: &Record) -> Result<CommonPerformanceInfo, RecordError> {
         let proof = match record.field_opt("video") {
             Some(FieldValue::String(a)) if a == ":(" || a == "-" => {
                 // `:(` => Proof got corrupted before it could be uploaded.
@@ -86,7 +86,7 @@ impl SpreadsheetContext<'_> {
             }
             Some(value) => {
                 // Invalid cell contents
-                return Err(SpreadsheetRecordImportError::NotAHyperlink(
+                return Err(RecordError::NotAHyperlink(
                     "video".into(),
                     Box::new(value.to_owned()),
                 ));
@@ -124,14 +124,14 @@ pub enum IncompleteOrCritical<E> {
     Incomplete(E),
     Critical(E),
 }
-pub type RecordImportResult<T> = Result<T, IncompleteOrCritical<SpreadsheetRecordImportError>>;
+pub type RecordImportResult<T> = Result<T, IncompleteOrCritical<RecordError>>;
 
 pub trait SkipOrQuit<T> {
     fn or_skip(self) -> RecordImportResult<T>;
     fn or_quit(self) -> RecordImportResult<T>;
 }
 
-impl<T> SkipOrQuit<T> for Result<T, SpreadsheetRecordImportError> {
+impl<T> SkipOrQuit<T> for Result<T, RecordError> {
     fn or_quit(self) -> RecordImportResult<T> {
         self.map_err(IncompleteOrCritical::Critical)
     }
@@ -140,8 +140,8 @@ impl<T> SkipOrQuit<T> for Result<T, SpreadsheetRecordImportError> {
     }
 }
 
-impl From<SpreadsheetRecordImportError> for IncompleteOrCritical<SpreadsheetRecordImportError> {
-    fn from(value: SpreadsheetRecordImportError) -> Self {
+impl From<RecordError> for IncompleteOrCritical<RecordError> {
+    fn from(value: RecordError) -> Self {
         IncompleteOrCritical::Critical(value)
     }
 }
@@ -159,11 +159,11 @@ pub trait Game: Debug {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportMatchResult {
-        Err(Critical(SpreadsheetRecordImportError::NotImplemented))
+        Err(Critical(RecordError::NotImplemented))
     }
 
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Critical(SpreadsheetRecordImportError::NotImplemented))
+        Err(Critical(RecordError::NotImplemented))
     }
 }
 

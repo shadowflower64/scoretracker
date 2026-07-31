@@ -23,6 +23,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Europe::Warsaw;
 use chrono_tz::Tz;
 use std::error::Error;
+use std::fmt;
 use std::path::Path;
 use thiserror::Error;
 
@@ -35,7 +36,7 @@ pub struct SpreadsheetImportResults {
 }
 
 #[derive(Debug, Error)]
-pub enum SpreadsheetRecordImportError {
+pub enum RecordError {
     #[error("not implemented")]
     NotImplemented,
     #[error("not implemented yet")]
@@ -81,6 +82,28 @@ pub enum SpreadsheetRecordImportError {
 }
 
 #[derive(Debug, Error)]
+pub struct RecordErrorWithContext {
+    pub game_id: String,
+    pub row: usize,
+    pub error: Box<RecordError>,
+    pub record: Option<Record>,
+}
+
+impl fmt::Display for RecordErrorWithContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(record) = &self.record {
+            write!(
+                f,
+                "for game '{}', row {}: {};\nrecord = {record}",
+                self.game_id, self.row, self.error
+            )
+        } else {
+            write!(f, "for game '{}', row {}: {}", self.game_id, self.row, self.error)
+        }
+    }
+}
+
+#[derive(Debug, Error)]
 pub enum SpreadsheetImportError {
     #[error("cannot open ods file: {0}")]
     CannotOpenOds(#[from] OdsError),
@@ -98,38 +121,26 @@ pub enum SpreadsheetImportError {
     CannotReadPlayerDatabase(file_ex::Error),
     #[error("cannot read library database: {0}")]
     CannotReadLibraryDatabase(lockfile::Error),
-    #[error("cannot parse performance for game '{game_id}', row {row}: {error};\nrecord = {record}")]
-    ParsePerformanceError {
-        game_id: String,
-        row: usize,
-        record: Record,
-        error: Box<SpreadsheetRecordImportError>,
-    },
-    #[error("cannot parse performance for game '{game_id}', row {row}: {error}")]
-    ParsePerformanceErrorQuieter {
-        game_id: String,
-        row: usize,
-        error: Box<SpreadsheetRecordImportError>,
-    },
-    #[error("cannot parse song for game '{game_id}', row {row}: {error};\nrecord = {record}")]
-    ParseSongError {
-        game_id: String,
-        row: usize,
-        record: Record,
-        error: Box<SpreadsheetRecordImportError>,
-    },
-    #[error("cannot parse song for game '{game_id}', row {row}: {error}")]
-    ParseSongErrorQuieter {
-        game_id: String,
-        row: usize,
-        error: Box<SpreadsheetRecordImportError>,
-    },
+    #[error("cannot parse performance: {0}")]
+    ParsePerformanceError(RecordErrorWithContext),
+    #[error("cannot parse song: {0}")]
+    ParseSongError(RecordErrorWithContext),
 }
 
-// TODO: rework these verbocity levels
+// TODO: rework these verbosity levels
 pub const VERBOSE_COMPLETE: bool = false;
 pub const VERBOSE_INCOMPLETE: bool = true;
-pub const QUIETER_WARNINGS: bool = true;
+pub const EVEN_MORE_VERBOSE_INCOMPLETE: bool = false;
+
+// idk anymore
+fn throw_up(game_id: &str, i: usize, e: RecordError, record: Record, show_record: bool) -> RecordErrorWithContext {
+    RecordErrorWithContext {
+        game_id: game_id.to_owned(),
+        row: i + 2,
+        record: show_record.then_some(record),
+        error: Box::new(e),
+    }
+}
 
 fn import_org_spreadsheet_matches(
     game: Box<dyn Game>,
@@ -141,21 +152,8 @@ fn import_org_spreadsheet_matches(
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_matches");
 
-    let make_throwable = |i: usize, record: Record, e: SpreadsheetRecordImportError, quieter: bool| {
-        if quieter {
-            SpreadsheetImportError::ParsePerformanceErrorQuieter {
-                game_id: game_id.to_owned(),
-                row: i + 2,
-                error: Box::new(e),
-            }
-        } else {
-            SpreadsheetImportError::ParsePerformanceError {
-                game_id: game_id.to_owned(),
-                row: i + 2,
-                record,
-                error: Box::new(e),
-            }
-        }
+    let make_throwable = |i: usize, record: Record, e: RecordError, show_record: bool| {
+        SpreadsheetImportError::ParsePerformanceError(throw_up(game_id, i, e, record, show_record))
     };
 
     for (i, record) in records.iter().enumerate() {
@@ -174,7 +172,7 @@ fn import_org_spreadsheet_matches(
             }
             Err(Incomplete(e)) => {
                 if VERBOSE_INCOMPLETE {
-                    let e = make_throwable(i, record.to_owned(), e, QUIETER_WARNINGS);
+                    let e = make_throwable(i, record.to_owned(), e, EVEN_MORE_VERBOSE_INCOMPLETE);
                     warn!("{game_id}:{} | incomplete match record: {e}; ignoring", i + 2);
                 } else {
                     warn!("{game_id}:{} | incomplete match record; ignoring", i + 2);
@@ -197,21 +195,8 @@ fn import_org_spreadsheet_songs(
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_songs");
 
-    let make_throwable = |i: usize, record: Record, e: SpreadsheetRecordImportError, quieter: bool| {
-        if quieter {
-            SpreadsheetImportError::ParseSongErrorQuieter {
-                game_id: game_id.to_owned(),
-                row: i + 2,
-                error: Box::new(e),
-            }
-        } else {
-            SpreadsheetImportError::ParseSongError {
-                game_id: game_id.to_owned(),
-                row: i + 2,
-                record,
-                error: Box::new(e),
-            }
-        }
+    let make_error = |i: usize, record: Record, e: RecordError, show_record: bool| {
+        SpreadsheetImportError::ParseSongError(throw_up(game_id, i, e, record, show_record))
     };
 
     let mut song_list: Vec<AnySong> = Vec::new();
@@ -227,14 +212,14 @@ fn import_org_spreadsheet_songs(
             }
             Err(Incomplete(e)) => {
                 if VERBOSE_INCOMPLETE {
-                    let e = make_throwable(i, record.to_owned(), e, QUIETER_WARNINGS);
+                    let e = make_error(i, record.to_owned(), e, EVEN_MORE_VERBOSE_INCOMPLETE);
                     warn!("{game_id}:{} | incomplete song record: {e}; ignoring", i + 2);
                 } else {
                     warn!("{game_id}:{} | incomplete song record; ignoring", i + 2);
                 }
             }
             Err(Critical(e)) => {
-                return Err(make_throwable(i, record.to_owned(), e, false));
+                return Err(make_error(i, record.to_owned(), e, true));
             }
         }
     }

@@ -6,7 +6,7 @@ use std::fmt::Display;
 ///
 /// # Examples
 /// ```
-/// # use scoretracker::spreadsheet::FieldPath;
+/// # use scoretracker::spreadsheet::field_path::FieldPath;
 /// assert_eq!(FieldPath::from("song_id"), FieldPath(vec!["song_id".to_string()]));
 /// assert_eq!(FieldPath::from("chart.x.total_notes"), FieldPath(vec!["chart".to_string(), "x".to_string(), "total_notes".to_string()]));
 /// assert_eq!(FieldPath(vec!["chart".to_string(), "x".to_string(), "total_notes".to_string()]).to_string().as_str(), "chart.x.total_notes");

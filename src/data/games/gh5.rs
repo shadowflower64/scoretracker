@@ -5,7 +5,7 @@ use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, S
 use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
-use crate::spreadsheet::SpreadsheetRecordImportError;
+use crate::spreadsheet::RecordError;
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -58,7 +58,7 @@ pub enum Instrument {
 #[error("not an instrument: {0}")]
 pub struct NotAnInstrument(String);
 
-impl From<NotAnInstrument> for SpreadsheetRecordImportError {
+impl From<NotAnInstrument> for RecordError {
     fn from(value: NotAnInstrument) -> Self {
         Self::Custom(Box::new(value))
     }
@@ -94,7 +94,7 @@ pub enum Difficulty {
 #[error("not a difficulty: {0}")]
 pub struct NotADifficulty(String);
 
-impl From<NotADifficulty> for SpreadsheetRecordImportError {
+impl From<NotADifficulty> for RecordError {
     fn from(value: NotADifficulty) -> Self {
         Self::Custom(Box::new(value))
     }
@@ -207,6 +207,6 @@ impl Game for GuitarHero5 {
     }
 
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(SpreadsheetRecordImportError::NotImplemented))
+        Err(Incomplete(RecordError::NotImplemented))
     }
 }

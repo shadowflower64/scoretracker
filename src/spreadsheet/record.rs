@@ -1,5 +1,5 @@
 use crate::spreadsheet::field_value::parse_cell_value;
-use crate::spreadsheet::{FieldPath, FieldValue, SpreadsheetRecordImportError};
+use crate::spreadsheet::{FieldPath, FieldValue, RecordError};
 use crate::util::timestamp::NsTimestamp;
 use crate::{info, log_fn_name};
 use calamine::{Data, Hyperlink, Range};
@@ -21,10 +21,10 @@ impl Record {
         Default::default()
     }
 
-    pub fn field<K: Into<FieldPath>>(&self, key: K) -> Result<&FieldValue, SpreadsheetRecordImportError> {
+    pub fn field<K: Into<FieldPath>>(&self, key: K) -> Result<&FieldValue, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         Ok(value)
     }
@@ -40,44 +40,44 @@ impl Record {
         Some(value)
     }
 
-    pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<String, SpreadsheetRecordImportError> {
+    pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<String, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         let FieldValue::String(string) = value else {
-            return Err(SpreadsheetRecordImportError::NotAString(path, Box::new(value.to_owned())));
+            return Err(RecordError::NotAString(path, Box::new(value.to_owned())));
         };
 
         Ok(string.to_owned())
     }
 
-    pub fn string_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<String>, SpreadsheetRecordImportError> {
+    pub fn string_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<String>, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else { return Ok(None) };
         if matches!(value, FieldValue::Empty) {
             return Ok(None);
         }
         let FieldValue::String(string) = value else {
-            return Err(SpreadsheetRecordImportError::NotAString(path, Box::new(value.to_owned())));
+            return Err(RecordError::NotAString(path, Box::new(value.to_owned())));
         };
 
         Ok(Some(string.to_owned()))
     }
 
-    pub fn int<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<T, SpreadsheetRecordImportError> {
+    pub fn int<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<T, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         let int = match value {
             FieldValue::Int(int) => *int,
             FieldValue::Float(float) if *float == float.round() && Self::ALLOW_FLOATS_AS_INTS => float.round() as i64,
-            _ => return Err(SpreadsheetRecordImportError::NotAnInt(path, Box::new(value.to_owned()))),
+            _ => return Err(RecordError::NotAnInt(path, Box::new(value.to_owned()))),
         };
 
         let Ok(requested_int) = int.try_into() else {
-            return Err(SpreadsheetRecordImportError::NotAnIntSubtype(path, Box::new(value.to_owned())));
+            return Err(RecordError::NotAnIntSubtype(path, Box::new(value.to_owned())));
         };
 
         Ok(requested_int)
@@ -112,116 +112,110 @@ impl Record {
         }
     }
 
-    pub fn bool<K: Into<FieldPath>>(&self, key: K) -> Result<bool, SpreadsheetRecordImportError> {
+    pub fn bool<K: Into<FieldPath>>(&self, key: K) -> Result<bool, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         match value {
-            FieldValue::Int(int) => {
-                Ok(Self::try_int_as_bool(*int).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
-            }
+            FieldValue::Int(int) => Ok(Self::try_int_as_bool(*int).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?),
             FieldValue::Float(float) => {
-                Ok(Self::try_float_as_bool(*float)
-                    .ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
+                Ok(Self::try_float_as_bool(*float).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?)
             }
             FieldValue::Bool(bool) => Ok(*bool),
-            _ => Err(SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned()))),
+            _ => Err(RecordError::NotABool(path, Box::new(value.to_owned()))),
         }
     }
 
-    pub fn bool_or<K: Into<FieldPath>>(&self, key: K, value_if_empty: bool) -> Result<bool, SpreadsheetRecordImportError> {
+    pub fn bool_or<K: Into<FieldPath>>(&self, key: K, value_if_empty: bool) -> Result<bool, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
             return Ok(value_if_empty);
         };
         match value {
-            FieldValue::Int(int) => {
-                Ok(Self::try_int_as_bool(*int).ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
-            }
+            FieldValue::Int(int) => Ok(Self::try_int_as_bool(*int).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?),
             FieldValue::Float(float) => {
-                Ok(Self::try_float_as_bool(*float)
-                    .ok_or_else(|| SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned())))?)
+                Ok(Self::try_float_as_bool(*float).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?)
             }
             FieldValue::Bool(bool) => Ok(*bool),
             FieldValue::Empty => Ok(value_if_empty),
-            _ => Err(SpreadsheetRecordImportError::NotABool(path, Box::new(value.to_owned()))),
+            _ => Err(RecordError::NotABool(path, Box::new(value.to_owned()))),
         }
     }
 
-    pub fn timestamp<K: Into<FieldPath>>(&self, key: K, tz: Tz) -> Result<NsTimestamp, SpreadsheetRecordImportError> {
+    pub fn timestamp<K: Into<FieldPath>>(&self, key: K, tz: Tz) -> Result<NsTimestamp, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         match value {
             FieldValue::DateTimeWithMsNoTz(naive) | FieldValue::DateTimeNoTz(naive) => {
                 let naive = *naive;
                 match tz.from_local_datetime(&naive) {
                     LocalResult::Single(converted) => Ok(NsTimestamp::from(converted)),
-                    LocalResult::Ambiguous(earliest, latest) => Err(SpreadsheetRecordImportError::LocalDateIsAmbiguous {
+                    LocalResult::Ambiguous(earliest, latest) => Err(RecordError::LocalDateIsAmbiguous {
                         naive,
                         path,
                         tz,
                         earliest: earliest.to_utc(),
                         latest: latest.to_utc(),
                     }),
-                    LocalResult::None => Err(SpreadsheetRecordImportError::LocalDateIsInGap { naive, path, tz }),
+                    LocalResult::None => Err(RecordError::LocalDateIsInGap { naive, path, tz }),
                 }
             }
             FieldValue::DateTime(timestamp) => Ok(*timestamp),
-            FieldValue::DateOnlyNoTz(_) => Err(SpreadsheetRecordImportError::NotATimestamp(path, Box::new(value.to_owned()))), // this is too imprecise to use as a "timestamp"
-            _ => Err(SpreadsheetRecordImportError::NotATimestamp(path, Box::new(value.to_owned()))),
+            FieldValue::DateOnlyNoTz(_) => Err(RecordError::NotATimestamp(path, Box::new(value.to_owned()))), // this is too imprecise to use as a "timestamp"
+            _ => Err(RecordError::NotATimestamp(path, Box::new(value.to_owned()))),
         }
     }
 
-    pub fn date_only<K: Into<FieldPath>>(&self, key: K) -> Result<NaiveDate, SpreadsheetRecordImportError> {
+    pub fn date_only<K: Into<FieldPath>>(&self, key: K) -> Result<NaiveDate, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         match value {
             FieldValue::DateOnlyNoTz(naive) => Ok(*naive),
-            _ => Err(SpreadsheetRecordImportError::NotADate(path, Box::new(value.to_owned()))),
+            _ => Err(RecordError::NotADate(path, Box::new(value.to_owned()))),
         }
     }
 
-    pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<Hyperlink, SpreadsheetRecordImportError> {
+    pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<Hyperlink, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         let FieldValue::Hyperlink(hyperlink) = value else {
-            return Err(SpreadsheetRecordImportError::NotAHyperlink(path, Box::new(value.to_owned())));
+            return Err(RecordError::NotAHyperlink(path, Box::new(value.to_owned())));
         };
 
         Ok(hyperlink.to_owned())
     }
 
-    pub fn hyperlink_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<Hyperlink>, SpreadsheetRecordImportError> {
+    pub fn hyperlink_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<Hyperlink>, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else { return Ok(None) };
         if matches!(value, FieldValue::Empty) {
             return Ok(None);
         }
         let FieldValue::Hyperlink(hyperlink) = value else {
-            return Err(SpreadsheetRecordImportError::NotAHyperlink(path, Box::new(value.to_owned())));
+            return Err(RecordError::NotAHyperlink(path, Box::new(value.to_owned())));
         };
 
         Ok(Some(hyperlink.to_owned()))
     }
 
-    pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str>>(&self, key: K) -> Result<T, SpreadsheetRecordImportError> {
+    pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str>>(&self, key: K) -> Result<T, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
-            return Err(SpreadsheetRecordImportError::FieldNotPresent(path));
+            return Err(RecordError::FieldNotPresent(path));
         };
         let FieldValue::String(string) = value else {
-            return Err(SpreadsheetRecordImportError::NotAString(path, Box::new(value.to_owned())));
+            return Err(RecordError::NotAString(path, Box::new(value.to_owned())));
         };
 
         let Ok(enum_variant) = T::try_from(string.as_str()) else {
-            return Err(SpreadsheetRecordImportError::NotAValidEnumVariant(path, string.to_owned()));
+            return Err(RecordError::NotAValidEnumVariant(path, string.to_owned()));
         };
 
         Ok(enum_variant)
