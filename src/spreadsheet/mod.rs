@@ -540,27 +540,27 @@ pub enum SpreadsheetImportError {
     CannotReadPlayerDatabase(file_ex::Error),
     #[error("cannot read library database: {0}")]
     CannotReadLibraryDatabase(lockfile::Error),
-    #[error("could not create performance for game '{game_id}' from spreadsheet row {row}: {error};\nrecord = {record}")]
+    #[error("cannot parse performance for game '{game_id}', row {row}: {error};\nrecord = {record}")]
     ParsePerformanceError {
         game_id: String,
         row: usize,
         record: Record,
         error: Box<SpreadsheetRecordImportError>,
     },
-    #[error("could not create performance for game '{game_id}' from spreadsheet row {row}: {error}")]
+    #[error("cannot parse performance for game '{game_id}', row {row}: {error}")]
     ParsePerformanceErrorQuieter {
         game_id: String,
         row: usize,
         error: Box<SpreadsheetRecordImportError>,
     },
-    #[error("could not create song for game '{game_id}' from spreadsheet row {row}: {error};\nrecord = {record}")]
+    #[error("cannot parse song for game '{game_id}', row {row}: {error};\nrecord = {record}")]
     ParseSongError {
         game_id: String,
         row: usize,
         record: Record,
         error: Box<SpreadsheetRecordImportError>,
     },
-    #[error("could not create song for game '{game_id}' from spreadsheet row {row}: {error}")]
+    #[error("cannot parse song for game '{game_id}', row {row}: {error}")]
     ParseSongErrorQuieter {
         game_id: String,
         row: usize,

@@ -1,10 +1,12 @@
-//! Data structures for Guitar Hero III: Legends of Rock.
+//! Data structures for Guitar Hero: Warriors of Rock.
+
 use crate::data::game::IncompleteOrCritical::Incomplete;
 use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
-use crate::spreadsheet::{Record, SpreadsheetRecordImportError};
-use crate::util::command_line::AskError;
+use crate::data::scoreboard::r#match::MatchTrait;
+use crate::data::scoreboard::performance::PerformanceTrait;
+use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
+use crate::spreadsheet::SpreadsheetRecordImportError;
+use crate::{spreadsheet::Record, util::command_line::AskError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -15,21 +17,6 @@ pub enum Mode {
     Career,
     Quickplay,
     UnknownSingle, // Either Career or Quickplay mode
-    CoOpCareer,
-    FaceOff,
-    ProFaceOff,
-    Battle,
-    CoOp,
-    Practice,
-}
-
-impl Mode {
-    pub fn player_count(&self) -> u8 {
-        match self {
-            Self::Career | Self::Quickplay | Self::Practice | Self::UnknownSingle => 1,
-            Self::CoOpCareer | Self::FaceOff | Self::ProFaceOff | Self::Battle | Self::CoOp => 2,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -41,23 +28,13 @@ pub struct Match {
     /// Game mode that this match was played on.
     pub mode: Mode,
 
-    ///// Score and stats. /////
-    /// Amount of points at the end of the match.
-    pub score: u64,
-
-    /// How many notes were hit successfully.
-    pub notes_hit: u64,
-
-    /// The maximum streak achieved during the match.
-    pub max_streak: u64,
-
     ///// Game settings and information. /////
     /// String of the game version that was played on for this match.
     /// None for unknown.
     pub game_version: Option<String>,
 }
 
-#[typetag::serde(name = "gh3")]
+#[typetag::serde(name = "ghwor")]
 impl MatchTrait for Match {
     fn common(&self) -> &CommonMatchInfo {
         &self.common
@@ -71,9 +48,10 @@ impl MatchTrait for Match {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Instrument {
-    LeadGuitar,
-    RhythmGuitar,
-    BassGuitar,
+    Gutiar,
+    Bass,
+    Drums,
+    Vocals,
 }
 
 #[derive(Error, Debug)]
@@ -90,9 +68,10 @@ impl TryFrom<&str> for Instrument {
     type Error = NotAnInstrument;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "guitar" => Ok(Self::LeadGuitar),
-            "rhythm" => Ok(Self::RhythmGuitar),
-            "bass" => Ok(Self::BassGuitar),
+            "guitar" => Ok(Self::Gutiar),
+            "bass" => Ok(Self::Bass),
+            "drums" => Ok(Self::Drums),
+            "vocals" => Ok(Self::Vocals),
             a => Err(NotAnInstrument(a.to_owned())),
         }
     }
@@ -102,10 +81,13 @@ impl TryFrom<&str> for Instrument {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {
+    Beginner,
     Easy,
     Medium,
     Hard,
     Expert,
+    #[serde(rename = "expert+")]
+    ExpertPlus,
 }
 
 #[derive(Error, Debug)]
@@ -122,10 +104,12 @@ impl TryFrom<&str> for Difficulty {
     type Error = NotADifficulty;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
+            "beginner" => Ok(Self::Beginner),
             "easy" => Ok(Self::Easy),
             "medium" => Ok(Self::Medium),
             "hard" => Ok(Self::Hard),
             "expert" => Ok(Self::Expert),
+            "expert+" => Ok(Self::Expert),
             a => Err(NotADifficulty(a.to_owned())),
         }
     }
@@ -169,7 +153,7 @@ pub struct Performance {
     pub max_streak: u64,
 }
 
-#[typetag::serde(name = "gh3")]
+#[typetag::serde(name = "ghwor")]
 impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common
@@ -183,19 +167,20 @@ impl PerformanceTrait for Performance {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GuitarHero3;
+pub struct GuitarHeroWarriorsOfRock;
 
-#[typetag::serde(name = "gh3")]
-impl Game for GuitarHero3 {
+#[typetag::serde(name = "ghwor")]
+impl Game for GuitarHeroWarriorsOfRock {
     fn pretty_name(&self) -> &'static str {
-        "Guitar Hero III: Legends of Rock"
+        "Guitar Hero: Warriors of Rock"
     }
     fn url_shortname(&self) -> &'static str {
-        "gh3"
+        "ghwor"
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
         // println!("{record}");
+        ctx.check_early_skip(record)?;
         let mut lamp = Lamp::None;
         if record.bool("clear")? {
             lamp = Lamp::Clear;
@@ -216,9 +201,6 @@ impl Game for GuitarHero3 {
         let match_data = Match {
             common: ctx.create_common_m(record, &[&performance_data])?,
             mode: Mode::UnknownSingle,
-            score: record.int("score")?,
-            notes_hit: record.int("hit_notes")?,
-            max_streak: record.int("note_streak")?,
             game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))

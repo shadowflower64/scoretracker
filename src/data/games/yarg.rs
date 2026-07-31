@@ -70,6 +70,7 @@ pub enum Modifier {
 /// A YARG performance - a performance of one player playing on one instrument on a specific chart.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Performance {
+    #[serde(flatten)]
     pub common: CommonPerformanceInfo,
 
     ///// Who played what and when. /////

@@ -70,11 +70,12 @@ impl SpreadsheetContext<'_> {
 
     pub fn create_common_p(&mut self, record: &Record) -> Result<CommonPerformanceInfo, SpreadsheetRecordImportError> {
         let proof = match record.field_opt("video") {
-            Some(FieldValue::String(a)) if a == ":(" => {
-                // Proof got corrupted before it could be uploaded :(
+            Some(FieldValue::String(a)) if a == ":(" || a == "-" => {
+                // `:(` => Proof got corrupted before it could be uploaded.
+                // `-` => Proof never existed at all most likely.
                 Vec::new()
             }
-            Some(FieldValue::Hyperlink(hyperlink)) => {
+            Some(FieldValue::Hyperlink(hyperlink)) if hyperlink.displayed_text == Some("YouTube".to_string()) => {
                 let proof_uuid = self.get_or_insert_proof_by_hyperlink(hyperlink)?;
                 vec![proof_uuid]
             }
@@ -110,6 +111,11 @@ impl SpreadsheetContext<'_> {
             comment: record.string_opt("comment")?,
             metadata: IndexMap::new(),
         })
+    }
+
+    pub fn check_early_skip(&mut self, record: &Record) -> RecordImportResult<()> {
+        record.timestamp("timestamp", self.tz).or_skip()?;
+        Ok(())
     }
 }
 

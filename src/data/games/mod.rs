@@ -6,9 +6,15 @@
 //! The structure for Game is always empty and contains some static functions can be defined per-game.
 //! An instance of a Game structure can be created by using [`crate::data::game::game_instance_from_id`]
 pub mod adofai;
+pub mod bh;
 pub mod ch;
 pub mod djmax_respect_v;
 pub mod gh3;
+pub mod gh5;
+pub mod ghsh;
+pub mod ghvh;
+pub mod ghwor;
+pub mod ghwt;
 pub mod in_falsus;
 pub mod osu;
 pub mod rd;

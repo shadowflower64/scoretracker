@@ -16,6 +16,7 @@ pub type JudgementCount = u32;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Match {
+    #[serde(flatten)]
     pub common: CommonMatchInfo,
 }
 
@@ -42,6 +43,7 @@ pub enum Lamp {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Performance {
+    #[serde(flatten)]
     pub common: CommonPerformanceInfo,
     pub lamp: Lamp,
     pub misses: JudgementCount,
