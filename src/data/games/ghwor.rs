@@ -6,7 +6,7 @@ use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
 use crate::spreadsheet::SpreadsheetRecordImportError;
-use crate::{spreadsheet::Record, util::command_line::AskError};
+use crate::{spreadsheet::record::Record, util::command_line::AskError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

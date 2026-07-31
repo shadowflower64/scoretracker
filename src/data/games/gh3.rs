@@ -3,7 +3,7 @@ use crate::data::game::IncompleteOrCritical::Incomplete;
 use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
-use crate::spreadsheet::{Record, SpreadsheetRecordImportError};
+use crate::spreadsheet::{SpreadsheetRecordImportError, record::Record};
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
