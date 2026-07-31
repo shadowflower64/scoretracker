@@ -1,9 +1,10 @@
-//! Data structures for DJMAX RESPECT V
+//! Data structures for DJMAX RESPECT V.
+
 use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct DJMAXRESPECTV {}
+pub struct DJMAXRESPECTV;
 
 #[typetag::serde(name = "djmax_respect_v")]
 impl Game for DJMAXRESPECTV {

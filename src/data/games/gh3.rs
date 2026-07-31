@@ -1,4 +1,7 @@
 //! Data structures for Guitar Hero III: Legends of Rock.
+//!
+//! Progress status: All fields from the original spreadsheet are implemented.
+
 use crate::data::game::IncompleteOrCritical::Incomplete;
 use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};

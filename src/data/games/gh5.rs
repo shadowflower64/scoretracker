@@ -1,4 +1,6 @@
 //! Data structures for Guitar Hero 5.
+//!
+//! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::IncompleteOrCritical::Incomplete;
 use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
@@ -48,7 +50,7 @@ impl MatchTrait for Match {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Instrument {
-    Gutiar,
+    Guitar,
     Bass,
     Drums,
     Vocals,
@@ -68,7 +70,7 @@ impl TryFrom<&str> for Instrument {
     type Error = NotAnInstrument;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "guitar" => Ok(Self::Gutiar),
+            "guitar" => Ok(Self::Guitar),
             "bass" => Ok(Self::Bass),
             "drums" => Ok(Self::Drums),
             "vocals" => Ok(Self::Vocals),

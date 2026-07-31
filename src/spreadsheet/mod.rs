@@ -49,6 +49,10 @@ pub enum RecordError {
     NotAnInt(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not an int subtype: {1:?}")]
     NotAnIntSubtype(FieldPath, Box<FieldValue>),
+    #[error("field '{0}' not an float: {1:?}")]
+    NotAFloat(FieldPath, Box<FieldValue>),
+    #[error("field '{0}' not an float subtype: {1:?}")]
+    NotAFloatSubtype(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a bool: {1:?}")]
     NotABool(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a timestamp: {1:?}")]
@@ -109,11 +113,11 @@ pub enum SpreadsheetImportError {
     CannotOpenOds(#[from] OdsError),
     #[error("cannot open xlsx file: {0}")]
     CannotOpenXlsx(#[from] XlsxError),
-    #[error("unknown game id: {0}")]
+    #[error("unknown game id: '{0}'")]
     UnknownGame(String),
-    #[error("invalid sheet name: {0}")]
+    #[error("invalid sheet name: '{0}'")]
     InvalidSheetName(String),
-    #[error("invalid table type: {0}")]
+    #[error("invalid table type: '{0}'")]
     InvalidTableType(String),
     #[error("cannot read config: {0}")]
     CannotReadConfig(lockfile::Error), // TODO: this should actually be file_ex::Error, because the config is not open for writing
@@ -179,7 +183,7 @@ fn import_org_spreadsheet_matches(
                 }
             }
             Err(Critical(e)) => {
-                return Err(make_throwable(i, record.to_owned(), e, false));
+                return Err(make_throwable(i, record.to_owned(), e, true));
             }
         }
     }
@@ -247,6 +251,18 @@ where
     let mut matches = Vec::new();
     let mut performances = Vec::new();
 
+    let config = Config::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
+    let player_database =
+        PlayerDatabase::read_without_locking(config.player_database_path()).map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
+    let library_database =
+        LibraryDatabase::lock_and_read(config.library_database_path(), None).map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
+    let mut ctx = SpreadsheetContext {
+        player_database: &player_database,
+        library_database: &library_database,
+        proofs_to_insert: Vec::new(),
+        tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
+    };
+
     for (sheet_name, range) in worksheets {
         let sheet_name_split = FieldPath::from(&sheet_name);
         let table_type = sheet_name_split
@@ -259,18 +275,6 @@ where
             .ok_or_else(|| SpreadsheetImportError::InvalidSheetName(sheet_name.to_owned()))?;
 
         let game = game_instance_from_id(game_id.as_str()).ok_or_else(|| SpreadsheetImportError::UnknownGame(game_id.to_owned()))?;
-
-        let config = Config::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
-        let player_database = PlayerDatabase::read_without_locking(config.player_database_path())
-            .map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
-        let library_database = LibraryDatabase::lock_and_read(config.library_database_path(), None)
-            .map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
-        let mut ctx = SpreadsheetContext {
-            player_database: &player_database,
-            library_database: &library_database,
-            proofs_to_insert: Vec::new(),
-            tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
-        };
 
         let records = parse_records(&sheet_name, range, read_hyperlinks(&sheet_name));
         // println!("{records:#?}");

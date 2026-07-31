@@ -1,6 +1,7 @@
-//! Data structures for Guitar Hero: Smash Hits.
+//! Data structures for Fortnite Festival.
 //!
 //! Progress status: All fields from the original spreadsheet are implemented.
+//! Spreadsheet bug: `!artist_title` field in the spreadsheet - song ID is not present, it should be present in the input data. (TODO)
 
 use crate::data::game::IncompleteOrCritical::Incomplete;
 use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
@@ -16,9 +17,8 @@ use thiserror::Error;
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
-    Career,
-    Quickplay,
-    UnknownSingle, // Either Career or Quickplay mode
+    MainStage,
+    BattleStage,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -26,17 +26,18 @@ pub struct Match {
     #[serde(flatten)]
     pub common: CommonMatchInfo,
 
-    ///// Who played what and when. /////
     /// Game mode that this match was played on.
     pub mode: Mode,
 
-    ///// Game settings and information. /////
+    /// Leaderboard placement at the time of achieving the score.
+    pub leaderboard_placement: Option<u32>,
+
     /// String of the game version that was played on for this match.
     /// None for unknown.
     pub game_version: Option<String>,
 }
 
-#[typetag::serde(name = "ghsh")]
+#[typetag::serde(name = "fnfest")]
 impl MatchTrait for Match {
     fn common(&self) -> &CommonMatchInfo {
         &self.common
@@ -47,13 +48,19 @@ impl MatchTrait for Match {
 }
 
 /// A playable part in the chart.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Instrument {
-    Guitar,
-    Bass,
-    Drums,
-    Vocals,
+    Lead,      // 5K gamepad gameplay
+    Bass,      // 5K gamepad gameplay
+    Drums,     // 5K gamepad gameplay
+    Vocals,    // 5K gamepad gameplay
+    ProLead,   // 5-fret guitar gameplay
+    ProBass,   // 5-fret guitar gameplay
+    ProDrums,  // 4-lane MIDI drums gameplay
+    ProVocals, // Mic gameplay
+    #[serde(rename = "pro_drums+cymbals")]
+    ProDrumsWithCymbals, // 4-lane MIDI drums (4 drum pads + 3 cymbals) gameplay
 }
 
 #[derive(Error, Debug)]
@@ -70,10 +77,15 @@ impl TryFrom<&str> for Instrument {
     type Error = NotAnInstrument;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "guitar" => Ok(Self::Guitar),
+            "lead" => Ok(Self::Lead),
             "bass" => Ok(Self::Bass),
             "drums" => Ok(Self::Drums),
             "vocals" => Ok(Self::Vocals),
+            "pro_lead" => Ok(Self::ProLead),
+            "pro_bass" => Ok(Self::ProBass),
+            "pro_drums" => Ok(Self::ProDrums),
+            "pro_vocals" => Ok(Self::ProVocals),
+            "pro_drums+cymbals" => Ok(Self::ProDrumsWithCymbals),
             a => Err(NotAnInstrument(a.to_owned())),
         }
     }
@@ -83,7 +95,6 @@ impl TryFrom<&str> for Instrument {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {
-    Beginner,
     Easy,
     Medium,
     Hard,
@@ -104,7 +115,6 @@ impl TryFrom<&str> for Difficulty {
     type Error = NotADifficulty;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "beginner" => Ok(Self::Beginner),
             "easy" => Ok(Self::Easy),
             "medium" => Ok(Self::Medium),
             "hard" => Ok(Self::Hard),
@@ -121,6 +131,7 @@ pub enum Lamp {
     None,
     Clear,
     FC,
+    PFC,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -142,17 +153,38 @@ pub struct Performance {
     /// Amount of points at the end of the performance.
     pub score: u64,
 
-    /// How many notes were hit successfully.
-    pub notes_hit: u64,
+    /// How many notes were hit perfectly.
+    pub perfect: u64,
 
-    /// How many notes were in the chart (TODO: should be const across different scores of the chart)
-    pub notes_total: u64,
+    /// How many notes were hit not perfectly.
+    pub great: u64,
+
+    /// How many notes were missed.
+    pub miss: u64,
+
+    /// How many overhits happened.
+    pub strike: u64,
 
     /// The maximum streak achieved during the performance.
     pub max_streak: u64,
 }
 
-#[typetag::serde(name = "ghsh")]
+impl Performance {
+    /// Custom formula calculating the X-Accuracy of the performance.
+    ///
+    /// Ouputs a number from 0.0 to 1.0.
+    /// 0.0 -- all missed; 1.0 -- all perfect.
+    pub fn x_acc(&self) -> f64 {
+        todo!("implement x_acc formula from spreadsheet");
+    }
+
+    /// Letter grade based on the output of [`Self::x_acc`].
+    pub fn grade(&self) -> String {
+        todo!("implement grade formula from spreadsheet");
+    }
+}
+
+#[typetag::serde(name = "rb4")]
 impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common
@@ -166,40 +198,49 @@ impl PerformanceTrait for Performance {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GuitarHeroSmashHits;
+pub struct FortniteFestival;
 
-#[typetag::serde(name = "ghsh")]
-impl Game for GuitarHeroSmashHits {
+#[typetag::serde(name = "fnfest")]
+impl Game for FortniteFestival {
     fn pretty_name(&self) -> &'static str {
-        "Guitar Hero: Smash Hits"
+        "Fortnite Festival"
     }
     fn url_shortname(&self) -> &'static str {
-        "ghsh"
+        "fnfest"
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
         // println!("{record}");
         ctx.check_early_skip(record)?;
         let mut lamp = Lamp::None;
-        if record.bool("clear")? {
+        if record.bool("c")? {
             lamp = Lamp::Clear;
         }
         if record.bool("fc")? {
             lamp = Lamp::FC;
         }
+        if record.bool("pfc")? {
+            lamp = Lamp::PFC;
+        }
+
+        let instrument: Instrument = record.string_enum("instrument")?;
+
         let performance_data = Performance {
             common: ctx.create_common_p(record)?,
-            instrument: record.string_enum("instrument")?,
+            instrument,
             difficulty: record.string_enum("difficulty")?,
             lamp,
-            score: record.int("score").or_skip()?,
-            notes_hit: record.int("hit_notes")?,
-            notes_total: record.int("total_notes")?,
+            score: record.int("high_score").or_skip()?,
+            perfect: record.int("perfect")?,
+            great: record.int("great")?,
+            miss: record.int("miss")?,
+            strike: record.int("strike")?,
             max_streak: record.int("note_streak")?,
         };
         let match_data = Match {
             common: ctx.create_common_m(record, &[&performance_data])?,
-            mode: Mode::UnknownSingle,
+            mode: Mode::MainStage,
+            leaderboard_placement: record.int_opt("leaderboard_placement")?,
             game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))

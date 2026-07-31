@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Osu {}
 
-#[typetag::serde(name = "ch")]
+#[typetag::serde(name = "osu")]
 impl Game for Osu {
     fn pretty_name(&self) -> &'static str {
         "osu!"

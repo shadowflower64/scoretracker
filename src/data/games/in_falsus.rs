@@ -1,3 +1,5 @@
+//! Data structures for In Falsus.
+
 use crate::data::game::Game;
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};

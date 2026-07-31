@@ -86,10 +86,7 @@ impl SpreadsheetContext<'_> {
             }
             Some(value) => {
                 // Invalid cell contents
-                return Err(RecordError::NotAHyperlink(
-                    "video".into(),
-                    Box::new(value.to_owned()),
-                ));
+                return Err(RecordError::NotAHyperlink("video".into(), Box::new(value.to_owned())));
             }
         };
 
@@ -109,7 +106,7 @@ impl SpreadsheetContext<'_> {
             song_id: record.string("song_id")?,
             performance_ids: performances.iter().map(|x| *x.uuid()).collect(),
             proof: Vec::new(),
-            comment: record.string_opt("comment")?,
+            comment: None,
             metadata: IndexMap::new(),
         })
     }

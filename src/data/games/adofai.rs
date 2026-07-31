@@ -1,4 +1,5 @@
-//! Data structures for A Dance of Fire and Ice
+//! Data structures for A Dance of Fire and Ice.
+
 use crate::data::game::Game;
 use crate::data::game::ImportMatchResult;
 use crate::data::game::ImportSongResult;

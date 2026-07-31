@@ -83,6 +83,43 @@ impl Record {
         Ok(requested_int)
     }
 
+    pub fn int_opt<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<Option<T>, RecordError> {
+        let path = key.into();
+        let Some(value) = self.0.get(&path) else { return Ok(None) };
+        if matches!(value, FieldValue::Empty) {
+            return Ok(None);
+        }
+        let int = match value {
+            FieldValue::Int(int) => *int,
+            FieldValue::Float(float) if *float == float.round() && Self::ALLOW_FLOATS_AS_INTS => float.round() as i64,
+            _ => return Err(RecordError::NotAnInt(path, Box::new(value.to_owned()))),
+        };
+
+        let Ok(requested_int) = int.try_into() else {
+            return Err(RecordError::NotAnIntSubtype(path, Box::new(value.to_owned())));
+        };
+
+        Ok(Some(requested_int))
+    }
+
+    pub fn float<T: TryFrom<f64>, K: Into<FieldPath>>(&self, key: K) -> Result<T, RecordError> {
+        let path = key.into();
+        let Some(value) = self.0.get(&path) else {
+            return Err(RecordError::FieldNotPresent(path));
+        };
+        let float = match value {
+            FieldValue::Int(int) => *int as f64,
+            FieldValue::Float(float) => *float,
+            _ => return Err(RecordError::NotAFloat(path, Box::new(value.to_owned()))),
+        };
+
+        let Ok(requested_float) = float.try_into() else {
+            return Err(RecordError::NotAFloatSubtype(path, Box::new(value.to_owned())));
+        };
+
+        Ok(requested_float)
+    }
+
     fn try_int_as_bool(int: i64) -> Option<bool> {
         if Self::ALLOW_INTS_AS_BOOLS {
             if int == 0 {
