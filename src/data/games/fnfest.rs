@@ -11,7 +11,6 @@ use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerfo
 use crate::spreadsheet::RecordError;
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 /// Game mode.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -63,18 +62,8 @@ pub enum Instrument {
     ProDrumsWithCymbals, // 4-lane MIDI drums (4 drum pads + 3 cymbals) gameplay
 }
 
-#[derive(Error, Debug)]
-#[error("not an instrument: {0}")]
-pub struct NotAnInstrument(String);
-
-impl From<NotAnInstrument> for RecordError {
-    fn from(value: NotAnInstrument) -> Self {
-        Self::Custom(Box::new(value))
-    }
-}
-
 impl TryFrom<&str> for Instrument {
-    type Error = NotAnInstrument;
+    type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "lead" => Ok(Self::Lead),
@@ -86,7 +75,7 @@ impl TryFrom<&str> for Instrument {
             "pro_drums" => Ok(Self::ProDrums),
             "pro_vocals" => Ok(Self::ProVocals),
             "pro_drums+cymbals" => Ok(Self::ProDrumsWithCymbals),
-            a => Err(NotAnInstrument(a.to_owned())),
+            _ => Err("fnfest::Instrument"),
         }
     }
 }
@@ -101,25 +90,15 @@ pub enum Difficulty {
     Expert,
 }
 
-#[derive(Error, Debug)]
-#[error("not a difficulty: {0}")]
-pub struct NotADifficulty(String);
-
-impl From<NotADifficulty> for RecordError {
-    fn from(value: NotADifficulty) -> Self {
-        Self::Custom(Box::new(value))
-    }
-}
-
 impl TryFrom<&str> for Difficulty {
-    type Error = NotADifficulty;
+    type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "easy" => Ok(Self::Easy),
             "medium" => Ok(Self::Medium),
             "hard" => Ok(Self::Hard),
             "expert" => Ok(Self::Expert),
-            a => Err(NotADifficulty(a.to_owned())),
+            _ => Err("fnfest::Difficulty"),
         }
     }
 }

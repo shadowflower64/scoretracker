@@ -61,8 +61,8 @@ pub enum RecordError {
     NotADate(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not a hyperlink: {1:?}")]
     NotAHyperlink(FieldPath, Box<FieldValue>),
-    #[error("field '{0}' not a valid enum variant: {1:?}")]
-    NotAValidEnumVariant(FieldPath, String),
+    #[error("field '{0}' not a valid enum variant for enum {1}: {2:?}")]
+    NotAValidEnumVariant(FieldPath, String, String),
     #[error("field '{path}' date {naive} is ambiguous in timezone {tz} (date is in a fold): it could be from {earliest} to {latest}")]
     LocalDateIsAmbiguous {
         path: FieldPath,

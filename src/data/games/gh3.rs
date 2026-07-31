@@ -9,7 +9,6 @@ use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTra
 use crate::spreadsheet::{RecordError, record::Record};
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 /// Game mode.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -76,24 +75,14 @@ pub enum Instrument {
     BassGuitar,
 }
 
-#[derive(Error, Debug)]
-#[error("not an instrument: {0}")]
-pub struct NotAnInstrument(String);
-
-impl From<NotAnInstrument> for RecordError {
-    fn from(value: NotAnInstrument) -> Self {
-        Self::Custom(Box::new(value))
-    }
-}
-
 impl TryFrom<&str> for Instrument {
-    type Error = NotAnInstrument;
+    type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "guitar" => Ok(Self::LeadGuitar),
             "rhythm" => Ok(Self::RhythmGuitar),
             "bass" => Ok(Self::BassGuitar),
-            a => Err(NotAnInstrument(a.to_owned())),
+            _ => Err("gh3::Instrument"),
         }
     }
 }
@@ -108,25 +97,15 @@ pub enum Difficulty {
     Expert,
 }
 
-#[derive(Error, Debug)]
-#[error("not a difficulty: {0}")]
-pub struct NotADifficulty(String);
-
-impl From<NotADifficulty> for RecordError {
-    fn from(value: NotADifficulty) -> Self {
-        Self::Custom(Box::new(value))
-    }
-}
-
 impl TryFrom<&str> for Difficulty {
-    type Error = NotADifficulty;
+    type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "easy" => Ok(Self::Easy),
             "medium" => Ok(Self::Medium),
             "hard" => Ok(Self::Hard),
             "expert" => Ok(Self::Expert),
-            a => Err(NotADifficulty(a.to_owned())),
+            _ => Err("gh3::Difficulty"),
         }
     }
 }

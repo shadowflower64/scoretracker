@@ -242,7 +242,7 @@ impl Record {
         Ok(Some(hyperlink.to_owned()))
     }
 
-    pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str>>(&self, key: K) -> Result<T, RecordError> {
+    pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str, Error = &'static str>>(&self, key: K) -> Result<T, RecordError> {
         let path = key.into();
         let Some(value) = self.0.get(&path) else {
             return Err(RecordError::FieldNotPresent(path));
@@ -251,11 +251,7 @@ impl Record {
             return Err(RecordError::NotAString(path, Box::new(value.to_owned())));
         };
 
-        let Ok(enum_variant) = T::try_from(string.as_str()) else {
-            return Err(RecordError::NotAValidEnumVariant(path, string.to_owned()));
-        };
-
-        Ok(enum_variant)
+        T::try_from(string.as_str()).map_err(|enum_name| RecordError::NotAValidEnumVariant(path, enum_name.to_string(), string.to_owned()))
     }
 }
 

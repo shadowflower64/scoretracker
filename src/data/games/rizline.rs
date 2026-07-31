@@ -11,7 +11,6 @@ use crate::spreadsheet::{RecordError, record::Record};
 use crate::util::command_line::AskError;
 use crate::util::percentage::Percentage;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Match {
@@ -43,25 +42,15 @@ pub enum Difficulty {
     AT,
 }
 
-#[derive(Error, Debug)]
-#[error("not a difficulty: {0}")]
-pub struct NotADifficulty(String);
-
-impl From<NotADifficulty> for RecordError {
-    fn from(value: NotADifficulty) -> Self {
-        Self::Custom(Box::new(value))
-    }
-}
-
 impl TryFrom<&str> for Difficulty {
-    type Error = NotADifficulty;
+    type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "ez" => Ok(Self::EZ),
             "hd" => Ok(Self::HD),
             "in" => Ok(Self::IN),
             "at" => Ok(Self::AT),
-            a => Err(NotADifficulty(a.to_owned())),
+            _ => Err("rizline::Difficulty"),
         }
     }
 }
