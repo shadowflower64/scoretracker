@@ -73,7 +73,6 @@ pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,
 
-    ///// Who played what and when. /////
     /// Timestamp of the performance - specifically, the timestamp of the first frame of the end screen. Can be approximate.
     // this should be moved to Match
     // pub timestamp: NsTimestamp,
@@ -90,7 +89,6 @@ pub struct Performance {
     /// Game mode that this performance was played on.
     pub mode: Mode,
 
-    ///// Score and stats. /////
     /// Amount of points at the end of the performance.
     pub score: u64,
 
@@ -106,14 +104,12 @@ pub struct Performance {
     /// Was the health meter drained, was the song failed?
     pub failed: bool,
 
-    ///// Additional song settings. /////
     /// Speed of the song, as a percentage. This is not a normal `f64` to avoid rounding errors.
     pub song_speed: Percentage,
 
     /// List of modifiers that were used during this performance.
     pub modifiers: Vec<Modifier>,
 
-    ///// Game settings and information. /////
     /// String of the game version that was played on for this performance.
     pub game_version: String,
 }

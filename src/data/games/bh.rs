@@ -26,11 +26,9 @@ pub struct Match {
     #[serde(flatten)]
     pub common: CommonMatchInfo,
 
-    ///// Who played what and when. /////
     /// Game mode that this match was played on.
     pub mode: Mode,
 
-    ///// Game settings and information. /////
     /// String of the game version that was played on for this match.
     /// None for unknown.
     pub game_version: Option<String>,
@@ -131,14 +129,12 @@ pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,
 
-    ///// Who played what and when. /////
     /// Played instrument.
     pub instrument: Instrument,
 
     /// Difficulty level of the chart.
     pub difficulty: Difficulty,
 
-    ///// Score and stats. /////
     /// Clear type.
     pub lamp: Lamp,
 
