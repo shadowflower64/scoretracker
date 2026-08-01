@@ -42,7 +42,7 @@ impl FieldValue {
         }
     }
 
-    pub fn as_int(&self) -> Option<i64> {
+    pub fn as_i64(&self) -> Option<i64> {
         match self {
             FieldValue::Int(int) => Some(*int),
             FieldValue::Float(float) if *float == float.round() && Self::ALLOW_FLOATS_AS_INTS => Some(float.round() as i64),
@@ -50,11 +50,11 @@ impl FieldValue {
         }
     }
 
-    pub fn as_int_subtype<T: TryFrom<i64>>(&self) -> Option<T> {
-        self.as_int().and_then(|x| x.try_into().ok())
+    pub fn as_int<T: TryFrom<i64>>(&self) -> Option<T> {
+        self.as_i64().and_then(|x| x.try_into().ok())
     }
 
-    pub fn as_float(&self) -> Option<f64> {
+    pub fn as_f64(&self) -> Option<f64> {
         match self {
             FieldValue::Int(int) => Some(*int as f64),
             FieldValue::Float(float) => Some(*float),
@@ -62,8 +62,8 @@ impl FieldValue {
         }
     }
 
-    pub fn as_float_subtype<T: TryFrom<f64>>(&self) -> Option<T> {
-        self.as_float().and_then(|x| x.try_into().ok())
+    pub fn as_float<T: TryFrom<f64>>(&self) -> Option<T> {
+        self.as_f64().and_then(|x| x.try_into().ok())
     }
 
     pub fn as_bool(&self) -> Option<bool> {

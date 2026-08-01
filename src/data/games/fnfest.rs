@@ -140,7 +140,7 @@ pub struct Performance {
     pub miss: u32,
 
     /// How many overhits happened.
-    pub strike: u32,
+    pub strike: Option<u32>,
 
     /// The maximum streak achieved during the performance.
     pub max_streak: u32,
@@ -202,6 +202,25 @@ impl Game for FortniteFestival {
 
         let instrument: Instrument = record.string_enum("instrument")?;
 
+        fn create_lb_placement(record: &Record) -> Result<Option<u32>, RecordError> {
+            if let Some(string) = record.string_var("leaderboard_placement")? {
+                if string == "-" || string == "?" {
+                    return Ok(None);
+                }
+            }
+            if let Some(int) = record.int_var("leaderboard_placement")? {
+                return Ok(Some(int));
+            }
+            if record.is_empty("leaderboard_placement")? {
+                return Ok(None);
+            }
+
+            Err(RecordError::NotAnIntSubtype(
+                "leaderboard_placement".into(),
+                Box::new(record.field_value("leaderboard_placement")?.to_owned()),
+            ))
+        }
+
         let performance_data = Performance {
             common: ctx.create_common_p(record)?,
             instrument,
@@ -211,13 +230,13 @@ impl Game for FortniteFestival {
             perfect: record.int("perfect")?,
             great: record.int("great")?,
             miss: record.int("miss")?,
-            strike: record.int("strike")?,
+            strike: record.int_opt("strike")?,
             max_streak: record.int("note_streak")?,
         };
         let match_data = Match {
             common: ctx.create_common_m(record, &[&performance_data])?,
             mode: Mode::MainStage,
-            leaderboard_placement: record.int_opt("leaderboard_placement")?,
+            leaderboard_placement: create_lb_placement(record)?,
             game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))

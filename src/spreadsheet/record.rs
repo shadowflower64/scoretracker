@@ -96,7 +96,7 @@ impl Record {
     pub fn i64<K: Into<FieldPath>>(&self, key: K) -> Result<i64, RecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
-        value.as_int().ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
+        value.as_i64().ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
     }
 
     /// Parse the field as an `Option<i64>`.
@@ -109,7 +109,7 @@ impl Record {
             return Ok(None);
         };
         value
-            .as_int()
+            .as_i64()
             .ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
             .map(Some)
     }
@@ -120,7 +120,7 @@ impl Record {
     /// Returns an `Err(_)` if the field does not exist.
     pub fn i64_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<i64>, RecordError> {
         let path = key.into();
-        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_int()))
+        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_i64()))
     }
 
     /// Parse the field as something convertible from `i64`.
@@ -131,7 +131,7 @@ impl Record {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
-            .as_int_subtype()
+            .as_int()
             .ok_or_else(|| RecordError::NotAnIntSubtype(path, Box::new(value.clone())))
     }
 
@@ -145,9 +145,18 @@ impl Record {
             return Ok(None);
         };
         value
-            .as_int_subtype()
+            .as_int()
             .ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
             .map(Some)
+    }
+
+    /// Parse the field as a variable-type field, getting something convertible from `i64`.
+    ///
+    /// Returns `Ok(Some(T))` if an int is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
+    /// Returns an `Err(_)` if the field does not exist.
+    pub fn int_var<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<Option<T>, RecordError> {
+        let path = key.into();
+        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_int()))
     }
 
     /// Parse the field as a `f64`.
@@ -157,9 +166,7 @@ impl Record {
     pub fn f64<K: Into<FieldPath>>(&self, key: K) -> Result<f64, RecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
-        value
-            .as_float()
-            .ok_or_else(|| RecordError::NotAFloat(path, Box::new(value.clone())))
+        value.as_f64().ok_or_else(|| RecordError::NotAFloat(path, Box::new(value.clone())))
     }
 
     /// Parse the field as something convertible from `f64`.
@@ -170,7 +177,7 @@ impl Record {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
-            .as_float_subtype()
+            .as_float()
             .ok_or_else(|| RecordError::NotAFloatSubtype(path, Box::new(value.clone())))
     }
 
