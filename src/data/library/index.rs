@@ -23,7 +23,7 @@ use std::{collections::HashMap, path::Path};
 /// Let's say the user wants to list all available files in the proof library and view the associated scores.
 /// Without the index file, the software would have to:
 /// 1. Recursively search through the entire library.
-/// 2. Calculate the SHA256 hashes of found files (or fetch them from [`crate::library::cache::LibraryCache`]).
+/// 2. Calculate the SHA256 hashes of found files (or fetch them from [`crate::data::library::cache::LibraryCache`]).
 /// 3. Open the proof database.
 /// 4. Search through all proofs and filter for the ones with matching SHA256 hashes.
 /// 5. Note the UUIDs of the filtered proofs.
@@ -44,7 +44,7 @@ use std::{collections::HashMap, path::Path};
 /// This data structure goes out of date whenever a new proof file gets added to the library,
 /// whenever a proof file gets moved around the library, and whenever a proof is removed from the library.
 /// To sync up the data structure again, the library needs to be *rescanned*.
-/// Scanning can be done via the [`LibraryIndex::scan_library_dir`] function, which returns
+/// Scanning can be done via the [`crate::data::library::scan_full`] function, which returns
 /// an entirely new index structure, which can then be saved to disk.
 /// The saved file is usually called [`LibraryIndex::STANDARD_FILENAME`].
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

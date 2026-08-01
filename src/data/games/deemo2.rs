@@ -1,9 +1,9 @@
-//! Data structures for Rizline.
+//! Data structures for DEEMO II.
 //!
 //! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::IncompleteOrCritical::Incomplete;
-use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
+use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SpreadsheetContext};
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
 use crate::spreadsheet::{RecordError, record::Record};
@@ -21,7 +21,7 @@ pub struct Match {
     pub game_version: Option<String>,
 }
 
-#[typetag::serde(name = "rizline")]
+#[typetag::serde(name = "deemo2")]
 impl MatchTrait for Match {
     fn common(&self) -> &CommonMatchInfo {
         &self.common
@@ -33,23 +33,21 @@ impl MatchTrait for Match {
 
 /// Difficulty that the performance was played on.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum Difficulty {
-    EZ,
-    HD,
-    IN,
-    AT,
+    Easy,
+    Normal,
+    Hard,
 }
 
 impl TryFrom<&str> for Difficulty {
     type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "ez" => Ok(Self::EZ),
-            "hd" => Ok(Self::HD),
-            "in" => Ok(Self::IN),
-            "at" => Ok(Self::AT),
-            _ => Err("rizline::Difficulty"),
+            "easy" => Ok(Self::Easy),
+            "normal" => Ok(Self::Normal),
+            "hard" => Ok(Self::Hard),
+            _ => Err("deemo2::Difficulty"),
         }
     }
 }
@@ -61,7 +59,25 @@ pub enum Lamp {
     None,
     C,
     FC,
-    PFC,
+    PF,
+}
+
+impl TryFrom<&Record> for Lamp {
+    type Error = RecordError;
+    fn try_from(_record: &Record) -> Result<Self, Self::Error> {
+        let lamp = Lamp::None;
+        // if record.bool("c")? {
+        //     lamp = Lamp::C;
+        // }
+        // if record.bool("fc")? {
+        //     lamp = Lamp::FC;
+        // }
+        // if record.bool("pf")? {
+        //     lamp = Lamp::PF;
+        // }
+        // TODO
+        Ok(lamp)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -75,41 +91,26 @@ pub struct Performance {
     /// Clear type.
     pub lamp: Lamp,
 
-    /// How many big dots (grade dots) were achieved during the performance.
-    pub stars: u8,
-
-    /// How many hit points were achieved during the performance.
-    pub hits: u32,
-
-    /// How many hit points were possible to achieve.
-    /// TODO: this should be a chart property.
-    pub max_hits: u32,
-
-    /// The biggest combo achieved during the performance.
+    /// Count of colored perfect judgements.
     pub combo: u32,
 
-    /// The maximum combo possible in this chart.
-    /// TODO: this should be a chart property.
-    pub max_combo: u32,
+    /// Count of perfect judgements.
+    pub charming: u32,
 
-    /// Amount of score at the end of the performance.
-    pub score: u32,
+    /// Total count of judgements.
+    pub total: u32,
 
-    /// How many notes were in the chart.
-    /// TODO: this should be a chart property.
-    pub max_score: u32,
-
-    /// Clear rate percentage (from 0% to 120%).
-    pub clear_rate: Percentage,
+    /// Accuracy.
+    pub accuracy: Percentage,
 }
 
-#[typetag::serde(name = "rizline")]
+#[typetag::serde(name = "cytus")]
 impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common
     }
     fn sorting_key(&self) -> f64 {
-        self.score as f64
+        self.accuracy.0
     }
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
         todo!()
@@ -117,42 +118,27 @@ impl PerformanceTrait for Performance {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Rizline;
+pub struct Deemo2;
 
-#[typetag::serde(name = "rizline")]
-impl Game for Rizline {
+#[typetag::serde(name = "deemo2")]
+impl Game for Deemo2 {
     fn pretty_name(&self) -> &'static str {
-        "Rizline"
+        "DEEMO II"
     }
     fn url_shortname(&self) -> &'static str {
-        "rizline"
+        "deemo2"
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
         // println!("{record}");
-        let mut lamp = Lamp::None;
-        if record.bool("c")? {
-            lamp = Lamp::C;
-        }
-        if record.bool("fc")? {
-            lamp = Lamp::FC;
-        }
-        if record.bool("pfc")? {
-            lamp = Lamp::PFC;
-        }
-        let score = record.int("score").or_skip()?;
         let performance_data = Performance {
             common: ctx.create_common_p(record)?,
             difficulty: record.string_enum("difficulty")?,
-            lamp,
-            stars: record.int("stars")?,
-            hits: record.int("hits")?,
-            max_hits: record.int("max_hits")?,
+            lamp: record.try_into()?,
+            charming: record.int("charming")?,
+            total: record.int("total")?,
             combo: record.int("combo")?,
-            max_combo: record.int("max_combo")?,
-            score,
-            max_score: record.int("max_score")?,
-            clear_rate: Percentage::from_multiplier(record.f64("clear_rate")?),
+            accuracy: Percentage::from_multiplier(record.f64("accuracy")?),
         };
         let match_data = Match {
             common: ctx.create_common_m(record, &[&performance_data])?,

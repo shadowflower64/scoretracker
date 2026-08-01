@@ -5,10 +5,10 @@
 //! | #  | Component name               | Description                                                                          | Progress |
 //! | -- | ---------------------------- | ------------------------------------------------------------------------------------ | -------- |
 //! | 1  | [**Hive**](hive)             | Handles various computation tasks and dispatches workers to execute those tasks.     |      20% |
-//! | 2  | [**Library**](library)       | A database of rhythm game achievement proofs (mainly screenshots and videos).        |      10% |
+//! | 2  | [**Library**](data::library)       | A database of rhythm game achievement proofs (mainly screenshots and videos).        |      10% |
 //! | 3  | **YouTubeManager**           | Handles uploading proofs to YouTube and assigns the metadata using the YouTube API.  |     0.1% |
-//! | 4  | [**Scoreboard**](scoreboard) | A database of rhythm game plays/scores/performances.                                 |       2% |
-//! | 5  | [**SongDB**](songdb)         | A database of songs from rhythm games, along with their note counts and other stats. |     0.1% |
+//! | 4  | [**Scoreboard**](data::scoreboard) | A database of rhythm game plays/scores/performances.                                 |       2% |
+//! | 5  | [**SongDB**](data::game::song)         | A database of songs from rhythm games, along with their note counts and other stats. |     0.1% |
 //! | 6  | [**scoretracker-toolkit**](../scoretracker_toolkit/index.html)     | Command-Line Interface for all scoretracker features.                                |      15% |
 //! | 7  | **scoretracker-api**         | HTTP server with a JSON API interface for most or all scoretracker features.         |       0% |
 //! | 8  | **scoretracker-web**         | Web frontend that connects to the scoretracker-api mentioned above.                  |     0.1% |
@@ -23,7 +23,7 @@
 //! # Glossary
 //! Here is some of the terminology used in "scoretracker":
 //! - **Chart** - A set of notes that the player must play.
-//! - **Library item** (name wip) - An entry in the [`library`].
+//! - **Library item** (name wip) - An entry in the [`data::library`].
 //!   One *library item* represents a unique file in the library.
 //!   Duplicate files (files with the same SHA256 hash) are considered the same library item.
 //!   For that reason, a library item can have multiple locations/paths recorded in it.

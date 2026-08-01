@@ -3,7 +3,8 @@
 use crate::data::game::Game;
 use crate::data::game::ImportMatchResult;
 use crate::data::game::ImportSongResult;
-use crate::data::game::IncompleteOrCritical::Critical;
+use crate::data::game::IncompleteOrCritical::Incomplete;
+use crate::data::game::SkipOrQuit;
 use crate::data::game::SpreadsheetContext;
 use crate::data::scoreboard::r#match::CommonMatchInfo;
 use crate::data::scoreboard::r#match::MatchTrait;
@@ -40,6 +41,29 @@ pub enum Lamp {
     PerfectFC,
     PurePerfectFC,
     StrictPurePerfectFC,
+}
+
+impl TryFrom<&Record> for Lamp {
+    type Error = RecordError;
+    fn try_from(record: &Record) -> Result<Self, Self::Error> {
+        let mut lamp = Lamp::None;
+        if record.bool("c")? {
+            lamp = Lamp::Clear;
+        }
+        if record.bool("fc")? {
+            lamp = Lamp::FC;
+        }
+        if record.bool("pf")? {
+            lamp = Lamp::PerfectFC;
+        }
+        if record.bool("pf+")? {
+            lamp = Lamp::PurePerfectFC;
+        }
+        if record.bool_opt("strictpf+")?.unwrap_or(false) {
+            lamp = Lamp::StrictPurePerfectFC;
+        }
+        Ok(lamp)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -127,25 +151,10 @@ impl Game for ADOFAI {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
-        let mut lamp = Lamp::None;
-        if record.bool("c")? {
-            lamp = Lamp::Clear;
-        }
-        if record.bool("fc")? {
-            lamp = Lamp::FC;
-        }
-        if record.bool("pf")? {
-            lamp = Lamp::PerfectFC;
-        }
-        if record.bool("pf+")? {
-            lamp = Lamp::PurePerfectFC;
-        }
-        if record.bool_opt("strictpf+")?.unwrap_or(false) {
-            lamp = Lamp::StrictPurePerfectFC;
-        }
+        let perfect = record.int("perfect").or_skip()?;
         let performance_data = Performance {
             common: ctx.create_common_p(record)?,
-            lamp,
+            lamp: record.try_into()?,
             misses: record.int("misses")?,
             overload: record.int("overhits")?,
             too_early: record.int("too_early")?,
@@ -153,7 +162,7 @@ impl Game for ADOFAI {
             late: record.int("late")?,
             early_perfect: record.int("early_perfect")?,
             late_perfect: record.int("late_perfect")?,
-            perfect: record.int("perfect")?,
+            perfect,
             checkpoints_used: record.int("checkpoints_used")?,
         };
         let match_data = Match {
@@ -163,6 +172,7 @@ impl Game for ADOFAI {
     }
 
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Critical(RecordError::NotImplemented))
+        // Err(Critical(RecordError::NotImplemented))
+        Err(Incomplete(RecordError::NotImplemented)) // TODO
     }
 }
