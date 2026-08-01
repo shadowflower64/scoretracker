@@ -6,6 +6,7 @@ use crate::data::library::database::{LibraryDatabase, LibraryEntry};
 use crate::data::scoreboard::r#match::{AnyMatch, CommonMatchInfo};
 use crate::data::scoreboard::performance::{AnyPerformance, CommonPerformanceInfo, PerformanceTrait};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
+use crate::spreadsheet::RecordErrorWithContext;
 use crate::spreadsheet::{RecordError, record::Record};
 use crate::util::command_line::AskError;
 use crate::util::uuid::UuidString;
@@ -17,12 +18,13 @@ use serde::Serialize;
 use std::fmt::Debug;
 use uuid::Uuid;
 
-#[derive(Clone)]
 pub struct SpreadsheetContext<'a> {
     pub player_database: &'a PlayerDatabase,
     pub library_database: &'a LibraryDatabase,
     pub proofs_to_insert: Vec<LibraryEntry>,
     pub tz: Tz,
+    pub incomplete_match_records: Vec<RecordErrorWithContext>,
+    pub incomplete_song_records: Vec<RecordErrorWithContext>,
 }
 
 impl SpreadsheetContext<'_> {

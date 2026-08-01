@@ -10,6 +10,7 @@ use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::data::scoreboard::player::PlayerDatabase;
+use crate::spreadsheet::SpreadsheetImportError::{ParsePerformanceError, ParseSongError};
 use crate::spreadsheet::field_path::FieldPath;
 use crate::spreadsheet::field_value::FieldValue;
 use crate::spreadsheet::record::{Record, parse_records};
@@ -139,11 +140,11 @@ pub const VERBOSE_INCOMPLETE: bool = true;
 pub const EVEN_MORE_VERBOSE_INCOMPLETE: bool = false;
 
 // idk anymore
-fn throw_up(game_id: &str, i: usize, e: RecordError, record: Record, show_record: bool) -> RecordErrorWithContext {
+fn throw_up(game_id: &str, i: usize, e: RecordError, record: &Record, show_record: bool) -> RecordErrorWithContext {
     RecordErrorWithContext {
         game_id: game_id.to_owned(),
         row: i + 2,
-        record: show_record.then_some(record),
+        record: show_record.then_some(record.to_owned()),
         error: Box::new(e),
     }
 }
@@ -157,10 +158,6 @@ fn import_org_spreadsheet_matches(
     ctx: &mut SpreadsheetContext,
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_matches");
-
-    let make_throwable = |i: usize, record: Record, e: RecordError, show_record: bool| {
-        SpreadsheetImportError::ParsePerformanceError(throw_up(game_id, i, e, record, show_record))
-    };
 
     for (i, record) in records.iter().enumerate() {
         match game.create_match_and_performance_from_spreadsheet_record(record, ctx) {
@@ -177,15 +174,16 @@ fn import_org_spreadsheet_matches(
                 performances.extend(performance_data);
             }
             Err(Incomplete(e)) => {
+                let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
                 if VERBOSE_INCOMPLETE {
-                    let e = make_throwable(i, record.to_owned(), e, EVEN_MORE_VERBOSE_INCOMPLETE);
                     warn!("{game_id}:{} | incomplete match record: {e}; ignoring", i + 2);
                 } else {
                     warn!("{game_id}:{} | incomplete match record; ignoring", i + 2);
                 }
+                ctx.incomplete_match_records.push(e);
             }
             Err(Critical(e)) => {
-                return Err(make_throwable(i, record.to_owned(), e, true));
+                return Err(ParsePerformanceError(throw_up(game_id, i, e, record, true)));
             }
         }
     }
@@ -201,10 +199,6 @@ fn import_org_spreadsheet_songs(
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_songs");
 
-    let make_error = |i: usize, record: Record, e: RecordError, show_record: bool| {
-        SpreadsheetImportError::ParseSongError(throw_up(game_id, i, e, record, show_record))
-    };
-
     let mut song_list: Vec<AnySong> = Vec::new();
     for (i, record) in records.iter().enumerate() {
         match game.create_song_from_spreadsheet_record(record, ctx) {
@@ -217,15 +211,16 @@ fn import_org_spreadsheet_songs(
                 song_list.push(song);
             }
             Err(Incomplete(e)) => {
+                let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
                 if VERBOSE_INCOMPLETE {
-                    let e = make_error(i, record.to_owned(), e, EVEN_MORE_VERBOSE_INCOMPLETE);
                     warn!("{game_id}:{} | incomplete song record: {e}; ignoring", i + 2);
                 } else {
                     warn!("{game_id}:{} | incomplete song record; ignoring", i + 2);
                 }
+                ctx.incomplete_song_records.push(e);
             }
             Err(Critical(e)) => {
-                return Err(make_error(i, record.to_owned(), e, true));
+                return Err(ParseSongError(throw_up(game_id, i, e, record, true)));
             }
         }
     }
@@ -263,6 +258,8 @@ where
         library_database: &library_database,
         proofs_to_insert: Vec::new(),
         tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
+        incomplete_match_records: Vec::new(),
+        incomplete_song_records: Vec::new(),
     };
 
     for (sheet_name, range) in worksheets {
@@ -291,6 +288,12 @@ where
             a => Err(SpreadsheetImportError::InvalidTableType(a.to_owned()))?,
         }
     }
+
+    info!(
+        "{} match records skipped, {} song records skipped",
+        ctx.incomplete_match_records.len(),
+        ctx.incomplete_song_records.len()
+    );
 
     Ok(SpreadsheetImportResults {
         song_lists,
