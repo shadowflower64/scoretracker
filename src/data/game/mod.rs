@@ -6,7 +6,6 @@ use crate::data::library::database::{LibraryDatabase, LibraryEntry};
 use crate::data::scoreboard::r#match::{AnyMatch, CommonMatchInfo};
 use crate::data::scoreboard::performance::{AnyPerformance, CommonPerformanceInfo, PerformanceTrait};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
-use crate::spreadsheet::field_value::FieldValue;
 use crate::spreadsheet::{RecordError, record::Record};
 use crate::util::command_line::AskError;
 use crate::util::uuid::UuidString;
@@ -69,32 +68,45 @@ impl SpreadsheetContext<'_> {
         }
     }
 
-    pub fn create_common_p(&mut self, record: &Record) -> Result<CommonPerformanceInfo, RecordError> {
-        let proof = match record.field_opt("video") {
-            Some(FieldValue::String(a)) if a == ":(" || a == "-" => {
+    fn create_proof(&mut self, record: &Record) -> Result<Vec<UuidString>, RecordError> {
+        if let Some(string) = record.string_var("video")? {
+            if string == ":(" || string == "-" {
                 // `:(` => Proof got corrupted before it could be uploaded.
                 // `-` => Proof never existed at all most likely.
-                Vec::new()
+                return Ok(Vec::new());
             }
-            Some(FieldValue::Hyperlink(hyperlink)) if hyperlink.displayed_text == Some("YouTube".to_string()) => {
+        }
+        if let Some(hyperlink) = record.hyperlink_var("video")? {
+            if hyperlink.displayed_text == Some("YouTube".to_string()) {
                 let proof_uuid = self.get_or_insert_proof_by_hyperlink(hyperlink)?;
-                vec![proof_uuid]
+                return Ok(vec![proof_uuid]);
             }
-            None => {
-                // Cell is empty
-                Vec::new()
-            }
-            Some(value) => {
-                // Invalid cell contents
-                return Err(RecordError::NotAHyperlink("video".into(), Box::new(value.to_owned())));
-            }
-        };
+        }
+        if record.is_empty("video")? {
+            return Ok(Vec::new());
+        }
 
+        Err(RecordError::NotAHyperlink(
+            "video".into(),
+            Box::new(record.field_value("video")?.to_owned()),
+        ))
+    }
+
+    pub fn create_common_p(&mut self, record: &Record) -> Result<CommonPerformanceInfo, RecordError> {
+        let comment = match record.field_value("comment") {
+            Ok(value) => Some(
+                value
+                    .as_string()
+                    .ok_or(RecordError::NotAString("comment".into(), Box::new(value.to_owned())))?
+                    .to_owned(),
+            ),
+            Err(_) => None,
+        };
         Ok(CommonPerformanceInfo {
             uuid: Uuid::now_v7().into(),
             player_uuid: self.find_player_by_name(&record.string("player")?)?.uuid,
-            proof,
-            comment: record.string_opt("comment")?,
+            proof: self.create_proof(record)?,
+            comment: comment,
             metadata: IndexMap::new(),
         })
     }
@@ -103,7 +115,7 @@ impl SpreadsheetContext<'_> {
         Ok(CommonMatchInfo {
             uuid: Uuid::now_v7().into(),
             timestamp: record.timestamp("timestamp", self.tz).or_skip()?,
-            song_id: record.string("song_id")?,
+            song_id: record.string("song_id")?.to_owned(),
             performance_ids: performances.iter().map(|x| *x.uuid()).collect(),
             proof: Vec::new(),
             comment: None,

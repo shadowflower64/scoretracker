@@ -1,267 +1,274 @@
-use crate::spreadsheet::field_value::parse_cell_value;
+use crate::spreadsheet::field_value::{CellContents, parse_cell_contents};
 use crate::spreadsheet::{FieldPath, FieldValue, RecordError};
 use crate::util::timestamp::NsTimestamp;
 use crate::{info, log_fn_name};
 use calamine::{Data, Hyperlink, Range};
-use chrono::TimeZone;
-use chrono::{NaiveDate, offset::LocalResult};
+use chrono::NaiveDate;
 use chrono_tz::Tz;
 use indexmap::IndexMap;
 use std::fmt::Display;
 
 #[derive(Default, Debug, Clone)]
-pub struct Record(IndexMap<FieldPath, FieldValue>);
+pub struct Record(IndexMap<FieldPath, CellContents>);
 
 impl Record {
-    pub const ALLOW_FLOATS_AS_INTS: bool = true;
-    pub const ALLOW_FLOATS_AS_BOOLS: bool = true;
-    pub const ALLOW_INTS_AS_BOOLS: bool = true;
-
     fn new() -> Self {
         Default::default()
     }
 
-    pub fn field<K: Into<FieldPath>>(&self, key: K) -> Result<&FieldValue, RecordError> {
+    /// Returns `Ok(true)` if the field exists and is empty.
+    /// Returns `Ok(false)` if the field exists and is not empty.
+    /// Returns `Err(_)` if the field does not exist.
+    pub fn is_empty<K: Into<FieldPath>>(&self, key: K) -> Result<bool, RecordError> {
+        self.field_contents(key).map(CellContents::is_empty)
+    }
+
+    /// Returns `Ok(true)` if the field exists and is filled.
+    /// Returns `Ok(false)` if the field exists and is not filled.
+    /// Returns `Err(_)` if the field does not exist.
+    pub fn is_filled<K: Into<FieldPath>>(&self, key: K) -> Result<bool, RecordError> {
+        self.field_contents(key).map(CellContents::is_filled)
+    }
+
+    /// Returns `Some(_)` if the field exists.
+    pub fn field<K: Into<FieldPath>>(&self, key: K) -> Option<&CellContents> {
+        self.0.get(&key.into())
+    }
+
+    /// Returns `Ok(_)` if the field exists.
+    pub fn field_contents<K: Into<FieldPath>>(&self, key: K) -> Result<&CellContents, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
+        self.0.get(&path).ok_or_else(|| RecordError::FieldNotPresent(path))
+    }
+
+    /// Returns `Ok(_)` if the field exists and the cell is not empty.
+    pub fn field_value<K: Into<FieldPath>>(&self, key: K) -> Result<&FieldValue, RecordError> {
+        let path = key.into();
+        let Some(cell) = self.0.get(&path) else {
             return Err(RecordError::FieldNotPresent(path));
+        };
+        let Some(value) = cell.val() else {
+            return Err(RecordError::CellIsEmpty(path));
         };
         Ok(value)
     }
 
-    pub fn field_opt<K: Into<FieldPath>>(&self, key: K) -> Option<&FieldValue> {
+    /// Parse the field as a `String`.
+    ///
+    /// Returns `Ok(String)` if a string is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
+    pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<&String, RecordError> {
         let path = key.into();
-
-        let value = self.0.get(&path)?;
-        if matches!(value, FieldValue::Empty) {
-            return None;
-        }
-
-        Some(value)
+        let value = self.field_value(path.clone())?;
+        value
+            .as_string()
+            .ok_or_else(|| RecordError::NotAString(path, Box::new(value.clone())))
     }
 
-    pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<String, RecordError> {
+    /// Parse the field as an `Option<String>`.
+    ///
+    /// Returns `Ok(Some(String))` if a string is present in the cell, or `Ok(None)` if the cell is empty.
+    /// Returns an `Err(_)` if the field does not exist, or if the cell contains another data type.
+    pub fn string_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&String>, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        let FieldValue::String(string) = value else {
-            return Err(RecordError::NotAString(path, Box::new(value.to_owned())));
-        };
-
-        Ok(string.to_owned())
-    }
-
-    pub fn string_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<String>, RecordError> {
-        let path = key.into();
-        let Some(value) = self.0.get(&path) else { return Ok(None) };
-        if matches!(value, FieldValue::Empty) {
+        let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
-        }
-        let FieldValue::String(string) = value else {
-            return Err(RecordError::NotAString(path, Box::new(value.to_owned())));
         };
-
-        Ok(Some(string.to_owned()))
+        value
+            .as_string()
+            .ok_or_else(|| RecordError::NotAString(path, Box::new(value.clone())))
+            .map(Some)
     }
 
+    /// Parse the field as a variable-type field, getting a `String` type.
+    ///
+    /// Returns `Ok(Some(String))` if a string is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
+    /// Returns an `Err(_)` if the field does not exist.
+    pub fn string_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&String>, RecordError> {
+        let path = key.into();
+        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_string()))
+    }
+
+    /// Parse the field as a `i64`.
+    ///
+    /// Returns `Ok(i64)` if an int is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
+    pub fn i64<K: Into<FieldPath>>(&self, key: K) -> Result<i64, RecordError> {
+        let path = key.into();
+        let value = self.field_value(path.clone())?;
+        value.as_int().ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
+    }
+
+    /// Parse the field as an `Option<i64>`.
+    ///
+    /// Returns `Ok(Some(i64))` if an int is present in the cell, or `Ok(None)` if the cell is empty.
+    /// Returns an `Err(_)` if the field does not exist, or if the cell contains another data type.
+    pub fn i64_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<i64>, RecordError> {
+        let path = key.into();
+        let Some(value) = self.field_contents(path.clone())?.val() else {
+            return Ok(None);
+        };
+        value
+            .as_int()
+            .ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
+            .map(Some)
+    }
+
+    /// Parse the field as a variable-type field, getting a `i64` type.
+    ///
+    /// Returns `Ok(Some(i64))` if an int is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
+    /// Returns an `Err(_)` if the field does not exist.
+    pub fn i64_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<i64>, RecordError> {
+        let path = key.into();
+        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_int()))
+    }
+
+    /// Parse the field as something convertible from `i64`.
+    ///
+    /// Returns `Ok(T)` if an int is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
     pub fn int<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<T, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        let int = match value {
-            FieldValue::Int(int) => *int,
-            FieldValue::Float(float) if *float == float.round() && Self::ALLOW_FLOATS_AS_INTS => float.round() as i64,
-            _ => return Err(RecordError::NotAnInt(path, Box::new(value.to_owned()))),
-        };
-
-        let Ok(requested_int) = int.try_into() else {
-            return Err(RecordError::NotAnIntSubtype(path, Box::new(value.to_owned())));
-        };
-
-        Ok(requested_int)
+        let value = self.field_value(path.clone())?;
+        value
+            .as_int_subtype()
+            .ok_or_else(|| RecordError::NotAnIntSubtype(path, Box::new(value.clone())))
     }
 
+    /// Parse the field as something convertible from `Option<i64>`.
+    ///
+    /// Returns `Ok(Some(T))` if an int is present in the cell, or `Ok(None)` if the cell is empty.
+    /// Returns an `Err(_)` if the field does not exist, or if the cell contains another data type.
     pub fn int_opt<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<Option<T>, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else { return Ok(None) };
-        if matches!(value, FieldValue::Empty) {
+        let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
-        }
-        let int = match value {
-            FieldValue::Int(int) => *int,
-            FieldValue::Float(float) if *float == float.round() && Self::ALLOW_FLOATS_AS_INTS => float.round() as i64,
-            _ => return Err(RecordError::NotAnInt(path, Box::new(value.to_owned()))),
         };
-
-        let Ok(requested_int) = int.try_into() else {
-            return Err(RecordError::NotAnIntSubtype(path, Box::new(value.to_owned())));
-        };
-
-        Ok(Some(requested_int))
+        value
+            .as_int_subtype()
+            .ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
+            .map(Some)
     }
 
+    /// Parse the field as a `f64`.
+    ///
+    /// Returns `Ok(f64)` if a float is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
+    pub fn f64<K: Into<FieldPath>>(&self, key: K) -> Result<f64, RecordError> {
+        let path = key.into();
+        let value = self.field_value(path.clone())?;
+        value
+            .as_float()
+            .ok_or_else(|| RecordError::NotAFloat(path, Box::new(value.clone())))
+    }
+
+    /// Parse the field as something convertible from `f64`.
+    ///
+    /// Returns `Ok(T)` if a float is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
     pub fn float<T: TryFrom<f64>, K: Into<FieldPath>>(&self, key: K) -> Result<T, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        let float = match value {
-            FieldValue::Int(int) => *int as f64,
-            FieldValue::Float(float) => *float,
-            _ => return Err(RecordError::NotAFloat(path, Box::new(value.to_owned()))),
-        };
-
-        let Ok(requested_float) = float.try_into() else {
-            return Err(RecordError::NotAFloatSubtype(path, Box::new(value.to_owned())));
-        };
-
-        Ok(requested_float)
+        let value = self.field_value(path.clone())?;
+        value
+            .as_float_subtype()
+            .ok_or_else(|| RecordError::NotAFloatSubtype(path, Box::new(value.clone())))
     }
 
-    fn try_int_as_bool(int: i64) -> Option<bool> {
-        if Self::ALLOW_INTS_AS_BOOLS {
-            if int == 0 {
-                Some(false)
-            } else if int == 1 {
-                Some(true)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    fn try_float_as_bool(float: f64) -> Option<bool> {
-        if float == float.round() && Self::ALLOW_FLOATS_AS_BOOLS {
-            let int = float.round() as i64;
-            if int == 0 {
-                Some(false)
-            } else if int == 1 {
-                Some(true)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
+    /// Parse the field as a `bool`.
+    ///
+    /// Returns `Ok(bool)` if a boolean value is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
     pub fn bool<K: Into<FieldPath>>(&self, key: K) -> Result<bool, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        match value {
-            FieldValue::Int(int) => Ok(Self::try_int_as_bool(*int).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?),
-            FieldValue::Float(float) => {
-                Ok(Self::try_float_as_bool(*float).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?)
-            }
-            FieldValue::Bool(bool) => Ok(*bool),
-            _ => Err(RecordError::NotABool(path, Box::new(value.to_owned()))),
-        }
+        let value = self.field_value(path.clone())?;
+        value.as_bool().ok_or_else(|| RecordError::NotABool(path, Box::new(value.clone())))
     }
 
-    pub fn bool_or<K: Into<FieldPath>>(&self, key: K, value_if_empty: bool) -> Result<bool, RecordError> {
+    /// Parse the field as an `Option<bool>`.
+    ///
+    /// Returns `Ok(bool)` if a boolean value is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
+    pub fn bool_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<bool>, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Ok(value_if_empty);
+        let Some(value) = self.field_contents(path.clone())?.val() else {
+            return Ok(None);
         };
-        match value {
-            FieldValue::Int(int) => Ok(Self::try_int_as_bool(*int).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?),
-            FieldValue::Float(float) => {
-                Ok(Self::try_float_as_bool(*float).ok_or_else(|| RecordError::NotABool(path, Box::new(value.to_owned())))?)
-            }
-            FieldValue::Bool(bool) => Ok(*bool),
-            FieldValue::Empty => Ok(value_if_empty),
-            _ => Err(RecordError::NotABool(path, Box::new(value.to_owned()))),
-        }
+        value
+            .as_bool()
+            .ok_or_else(|| RecordError::NotABool(path, Box::new(value.clone())))
+            .map(Some)
     }
 
+    /// Parse the field as a timestamp.
+    ///
+    /// Returns `Ok(NsTimestamp)` if a timestamp is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
     pub fn timestamp<K: Into<FieldPath>>(&self, key: K, tz: Tz) -> Result<NsTimestamp, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        match value {
-            FieldValue::DateTimeWithMsNoTz(naive) | FieldValue::DateTimeNoTz(naive) => {
-                let naive = *naive;
-                match tz.from_local_datetime(&naive) {
-                    LocalResult::Single(converted) => Ok(NsTimestamp::from(converted)),
-                    LocalResult::Ambiguous(earliest, latest) => Err(RecordError::LocalDateIsAmbiguous {
-                        naive,
-                        path,
-                        tz,
-                        earliest: earliest.to_utc(),
-                        latest: latest.to_utc(),
-                    }),
-                    LocalResult::None => Err(RecordError::LocalDateIsInGap { naive, path, tz }),
-                }
-            }
-            FieldValue::DateTime(timestamp) => Ok(*timestamp),
-            FieldValue::DateOnlyNoTz(_) => Err(RecordError::NotATimestamp(path, Box::new(value.to_owned()))), // this is too imprecise to use as a "timestamp"
-            _ => Err(RecordError::NotATimestamp(path, Box::new(value.to_owned()))),
-        }
+        let value = self.field_value(path.clone())?;
+        value.try_as_timestamp(path, tz)
     }
 
+    /// Parse the field as a `NaiveDate`.
+    ///
+    /// Returns `Ok(NaiveDate)` if a date is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
     pub fn date_only<K: Into<FieldPath>>(&self, key: K) -> Result<NaiveDate, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        match value {
-            FieldValue::DateOnlyNoTz(naive) => Ok(*naive),
-            _ => Err(RecordError::NotADate(path, Box::new(value.to_owned()))),
-        }
+        let value = self.field_value(path.clone())?;
+        value.as_date().ok_or_else(|| RecordError::NotADate(path, Box::new(value.clone())))
     }
 
-    pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<Hyperlink, RecordError> {
+    /// Parse the field as a `Hyperlink`.
+    ///
+    /// Returns `Ok(Hyperlink)` if a hyperlink is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
+    pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<&Hyperlink, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        let FieldValue::Hyperlink(hyperlink) = value else {
-            return Err(RecordError::NotAHyperlink(path, Box::new(value.to_owned())));
-        };
-
-        Ok(hyperlink.to_owned())
+        let value = self.field_value(path.clone())?;
+        value
+            .as_hyperlink()
+            .ok_or_else(|| RecordError::NotAHyperlink(path, Box::new(value.clone())))
     }
 
-    pub fn hyperlink_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<Hyperlink>, RecordError> {
+    /// Parse the field as an `Option<Hyperlink>`.
+    ///
+    /// Returns Ok(Hyperlink) if a hyperlink is present in the cell.
+    /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
+    pub fn hyperlink_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&Hyperlink>, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else { return Ok(None) };
-        if matches!(value, FieldValue::Empty) {
+        let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
-        }
-        let FieldValue::Hyperlink(hyperlink) = value else {
-            return Err(RecordError::NotAHyperlink(path, Box::new(value.to_owned())));
         };
+        value
+            .as_hyperlink()
+            .ok_or_else(|| RecordError::NotAnInt(path, Box::new(value.clone())))
+            .map(Some)
+    }
 
-        Ok(Some(hyperlink.to_owned()))
+    /// Parse the field as a variable-type field, getting a `Hyperlink` type.
+    ///
+    /// Returns `Ok(Some(Hyperlink))` if a hyperlink is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
+    /// Returns an `Err(_)` if the field does not exist.
+    pub fn hyperlink_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&Hyperlink>, RecordError> {
+        let path = key.into();
+        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_hyperlink()))
     }
 
     pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str, Error = &'static str>>(&self, key: K) -> Result<T, RecordError> {
         let path = key.into();
-        let Some(value) = self.0.get(&path) else {
-            return Err(RecordError::FieldNotPresent(path));
-        };
-        let FieldValue::String(string) = value else {
-            return Err(RecordError::NotAString(path, Box::new(value.to_owned())));
-        };
-
+        let string = self.string(path.clone())?;
         T::try_from(string.as_str()).map_err(|enum_name| RecordError::NotAValidEnumVariant(path, enum_name.to_string(), string.to_owned()))
     }
 }
 
-impl AsRef<IndexMap<FieldPath, FieldValue>> for Record {
-    fn as_ref(&self) -> &IndexMap<FieldPath, FieldValue> {
+impl AsRef<IndexMap<FieldPath, CellContents>> for Record {
+    fn as_ref(&self) -> &IndexMap<FieldPath, CellContents> {
         &self.0
     }
 }
-impl AsMut<IndexMap<FieldPath, FieldValue>> for Record {
-    fn as_mut(&mut self) -> &mut IndexMap<FieldPath, FieldValue> {
+impl AsMut<IndexMap<FieldPath, CellContents>> for Record {
+    fn as_mut(&mut self) -> &mut IndexMap<FieldPath, CellContents> {
         &mut self.0
     }
 }
@@ -309,7 +316,7 @@ pub fn parse_records(sheet_name: &str, range: Range<Data>, hyperlinks: Vec<Hyper
                 .iter()
                 .find(|hyperlink| hyperlink.range.contains((y + 1) as u32, x as u32));
             let prefix = format!("sheet: '{sheet_name}', row: {}, field: '{field_name}', value: '{cell}'", y + 2);
-            let field_value = parse_cell_value(cell, hyperlink, formula_mode, Some(&prefix));
+            let field_value = parse_cell_contents(cell, hyperlink, formula_mode, Some(&prefix));
             record.as_mut().insert(field_name.into(), field_value);
         }
         records.push(record);

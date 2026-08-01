@@ -1,13 +1,22 @@
 use std::time::Duration;
 
 use calamine::{Data, ExcelDateTime, Hyperlink};
-use chrono::{DateTime, NaiveDate, NaiveDateTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, offset::LocalResult};
+use chrono_tz::Tz;
 
-use crate::{debug, error, log_fn_name, log_should_print_debug, util::timestamp::NsTimestamp, warn};
+use crate::{
+    debug, error, log_fn_name, log_should_print_debug,
+    spreadsheet::{
+        RecordError,
+        field_path::FieldPath,
+        field_value::CellContents::{Empty, Filled},
+    },
+    util::timestamp::NsTimestamp,
+    warn,
+};
 
 #[derive(Debug, Clone)]
 pub enum FieldValue {
-    Empty,
     String(String),
     Bool(bool), // unused
     Int(i64),   // unused
@@ -18,10 +27,151 @@ pub enum FieldValue {
     DateTimeNoTz(NaiveDateTime),
     DateTimeWithMsNoTz(NaiveDateTime),
     Hyperlink(Hyperlink),
+    InvalidFormula,
 }
 
-pub fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bool, log_prefix: Option<&str>) -> FieldValue {
-    log_fn_name!("parse_cell_value");
+impl FieldValue {
+    pub const ALLOW_FLOATS_AS_INTS: bool = true;
+    pub const ALLOW_FLOATS_AS_BOOLS: bool = true;
+    pub const ALLOW_INTS_AS_BOOLS: bool = true;
+
+    pub fn as_string(&self) -> Option<&String> {
+        match self {
+            Self::String(a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub fn as_int(&self) -> Option<i64> {
+        match self {
+            FieldValue::Int(int) => Some(*int),
+            FieldValue::Float(float) if *float == float.round() && Self::ALLOW_FLOATS_AS_INTS => Some(float.round() as i64),
+            _ => None,
+        }
+    }
+
+    pub fn as_int_subtype<T: TryFrom<i64>>(&self) -> Option<T> {
+        self.as_int().and_then(|x| x.try_into().ok())
+    }
+
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            FieldValue::Int(int) => Some(*int as f64),
+            FieldValue::Float(float) => Some(*float),
+            _ => None,
+        }
+    }
+
+    pub fn as_float_subtype<T: TryFrom<f64>>(&self) -> Option<T> {
+        self.as_float().and_then(|x| x.try_into().ok())
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            FieldValue::Int(int) => Self::try_int_as_bool(*int),
+            FieldValue::Float(float) => Self::try_float_as_bool(*float),
+            FieldValue::Bool(bool) => Some(*bool),
+            _ => None,
+        }
+    }
+
+    fn try_int_as_bool(int: i64) -> Option<bool> {
+        if Self::ALLOW_INTS_AS_BOOLS {
+            if int == 0 {
+                Some(false)
+            } else if int == 1 {
+                Some(true)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn try_float_as_bool(float: f64) -> Option<bool> {
+        if float == float.round() && Self::ALLOW_FLOATS_AS_BOOLS {
+            let int = float.round() as i64;
+            if int == 0 {
+                Some(false)
+            } else if int == 1 {
+                Some(true)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn as_date(&self) -> Option<NaiveDate> {
+        match self {
+            FieldValue::DateOnlyNoTz(naive) => Some(*naive),
+            _ => None,
+        }
+    }
+
+    pub fn as_datetime(&self) -> Option<NaiveDateTime> {
+        match self {
+            FieldValue::DateTimeWithMsNoTz(naive) | FieldValue::DateTimeNoTz(naive) => Some(*naive),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_timestamp(&self, path: FieldPath, tz: Tz) -> Result<NsTimestamp, RecordError> {
+        match self {
+            FieldValue::DateTimeWithMsNoTz(naive) | FieldValue::DateTimeNoTz(naive) => {
+                let naive = *naive;
+                match tz.from_local_datetime(&naive) {
+                    LocalResult::Single(converted) => Ok(NsTimestamp::from(converted)),
+                    LocalResult::Ambiguous(earliest, latest) => Err(RecordError::LocalDateIsAmbiguous {
+                        naive,
+                        path,
+                        tz,
+                        earliest: earliest.to_utc(),
+                        latest: latest.to_utc(),
+                    }),
+                    LocalResult::None => Err(RecordError::LocalDateIsInGap { naive, path, tz }),
+                }
+            }
+            FieldValue::DateTime(timestamp) => Ok(*timestamp),
+            FieldValue::DateOnlyNoTz(_) => Err(RecordError::NotATimestamp(path, Box::new(self.to_owned()))), // this is too imprecise to use as a "timestamp"
+            _ => Err(RecordError::NotATimestamp(path, Box::new(self.to_owned()))),
+        }
+    }
+
+    pub fn as_hyperlink(&self) -> Option<&Hyperlink> {
+        match self {
+            FieldValue::Hyperlink(hyperlink) => Some(hyperlink),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CellContents {
+    Empty,
+    Filled(FieldValue),
+}
+
+impl CellContents {
+    pub fn is_filled(&self) -> bool {
+        matches!(&self, Self::Filled(_))
+    }
+    pub fn is_empty(&self) -> bool {
+        matches!(&self, Self::Empty)
+    }
+
+    pub fn val(&self) -> Option<&FieldValue> {
+        match self {
+            Self::Empty => None,
+            Self::Filled(a) => Some(a),
+        }
+    }
+}
+
+pub fn parse_cell_contents(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bool, log_prefix: Option<&str>) -> CellContents {
+    log_fn_name!("parse_cell_contents");
     log_should_print_debug!(false);
 
     let log_prefix = log_prefix.map(|x| format!("{x}; ")).unwrap_or_default();
@@ -35,7 +185,7 @@ pub fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode
                     "{log_prefix}parsing as naive datetime with ms, success: {}",
                     datetime.format("%Y-%m-%dT%H:%M:%S%.3f")
                 );
-                return FieldValue::DateTimeWithMsNoTz(datetime);
+                return Filled(FieldValue::DateTimeWithMsNoTz(datetime));
             } else {
                 error!("{log_prefix}parsing as naive datetime with ms, fail: cannot create NaiveDate");
             }
@@ -47,12 +197,12 @@ pub fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode
             if let Some(duration) = iso_duration.to_std() {
                 debug!("{log_prefix}parsing duration, success: {iso_duration} (millis: {millisecond})");
                 let duration = duration + Duration::from_millis(millisecond as u64);
-                return FieldValue::Duration(NsTimestamp::from(duration));
+                return Filled(FieldValue::Duration(NsTimestamp::from(duration)));
             } else {
                 error!("{log_prefix}parsing duration, fail: {iso_duration} (millis: {millisecond}): cannot convert to std duration");
             }
         }
-        FieldValue::Empty
+        Empty
     };
     let parse_date_time = |cell: &str| {
         if cell.len() == "YYYY-MM-DD".len() {
@@ -60,7 +210,7 @@ pub fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode
             let result = NaiveDate::parse_from_str(cell, "%Y-%m-%d");
             if let Ok(date) = result {
                 debug!("{log_prefix}parsing as naive date only, success: {date}");
-                return FieldValue::DateOnlyNoTz(date);
+                return Filled(FieldValue::DateOnlyNoTz(date));
             } else {
                 warn!("{log_prefix}parsing as naive date only, fail: {result:?}");
             }
@@ -76,7 +226,7 @@ pub fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode
                         "there is no time in this datetime... so this cannot be stored as just a nstimestamp without extra information without losing any information."
                     );
                 }
-                return FieldValue::DateTimeNoTz(datetime);
+                return Filled(FieldValue::DateTimeNoTz(datetime));
             } else {
                 warn!("{log_prefix}parsing as naive datetime, fail: {result:?}");
             }
@@ -98,7 +248,7 @@ pub fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode
                         "there are no ms in this datetime... so this cannot be stored as just a nstimestamp without extra information without losing any information."
                     );
                 }
-                return FieldValue::DateTimeWithMsNoTz(datetime);
+                return Filled(FieldValue::DateTimeWithMsNoTz(datetime));
             } else {
                 warn!("{log_prefix}parsing as naive datetime with ms, fail: {result:?}");
             }
@@ -107,38 +257,38 @@ pub fn parse_cell_value(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode
         let result = DateTime::parse_from_rfc3339(cell);
         if let Ok(datetime) = result {
             debug!("{log_prefix}parsing as rfc3339 datetime, success: {datetime}");
-            return FieldValue::DateTime(NsTimestamp::from(datetime));
+            return Filled(FieldValue::DateTime(NsTimestamp::from(datetime)));
         } else {
             warn!("{log_prefix}parsing as rfc3339 datetime, fail: {result:?}");
         }
-        FieldValue::Empty
+        Empty
     };
     let parse_duration = |cell: &str| {
         let result = iso8601_duration::Duration::parse(cell);
         if let Ok(duration) = result {
             debug!("{log_prefix}parsing duration, success: {duration}");
-            return FieldValue::Duration(NsTimestamp::from(duration.to_std().expect("todo")));
+            return Filled(FieldValue::Duration(NsTimestamp::from(duration.to_std().expect("todo"))));
         } else {
             warn!("{log_prefix}parsing duration, fail: {result:?}");
         }
-        FieldValue::Empty
+        Empty
     };
 
     match (cell, hyperlink) {
-        (_, Some(hyperlink)) => FieldValue::Hyperlink(hyperlink.clone()),
-        (Data::String(a), _) => FieldValue::String(a.to_owned()),
-        (Data::Bool(a), _) => FieldValue::Bool(*a),
-        (Data::Int(a), _) => FieldValue::Int(*a),
-        (Data::Float(a), _) => FieldValue::Float(*a),
+        (_, Some(hyperlink)) => Filled(FieldValue::Hyperlink(hyperlink.clone())),
+        (Data::String(a), _) => Filled(FieldValue::String(a.to_owned())),
+        (Data::Bool(a), _) => Filled(FieldValue::Bool(*a)),
+        (Data::Int(a), _) => Filled(FieldValue::Int(*a)),
+        (Data::Float(a), _) => Filled(FieldValue::Float(*a)),
         (Data::DateTime(a), _) => parse_excel_date_time(a),
         (Data::DateTimeIso(a), _) => parse_date_time(a),
         (Data::DurationIso(a), _) => parse_duration(a),
-        (Data::Empty, _) => FieldValue::Empty,
+        (Data::Empty, _) => Empty,
         (Data::Error(a), _) => {
             if !formula_mode {
-                warn!("{log_prefix}cell with error read: {a:?}; treating as an empty cell");
+                warn!("{log_prefix}cell with error read: {a:?}; treating as an InvalidFormula");
             }
-            FieldValue::Empty
+            Filled(FieldValue::InvalidFormula)
         }
     }
 }

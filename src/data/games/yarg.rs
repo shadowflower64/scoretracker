@@ -93,13 +93,13 @@ pub struct Performance {
     pub score: u64,
 
     /// How many notes were hit successfully.
-    pub notes_hit: u64,
+    pub notes_hit: u32,
 
     /// The maximum streak achieved during the performance.
-    pub max_streak: u64,
+    pub max_streak: u32,
 
     /// The amount of extra erroneous inputs.
-    pub overhits: u64,
+    pub overhits: u32,
 
     /// Was the health meter drained, was the song failed?
     pub failed: bool,
@@ -182,9 +182,9 @@ impl Game for YARG {
             difficulty: Difficulty::Expert,
             mode: Mode::Quickplay,
             score: ask_u64("score", None)?,
-            notes_hit: ask_u64("notes hit", None)?,
-            max_streak: ask_u64("max streak", None)?,
-            overhits: ask_u64("overhits", None)?,
+            notes_hit: ask_u64("notes hit", None)? as u32,
+            max_streak: ask_u64("max streak", None)? as u32,
+            overhits: ask_u64("overhits", None)? as u32,
             failed: ask_yn("failed", None)?,
             song_speed: Percentage::from_percentage(ask_u64("song speed", Some(100))? as f64),
             modifiers: Vec::new(),

@@ -140,7 +140,7 @@ impl Game for ADOFAI {
         if record.bool("pf+")? {
             lamp = Lamp::PurePerfectFC;
         }
-        if record.bool_or("strictpf+", false)? {
+        if record.bool_opt("strictpf+")?.unwrap_or(false) {
             lamp = Lamp::StrictPurePerfectFC;
         }
         let performance_data = Performance {

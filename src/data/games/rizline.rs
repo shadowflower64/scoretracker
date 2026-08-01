@@ -80,25 +80,25 @@ pub struct Performance {
     pub stars: u8,
 
     /// How many hit points were achieved during the performance.
-    pub hits: u64,
+    pub hits: u32,
 
     /// How many hit points were possible to achieve.
     /// TODO: this should be a chart property.
-    pub max_hits: u64,
+    pub max_hits: u32,
 
     /// The biggest combo achieved during the performance.
-    pub combo: u64,
+    pub combo: u32,
 
     /// The maximum combo possible in this chart.
     /// TODO: this should be a chart property.
-    pub max_combo: u64,
+    pub max_combo: u32,
 
     /// Amount of score at the end of the performance.
-    pub score: u64,
+    pub score: u32,
 
     /// How many notes were in the chart.
     /// TODO: this should be a chart property.
-    pub max_score: u64,
+    pub max_score: u32,
 
     /// Clear rate percentage (from 0% to 120%).
     pub clear_rate: Percentage,
@@ -153,7 +153,7 @@ impl Game for Rizline {
             max_combo: record.int("max_combo")?,
             score,
             max_score: record.int("max_score")?,
-            clear_rate: Percentage::from_multiplier(record.float::<f64, _>("clear_rate")?),
+            clear_rate: Percentage::from_multiplier(record.f64("clear_rate")?),
         };
         let match_data = Match {
             common: ctx.create_common_m(record, &[&performance_data])?,

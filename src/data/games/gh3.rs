@@ -46,10 +46,10 @@ pub struct Match {
     pub score: u64,
 
     /// How many notes were hit successfully.
-    pub notes_hit: u64,
+    pub notes_hit: u32,
 
     /// The maximum streak achieved during the match.
-    pub max_streak: u64,
+    pub max_streak: u32,
 
     /// String of the game version that was played on for this match.
     /// None for unknown.
@@ -137,13 +137,13 @@ pub struct Performance {
     pub score: u64,
 
     /// How many notes were hit successfully.
-    pub notes_hit: u64,
+    pub notes_hit: u32,
 
     /// How many notes were in the chart (TODO: should be const across different scores of the chart)
-    pub notes_total: u64,
+    pub notes_total: u32,
 
     /// The maximum streak achieved during the performance.
-    pub max_streak: u64,
+    pub max_streak: u32,
 }
 
 #[typetag::serde(name = "gh3")]

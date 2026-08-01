@@ -43,6 +43,8 @@ pub enum RecordError {
     NotImplementedYet,
     #[error("field not present: '{0}'")]
     FieldNotPresent(FieldPath),
+    #[error("field '{0}' is empty")]
+    CellIsEmpty(FieldPath),
     #[error("field '{0}' not a string: {1:?}")]
     NotAString(FieldPath, Box<FieldValue>),
     #[error("field '{0}' not an int: {1:?}")]

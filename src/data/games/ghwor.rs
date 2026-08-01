@@ -81,8 +81,8 @@ impl Instrument {
                 notes_total: record.int("total_notes")?,
             }),
             Self::Vocals => {
-                let hit: f64 = record.float("hit_notes")?;
-                let total: f64 = record.float("total_notes")?;
+                let hit: f64 = record.f64("hit_notes")?;
+                let total: f64 = record.f64("total_notes")?;
                 if total == 1.0f64 && hit != 1.0f64 {
                     // Some spreadsheet records just use a percentage value in place of the actual phrase count.
                     // This is because the stats screen doesn't actually show the amount of phrases hit correctly, just the percentage, because of different judgements.
@@ -155,10 +155,10 @@ pub enum Lamp {
 pub enum NoteStats {
     Normal {
         /// How many notes were hit successfully.
-        notes_hit: u64,
+        notes_hit: u32,
 
         /// How many notes were in the chart (TODO: should be const across different scores of the chart)
-        notes_total: u64,
+        notes_total: u32,
     },
     VocalsAcc {
         /// Phrase accuracy.
@@ -166,10 +166,10 @@ pub enum NoteStats {
     },
     VocalsPhrases {
         /// How many phrases were hit successfully.
-        phrases_hit: u64,
+        phrases_hit: u32,
 
         /// How many phrases were in the chart (TODO: should be const across different scores of the chart)
-        phrases_total: u64,
+        phrases_total: u32,
     },
 }
 

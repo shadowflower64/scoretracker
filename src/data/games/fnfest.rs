@@ -131,19 +131,19 @@ pub struct Performance {
     pub score: u64,
 
     /// How many notes were hit perfectly.
-    pub perfect: u64,
+    pub perfect: u32,
 
     /// How many notes were hit not perfectly.
-    pub great: u64,
+    pub great: u32,
 
     /// How many notes were missed.
-    pub miss: u64,
+    pub miss: u32,
 
     /// How many overhits happened.
-    pub strike: u64,
+    pub strike: u32,
 
     /// The maximum streak achieved during the performance.
-    pub max_streak: u64,
+    pub max_streak: u32,
 }
 
 impl Performance {
