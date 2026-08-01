@@ -10,9 +10,9 @@ use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::data::scoreboard::player::PlayerDatabase;
-use crate::spreadsheet::SpreadsheetImportError::{ParsePerformanceError, ParseSongError};
+use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
 use crate::spreadsheet::field_path::FieldPath;
-use crate::spreadsheet::field_value::FieldValue;
+use crate::spreadsheet::field_value::{CellContents, FieldValue};
 use crate::spreadsheet::record::{Record, parse_records};
 use crate::success;
 use crate::util::filelocked::FileLockableData;
@@ -23,6 +23,7 @@ use calamine::{Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_wo
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Europe::Warsaw;
 use chrono_tz::Tz;
+use std::convert::identity;
 use std::error::Error;
 use std::fmt;
 use std::path::Path;
@@ -129,7 +130,7 @@ pub enum SpreadsheetImportError {
     #[error("cannot read library database: {0}")]
     CannotReadLibraryDatabase(lockfile::Error),
     #[error("cannot parse performance: {0}")]
-    ParsePerformanceError(RecordErrorWithContext),
+    ParseMatchError(RecordErrorWithContext),
     #[error("cannot parse song: {0}")]
     ParseSongError(RecordErrorWithContext),
 }
@@ -138,6 +139,8 @@ pub enum SpreadsheetImportError {
 pub const VERBOSE_COMPLETE: bool = false;
 pub const VERBOSE_INCOMPLETE: bool = true;
 pub const EVEN_MORE_VERBOSE_INCOMPLETE: bool = false;
+pub const CRITICAL_WARNINGS_UNLESS_THROWAWAY_MATCHES: bool = false; //true;
+pub const CRITICAL_WARNINGS_UNLESS_THROWAWAY_SONGS: bool = false;
 
 // idk anymore
 fn throw_up(game_id: &str, i: usize, e: RecordError, record: &Record, show_record: bool) -> RecordErrorWithContext {
@@ -160,6 +163,12 @@ fn import_org_spreadsheet_matches(
     log_fn_name!("import_org_spreadsheet_matches");
 
     for (i, record) in records.iter().enumerate() {
+        let throwaway = record
+            .field("throwaway")
+            .and_then(CellContents::val)
+            .and_then(FieldValue::as_bool)
+            .is_some_and(identity);
+
         match game.create_match_and_performance_from_spreadsheet_record(record, ctx) {
             Ok((match_data, performance_data)) => {
                 if VERBOSE_COMPLETE {
@@ -175,6 +184,10 @@ fn import_org_spreadsheet_matches(
             }
             Err(Incomplete(e)) => {
                 let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
+                if CRITICAL_WARNINGS_UNLESS_THROWAWAY_MATCHES && !throwaway {
+                    return Err(ParseMatchError(e));
+                }
+
                 if VERBOSE_INCOMPLETE {
                     warn!("{game_id}:{} | incomplete match record: {e}; ignoring", i + 2);
                 } else {
@@ -183,7 +196,7 @@ fn import_org_spreadsheet_matches(
                 ctx.incomplete_match_records.push(e);
             }
             Err(Critical(e)) => {
-                return Err(ParsePerformanceError(throw_up(game_id, i, e, record, true)));
+                return Err(ParseMatchError(throw_up(game_id, i, e, record, true)));
             }
         }
     }
@@ -201,6 +214,12 @@ fn import_org_spreadsheet_songs(
 
     let mut song_list: Vec<AnySong> = Vec::new();
     for (i, record) in records.iter().enumerate() {
+        let throwaway = record
+            .field("throwaway")
+            .and_then(CellContents::val)
+            .and_then(FieldValue::as_bool)
+            .is_some_and(identity);
+
         match game.create_song_from_spreadsheet_record(record, ctx) {
             Ok(song) => {
                 if VERBOSE_COMPLETE {
@@ -212,6 +231,10 @@ fn import_org_spreadsheet_songs(
             }
             Err(Incomplete(e)) => {
                 let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
+                if CRITICAL_WARNINGS_UNLESS_THROWAWAY_SONGS && !throwaway {
+                    return Err(ParseSongError(e));
+                }
+
                 if VERBOSE_INCOMPLETE {
                     warn!("{game_id}:{} | incomplete song record: {e}; ignoring", i + 2);
                 } else {
