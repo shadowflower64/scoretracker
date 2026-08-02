@@ -1,7 +1,11 @@
 //! Data structures for Beatstar.
 
-use crate::data::game::{Game, ImportSongResult, IncompleteOrCritical::Incomplete, SpreadsheetContext};
-use crate::spreadsheet::{RecordError, record::Record};
+use crate::data::game::Game;
+use crate::spreadsheet::BadRecordError;
+use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::ParseSongRecordResult;
+use crate::spreadsheet::context::Context;
+use crate::spreadsheet::record::Record;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -16,7 +20,7 @@ impl Game for Beatstar {
         "beatstar"
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }

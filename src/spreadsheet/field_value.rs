@@ -7,7 +7,7 @@ use chrono_tz::Tz;
 use crate::{
     debug, error, log_fn_name, log_should_print_debug,
     spreadsheet::{
-        RecordError,
+        BadRecordError,
         field_path::FieldPath,
         field_value::CellContents::{Empty, Filled},
     },
@@ -118,25 +118,25 @@ impl FieldValue {
         }
     }
 
-    pub fn try_as_timestamp(&self, path: FieldPath, tz: Tz) -> Result<NsTimestamp, RecordError> {
+    pub fn try_as_timestamp(&self, path: FieldPath, tz: Tz) -> Result<NsTimestamp, BadRecordError> {
         match self {
             FieldValue::DateTimeWithMsNoTz(naive) | FieldValue::DateTimeNoTz(naive) => {
                 let naive = *naive;
                 match tz.from_local_datetime(&naive) {
                     LocalResult::Single(converted) => Ok(NsTimestamp::from(converted)),
-                    LocalResult::Ambiguous(earliest, latest) => Err(RecordError::LocalDateIsAmbiguous {
+                    LocalResult::Ambiguous(earliest, latest) => Err(BadRecordError::LocalDateIsAmbiguous {
                         naive,
                         path,
                         tz,
                         earliest: earliest.to_utc(),
                         latest: latest.to_utc(),
                     }),
-                    LocalResult::None => Err(RecordError::LocalDateIsInGap { naive, path, tz }),
+                    LocalResult::None => Err(BadRecordError::LocalDateIsInGap { naive, path, tz }),
                 }
             }
             FieldValue::DateTime(timestamp) => Ok(*timestamp),
-            FieldValue::DateOnlyNoTz(_) => Err(RecordError::NotATimestamp(path, Box::new(self.to_owned()))), // this is too imprecise to use as a "timestamp"
-            _ => Err(RecordError::NotATimestamp(path, Box::new(self.to_owned()))),
+            FieldValue::DateOnlyNoTz(_) => Err(BadRecordError::NotATimestamp(path, Box::new(self.to_owned()))), // this is too imprecise to use as a "timestamp"
+            _ => Err(BadRecordError::NotATimestamp(path, Box::new(self.to_owned()))),
         }
     }
 

@@ -1,7 +1,8 @@
 //! Data structures for Guitar Hero Arcade.
 
-use crate::data::game::{Game, ImportSongResult, IncompleteOrCritical::Incomplete, SpreadsheetContext};
-use crate::spreadsheet::{RecordError, record::Record};
+use crate::data::game::Game;
+use crate::spreadsheet::record::Record;
+use crate::spreadsheet::{BadRecordError, IncompleteOrCritical::Continue, ParseSongRecordResult, context::Context};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -16,7 +17,7 @@ impl Game for GuitarHeroArcade {
         "gharcade"
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }

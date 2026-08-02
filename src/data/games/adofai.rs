@@ -1,16 +1,16 @@
 //! Data structures for A Dance of Fire and Ice.
 
 use crate::data::game::Game;
-use crate::data::game::ImportMatchResult;
-use crate::data::game::ImportSongResult;
-use crate::data::game::IncompleteOrCritical::Incomplete;
-use crate::data::game::SkipOrQuit;
-use crate::data::game::SpreadsheetContext;
 use crate::data::scoreboard::r#match::CommonMatchInfo;
 use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::CommonPerformanceInfo;
 use crate::data::scoreboard::performance::PerformanceTrait;
-use crate::spreadsheet::RecordError;
+use crate::spreadsheet::BadRecordError;
+use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::ParseMatchRecordResult;
+use crate::spreadsheet::ParseSongRecordResult;
+use crate::spreadsheet::SkipOrQuit;
+use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,7 @@ pub enum Lamp {
 }
 
 impl TryFrom<&Record> for Lamp {
-    type Error = RecordError;
+    type Error = BadRecordError;
     fn try_from(record: &Record) -> Result<Self, Self::Error> {
         let mut lamp = Lamp::None;
         if record.bool("c")? {
@@ -150,7 +150,7 @@ impl Game for ADOFAI {
         "adofai"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         let perfect = record.int("perfect").or_skip()?;
         let performance_data = Performance {
             common: ctx.create_common_p(record)?,
@@ -171,8 +171,8 @@ impl Game for ADOFAI {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
         // Err(Critical(RecordError::NotImplemented))
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }

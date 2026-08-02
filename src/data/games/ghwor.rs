@@ -2,12 +2,13 @@
 //!
 //! Progress status: All fields from the original spreadsheet are implemented.
 
-use crate::data::game::IncompleteOrCritical::{self, Incomplete};
-use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
+use crate::data::game::Game;
 use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
-use crate::spreadsheet::RecordError;
+use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::context::Context;
+use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseRecordResult, ParseSongRecordResult, SkipOrQuit};
 use crate::util::percentage::Percentage;
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
 use serde::{Deserialize, Serialize};
@@ -74,7 +75,7 @@ pub enum Instrument {
 }
 
 impl Instrument {
-    pub fn make_note_stats(&self, record: &Record) -> Result<NoteStats, IncompleteOrCritical<RecordError>> {
+    pub fn make_note_stats(&self, record: &Record) -> ParseRecordResult<NoteStats> {
         match self {
             Self::Guitar | Self::Bass | Self::Drums => Ok(NoteStats::Normal {
                 notes_hit: record.int("hit_notes")?,
@@ -222,7 +223,7 @@ impl Game for GuitarHeroWarriorsOfRock {
         "ghwor"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         // println!("{record}");
         ctx.check_early_skip(record)?;
         let mut lamp = Lamp::None;
@@ -253,7 +254,7 @@ impl Game for GuitarHeroWarriorsOfRock {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }

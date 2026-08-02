@@ -1,9 +1,9 @@
 //! Data structures for Phigros.
 
-use crate::data::game::{Game, IncompleteOrCritical::Incomplete};
-use crate::data::game::{ImportSongResult, SpreadsheetContext};
-use crate::spreadsheet::RecordError;
+use crate::spreadsheet::IncompleteOrCritical::Continue;
 use crate::spreadsheet::record::Record;
+use crate::spreadsheet::{BadRecordError, ParseSongRecordResult};
+use crate::{data::game::Game, spreadsheet::context::Context};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -18,7 +18,7 @@ impl Game for Phigros {
         "phigros"
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }

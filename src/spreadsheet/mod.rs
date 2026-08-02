@@ -1,16 +1,18 @@
+pub mod context;
 pub mod field_path;
 pub mod field_value;
 pub mod record;
 
 use crate::config::Config;
-use crate::data::game::IncompleteOrCritical::{Critical, Incomplete};
 use crate::data::game::song::AnySong;
-use crate::data::game::{Game, SpreadsheetContext, game_instance_from_id};
+use crate::data::game::{Game, game_instance_from_id};
 use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::data::scoreboard::player::PlayerDatabase;
+use crate::spreadsheet::IncompleteOrCritical::{Continue, Critical};
 use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
+use crate::spreadsheet::context::Context;
 use crate::spreadsheet::field_path::FieldPath;
 use crate::spreadsheet::field_value::{CellContents, FieldValue};
 use crate::spreadsheet::record::{Record, parse_records};
@@ -31,6 +33,35 @@ use thiserror::Error;
 
 pub type SongList = Vec<AnySong>;
 
+pub enum IncompleteOrCritical<E> {
+    Continue(E),
+    Critical(E),
+}
+pub type ParseRecordResult<T> = Result<T, IncompleteOrCritical<BadRecordError>>;
+
+pub trait SkipOrQuit<T> {
+    fn or_skip(self) -> ParseRecordResult<T>;
+    fn or_quit(self) -> ParseRecordResult<T>;
+}
+
+impl<T> SkipOrQuit<T> for Result<T, BadRecordError> {
+    fn or_quit(self) -> ParseRecordResult<T> {
+        self.map_err(IncompleteOrCritical::Critical)
+    }
+    fn or_skip(self) -> ParseRecordResult<T> {
+        self.map_err(IncompleteOrCritical::Continue)
+    }
+}
+
+impl From<BadRecordError> for IncompleteOrCritical<BadRecordError> {
+    fn from(value: BadRecordError) -> Self {
+        IncompleteOrCritical::Critical(value)
+    }
+}
+
+pub type ParseMatchRecordResult = ParseRecordResult<(AnyMatch, Vec<AnyPerformance>)>;
+pub type ParseSongRecordResult = ParseRecordResult<AnySong>;
+
 pub struct SpreadsheetImportResults {
     pub song_lists: Vec<SongList>,
     pub matches: Vec<AnyMatch>,
@@ -38,7 +69,7 @@ pub struct SpreadsheetImportResults {
 }
 
 #[derive(Debug, Error)]
-pub enum RecordError {
+pub enum BadRecordError {
     #[error("not implemented")]
     NotImplemented,
     #[error("not implemented yet")]
@@ -93,7 +124,7 @@ pub enum RecordError {
 pub struct RecordErrorWithContext {
     pub game_id: String,
     pub row: usize,
-    pub error: Box<RecordError>,
+    pub error: Box<BadRecordError>,
     pub record: Option<Record>,
 }
 
@@ -143,7 +174,7 @@ pub const CRITICAL_WARNINGS_UNLESS_THROWAWAY_MATCHES: bool = false; //true;
 pub const CRITICAL_WARNINGS_UNLESS_THROWAWAY_SONGS: bool = false;
 
 // idk anymore
-fn throw_up(game_id: &str, i: usize, e: RecordError, record: &Record, show_record: bool) -> RecordErrorWithContext {
+fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_record: bool) -> RecordErrorWithContext {
     RecordErrorWithContext {
         game_id: game_id.to_owned(),
         row: i + 2,
@@ -158,7 +189,7 @@ fn import_org_spreadsheet_matches(
     records: Vec<Record>,
     matches: &mut Vec<AnyMatch>,
     performances: &mut Vec<AnyPerformance>,
-    ctx: &mut SpreadsheetContext,
+    ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_matches");
 
@@ -182,7 +213,7 @@ fn import_org_spreadsheet_matches(
                 matches.push(match_data);
                 performances.extend(performance_data);
             }
-            Err(Incomplete(e)) => {
+            Err(Continue(e)) => {
                 let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
                 if CRITICAL_WARNINGS_UNLESS_THROWAWAY_MATCHES && !throwaway {
                     return Err(ParseMatchError(e));
@@ -208,7 +239,7 @@ fn import_org_spreadsheet_songs(
     game_id: &str,
     records: Vec<Record>,
     song_lists: &mut Vec<Vec<AnySong>>,
-    ctx: &mut SpreadsheetContext,
+    ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_songs");
 
@@ -229,7 +260,7 @@ fn import_org_spreadsheet_songs(
                 }
                 song_list.push(song);
             }
-            Err(Incomplete(e)) => {
+            Err(Continue(e)) => {
                 let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
                 if CRITICAL_WARNINGS_UNLESS_THROWAWAY_SONGS && !throwaway {
                     return Err(ParseSongError(e));
@@ -276,13 +307,15 @@ where
         PlayerDatabase::read_without_locking(config.player_database_path()).map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
     let library_database =
         LibraryDatabase::lock_and_read(config.library_database_path(), None).map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
-    let mut ctx = SpreadsheetContext {
+    let mut ctx = Context {
         player_database: &player_database,
         library_database: &library_database,
         proofs_to_insert: Vec::new(),
         tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
         incomplete_match_records: Vec::new(),
         incomplete_song_records: Vec::new(),
+        throwaway_match_record_count: 0,
+        throwaway_song_record_count: 0,
     };
 
     for (sheet_name, range) in worksheets {

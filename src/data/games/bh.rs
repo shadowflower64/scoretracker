@@ -2,13 +2,18 @@
 //!
 //! Progress status: All fields from the original spreadsheet are implemented.
 
-use crate::data::game::IncompleteOrCritical::Incomplete;
-use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
+use crate::data::game::Game;
+use crate::data::scoreboard::r#match::CommonMatchInfo;
 use crate::data::scoreboard::r#match::MatchTrait;
+use crate::data::scoreboard::performance::CommonPerformanceInfo;
 use crate::data::scoreboard::performance::PerformanceTrait;
-use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
-use crate::spreadsheet::RecordError;
-use crate::{spreadsheet::record::Record, util::command_line::AskError};
+use crate::spreadsheet::BadRecordError;
+use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::SkipOrQuit;
+use crate::spreadsheet::context::Context;
+use crate::spreadsheet::record::Record;
+use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult};
+use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
 
 /// Game mode.
@@ -155,7 +160,7 @@ impl Game for BandHero {
         "bh"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         // println!("{record}");
         ctx.check_early_skip(record)?;
         let mut lamp = Lamp::None;
@@ -183,7 +188,7 @@ impl Game for BandHero {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }

@@ -3,12 +3,13 @@
 //! Progress status: All fields from the original spreadsheet are implemented.
 //! Spreadsheet bug: `!artist_title` field in the spreadsheet - song ID is not present, it should be present in the input data. (TODO)
 
-use crate::data::game::IncompleteOrCritical::Incomplete;
-use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
+use crate::data::game::Game;
 use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
-use crate::spreadsheet::RecordError;
+use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::context::Context;
+use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
 use serde::{Deserialize, Serialize};
 
@@ -186,7 +187,7 @@ impl Game for FortniteFestival {
         "fnfest"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         // println!("{record}");
         ctx.check_early_skip(record)?;
         let mut lamp = Lamp::None;
@@ -202,7 +203,7 @@ impl Game for FortniteFestival {
 
         let instrument: Instrument = record.string_enum("instrument")?;
 
-        fn create_lb_placement(record: &Record) -> Result<Option<u32>, RecordError> {
+        fn create_lb_placement(record: &Record) -> Result<Option<u32>, BadRecordError> {
             if let Some(string) = record.string_var("leaderboard_placement")? {
                 if string == "-" || string == "?" {
                     return Ok(None);
@@ -215,7 +216,7 @@ impl Game for FortniteFestival {
                 return Ok(None);
             }
 
-            Err(RecordError::NotAnIntSubtype(
+            Err(BadRecordError::NotAnIntSubtype(
                 "leaderboard_placement".into(),
                 Box::new(record.field_value("leaderboard_placement")?.to_owned()),
             ))
@@ -242,7 +243,7 @@ impl Game for FortniteFestival {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }

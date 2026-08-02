@@ -2,11 +2,13 @@
 //!
 //! Progress status: All fields from the original spreadsheet are implemented.
 
-use crate::data::game::IncompleteOrCritical::Incomplete;
-use crate::data::game::{Game, ImportMatchResult, ImportSongResult, SkipOrQuit, SpreadsheetContext};
+use crate::data::game::Game;
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
-use crate::spreadsheet::{RecordError, record::Record};
+use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::context::Context;
+use crate::spreadsheet::{BadRecordError, record::Record};
+use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
 use crate::util::command_line::AskError;
 use serde::{Deserialize, Serialize};
 
@@ -171,7 +173,7 @@ impl Game for GuitarHero3 {
         "gh3"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut SpreadsheetContext) -> ImportMatchResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         // println!("{record}");
         let mut lamp = Lamp::None;
         if record.bool("clear")? {
@@ -201,7 +203,7 @@ impl Game for GuitarHero3 {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut SpreadsheetContext) -> ImportSongResult {
-        Err(Incomplete(RecordError::NotImplemented)) // TODO
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }
