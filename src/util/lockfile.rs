@@ -1,26 +1,39 @@
-use crate::VERSION;
+//! File lock handling.
+use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
+use crate::{VERSION, debug, info, log_fn_name, log_should_print_debug, warn};
 use notify::{ErrorKind, Event, RecursiveMode, Watcher};
+use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::id;
+use std::process;
 use std::result;
 use std::sync::mpsc;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    NoParentPath,
-    NoFilename,
-    FilenameIsNotUTF8,
+    #[error("no parent path for path: {0}")]
+    NoParentPath(PathBuf),
+    #[error("no filename for path: {0}")]
+    NoFilename(PathBuf),
+    #[error("filename is not valid UTF-8: {0:?}")]
+    FilenameIsNotUTF8(OsString),
+    #[error("cannot create lockfile: {0}")]
     CannotCreateLockfile(io::Error),
+    #[error("cannot write to lockfile: {0}")]
     CannotWriteLockfile(io::Error),
+    #[error("cannot remove lockfile: {0}")]
     CannotRemoveLockfile(io::Error),
+    #[error("cannot get recommended file watcher: {0}")]
     CannotGetRecommendedWatcher(notify::Error),
+    #[error("cannot watch lockfile: {0}")]
     CannotWatchLockfile(notify::Error),
-    FileExError(file_ex::Error),
+    #[error("{0}")]
+    FileExError(#[from] file_ex::Error),
 }
 
 impl Error {
@@ -29,12 +42,6 @@ impl Error {
             Self::CannotCreateLockfile(io_error) => io_error.kind() == io::ErrorKind::AlreadyExists,
             _ => false,
         }
-    }
-}
-
-impl From<file_ex::Error> for Error {
-    fn from(value: file_ex::Error) -> Self {
-        Self::FileExError(value)
     }
 }
 
@@ -67,47 +74,73 @@ pub fn is_file_locked<T>(result: &Result<T>) -> bool {
 /// 4. The processed data is written to the file.
 ///    Again - since the lockfile still exists, this guarantees that other processes using this system do not overwrite the file.
 /// 5. After writing is finished, the lockfile is removed. This frees up any other processes to take over the file again.
-///
-/// NOTE: DO NOT CLONE - Owning an instance of this structure represents unique ownership of the associated. It should never be cloned.
+// DEV NOTE: DO NOT ADD CLONE - Owning an instance of this structure represents unique ownership of the associated file. It should never be cloned.
 #[derive(Debug)]
 pub struct LockfileHandle {
     main_file_path: PathBuf,
     lockfile_path: PathBuf,
+    unlocked_manually: bool,
 }
 
 impl LockfileHandle {
     const VERBOSE: bool = true;
 
-    fn generate_lockfile_contents() -> String {
+    fn generate_lockfile_contents(worker_info: Option<&WorkerInfo>) -> String {
         let timestamp = NsTimestamp::now();
-        let pid = id();
+        let timestamp_num = timestamp.as_nanos();
+        let timestamp_string = timestamp.to_date_time_string_local();
+        let pid = process::id();
+        let worker_info_string = worker_info
+            .map(|worker| {
+                let name = &worker.name;
+                let timestamp_num = worker.birth_timestamp.as_nanos();
+                let timestamp_string = worker.birth_timestamp.to_date_time_string_local();
+                let address = worker.address;
+                format!(
+                    "
+worker_name: {name}
+worker_birth_timestamp: {timestamp_num}
+# worker_birth_timestamp: {timestamp_string}
+worker_address: {address}",
+                )
+            })
+            .unwrap_or_default();
+
         format!(
-            "File locked by scoretracker v{VERSION}\nPID: {pid}\nLock timestamp: {timestamp}\n\nWARNING - Do not edit the locked file. Editing the locked file may result in data loss.\n"
+            "# File locked by scoretracker.
+# WARNING - Do not edit the locked file. Editing the locked file may result in data loss.
+
+version: {VERSION}
+pid: {pid}
+lock_timestamp: {timestamp_num}
+# lock_timestamp: {timestamp_string}
+{worker_info_string}
+",
         )
     }
 
-    fn create_lockfile_on_disk(lockfile_path: &Path) -> Result<()> {
+    fn create_lockfile_on_disk(lockfile_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<()> {
+        log_fn_name!("lockfile:create_lockfile_on_disk");
+        log_should_print_debug!(LockfileHandle::VERBOSE);
+
+        let parent = lockfile_path.parent().ok_or(Error::NoParentPath(lockfile_path.to_owned()))?;
+        let _ = fs::create_dir_all(parent).inspect_err(|e| warn!("could not create parent directories for lockfile: {e}"));
         let mut lockfile = File::create_new(lockfile_path).map_err(Error::CannotCreateLockfile)?;
         lockfile
-            .write_all(Self::generate_lockfile_contents().as_bytes())
+            .write_all(Self::generate_lockfile_contents(worker_info).as_bytes())
             .map_err(Error::CannotWriteLockfile)?;
 
-        if Self::VERBOSE {
-            eprintln!("[lockfile] created lockfile: {:?}", lockfile_path);
-        }
+        debug!("created lockfile: {:?}", lockfile_path);
         Ok(())
     }
 
     pub fn lockfile_path_for<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
         let path = path.as_ref();
-        let parent = path.parent().ok_or(Error::NoParentPath)?;
-        let filename = path
-            .file_name()
-            .ok_or(Error::NoFilename)?
-            .to_str()
-            .ok_or(Error::FilenameIsNotUTF8)?;
+        let parent = path.parent().ok_or(Error::NoParentPath(path.to_owned()))?;
+        let filename_osstr = path.file_name().ok_or(Error::NoFilename(path.to_owned()))?;
+        let filename = filename_osstr.to_str().ok_or(Error::FilenameIsNotUTF8(filename_osstr.to_owned()))?;
 
-        let lockfile_path = parent.join(format!("{filename}.lockfile"));
+        let lockfile_path = parent.join(format!("{filename}.lock"));
         Ok(lockfile_path)
     }
 
@@ -135,14 +168,15 @@ impl LockfileHandle {
     /// If the path for the lockfile cannot be generated, this function may return [`Error::NoParentPath`], [`Error::NoFilename`], or [`Error::FilenameIsNotUTF8`].
     /// If the lockfile could not be created, this function will return [`Error::CannotCreateLockfile`].
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
-    pub fn acquire<P: AsRef<Path>>(path: P) -> Result<LockfileHandle> {
+    pub fn acquire<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
         // Create lockfile
         let lockfile_path = Self::lockfile_path_for(&path)?;
-        Self::create_lockfile_on_disk(&lockfile_path)?;
+        Self::create_lockfile_on_disk(&lockfile_path, worker_info)?;
 
         Ok(Self {
             main_file_path: path.as_ref().to_path_buf(),
             lockfile_path,
+            unlocked_manually: false,
         })
     }
 
@@ -165,14 +199,15 @@ impl LockfileHandle {
     /// # Errors
     /// If the path for the lockfile cannot be generated, this function may return [`Error::NoParentPath`], [`Error::NoFilename`], or [`Error::FilenameIsNotUTF8`].
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
-    pub fn acquire_wait<P: AsRef<Path>>(path: P) -> Result<LockfileHandle> {
+    pub fn acquire_wait<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
+        log_fn_name!("lockfile:acquire_wait");
+        log_should_print_debug!(LockfileHandle::VERBOSE);
+
         // Try to create initial lockfile
-        let initial_result = Self::acquire(&path);
+        let initial_result = Self::acquire(&path, worker_info);
         if !is_file_locked(&initial_result) {
             // The file was not locked before - return the initial result, whatever it was.
-            if Self::VERBOSE {
-                eprintln!("[lockfile] acquire_wait: file not locked from initial result");
-            }
+            debug!("file was unlocked initially");
             return initial_result;
         }
 
@@ -180,41 +215,34 @@ impl LockfileHandle {
         // Setup a watcher to watch for file deletion.
         let lockfile_path = Self::lockfile_path_for(&path)?;
         let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
-        let mut watcher =
-            notify::recommended_watcher(tx).map_err(Error::CannotGetRecommendedWatcher)?;
+        let mut watcher = notify::recommended_watcher(tx).map_err(Error::CannotGetRecommendedWatcher)?;
         watcher
             .watch(&lockfile_path, RecursiveMode::NonRecursive)
-            .map_err(Error::CannotWatchLockfile)?; // TODO: this will sometimes exit if the file doesn't exist anymore as you can't watch paths that don't exist. should be very rare though.
+            .map_err(Error::CannotWatchLockfile)?;
+        // TODO: this ^ will sometimes exit with an error if the file doesn't exist anymore as you can't watch paths that don't exist.
+        // the intended behavior for this case is to create the lockfile. this should be very rare though.
 
         // Theoretically, the file could've been deleted while everything was being set up - check again for the file again
-        let result = Self::acquire(&path);
+        let result = Self::acquire(&path, worker_info);
         if !is_file_locked(&result) {
             // The file is not locked anymore! - return the result, whatever it was.
-            if Self::VERBOSE {
-                eprintln!("[lockfile] acquire_wait: file unlocked from after setup");
-            }
+            debug!("file has been unlocked during setup");
             return result;
         }
 
-        if Self::VERBOSE {
-            eprintln!("[lockfile] acquire_wait: waiting for file to be unlocked...");
-        }
+        info!("waiting for file {lockfile_path:?} to be unlocked");
         for res in rx {
             let event = res.unwrap();
-            if Self::VERBOSE {
-                eprintln!("[lockfile] acquire_wait: event about lockfile: {event:?}");
-            }
+            debug!("event about lockfile: {event:?}");
 
             if event.kind.is_remove() || event.kind.is_modify() {
                 // No matter what the event is, we can try to aquire the lockfile again as it might be freed up now.
                 // Sometimes the lock is freed even after modification events (such as renaming the file).
                 // This may still fail, as another process might've acquired the lock as well.
-                let result = Self::acquire(&path);
+                let result = Self::acquire(&path, worker_info);
                 if !is_file_locked(&result) {
                     // The file is not locked anymore - return the result, whatever it was.
-                    if Self::VERBOSE {
-                        eprintln!("[lockfile] acquire_wait: file unlocked from notification");
-                    }
+                    debug!("file unlocked from notification");
                     return result;
                 }
                 // Otherwise, the lockfile is locked still, try again later.
@@ -230,45 +258,49 @@ impl LockfileHandle {
                 if matches!(error.kind, ErrorKind::WatchNotFound) {
                     // This is fine and expected, ignore entirely
                 } else {
-                    eprintln!(
-                        "warning: couldn't unwatch lockfile at {:?}: {error}",
-                        &lockfile_path
-                    )
+                    warn!("couldn't unwatch lockfile at {:?}: {error}", &lockfile_path);
                 }
             });
 
-            if Self::VERBOSE {
-                eprintln!("[lockfile] acquire_wait: rewatching lockfile");
-            }
+            debug!("rewatching lockfile");
             watcher
                 .watch(&lockfile_path, RecursiveMode::NonRecursive)
-                .map_err(Error::CannotWatchLockfile)?; // TODO: this will sometimes exit if the file doesn't exist anymore as you can't watch paths that don't exist. should be very rare though.
+                .map_err(Error::CannotWatchLockfile)?;
+            // TODO: this ^ will sometimes exit with an error if the file doesn't exist anymore as you can't watch paths that don't exist.
+            // the intended behavior for this case is to create the lockfile. this should be very rare though.
         }
 
         unreachable!();
     }
 
-    pub fn unlock(self) -> lockfile::Result<()> {
-        fs::remove_file(&self.lockfile_path).map_err(Error::CannotRemoveLockfile)?;
+    pub fn unlock(mut self) -> lockfile::Result<()> {
+        log_fn_name!("lockfile:unlock");
+        log_should_print_debug!(LockfileHandle::VERBOSE);
 
-        if Self::VERBOSE {
-            eprintln!("[lockfile] unlocked manually: {:?}", &self.lockfile_path);
-        }
+        fs::remove_file(&self.lockfile_path).map_err(Error::CannotRemoveLockfile)?;
+        self.unlocked_manually = true;
+
+        debug!("unlocked manually: {:?}", &self.lockfile_path);
         Ok(())
     }
 }
 
 impl Drop for LockfileHandle {
     fn drop(&mut self) {
-        if let Err(e) = fs::remove_file(&self.lockfile_path) {
-            eprintln!(
-                "warning: could not remove lockfile at {:?}: {e:?}",
-                &self.lockfile_path
-            );
+        log_fn_name!("lockfile:drop");
+        log_should_print_debug!(LockfileHandle::VERBOSE);
+
+        if self.unlocked_manually {
+            // File was already deleted, do not try to delete it again.
+            // If another process has created a new file in-between calling [`LockfileHandle::unlock`] and dropping,
+            // attempting to delete the lock file can lead to bugs.
             return;
         }
-        if Self::VERBOSE {
-            eprintln!("[lockfile] unlocked by dropping: {:?}", &self.lockfile_path);
+
+        if let Err(e) = fs::remove_file(&self.lockfile_path) {
+            warn!("could not remove lockfile at {:?}: {e:?}", &self.lockfile_path);
+        } else {
+            debug!("unlocked by dropping: {:?}", &self.lockfile_path);
         }
     }
 }

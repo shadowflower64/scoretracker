@@ -1,38 +1,58 @@
 use crate::hive::task::{Task, TaskState};
-use crate::util::file_ex::FileEx;
-use crate::util::lockfile::{self, LockfileHandle};
-use std::fmt;
-use std::path::Path;
+use crate::util::file_ex::{self, FileEx};
+use crate::util::filelocked::FileLockableData;
+use thiserror::Error;
 use uuid::Uuid;
 
+/// A queue of tasks that are to be executed by workers.
+///
+/// Tasks in this queue are taken on and executed by workers ([`crate::hive::worker::Worker`]).
+/// You can implement your own worker processes (in any programming language),
+/// but to make sure that no data is lost and no duplicate work is done, please follow the process described below:
+///
+/// If you want to add a task to the queue:
+/// 1. Lock the queue file (the process of locking a file is described in the [`crate::util::lockfile`] module).
+/// 2. Read the queue file (jsonlines format) (this is technically optional, as with jsonlines you can add new entries without parsing the whole file).
+/// 3. Append a new entry with a unique UUID to the end of the file.
+/// 4. Write to the queue file.
+/// 5. Unlock the queue file.
+///
+/// If you want to execute a task in the queue:
+/// 1. Lock the queue file.
+/// 2. Read the queue file (jsonlines format).
+/// 3. Find a task to do, either by an externally provided UUID, or by just choosing one of the tasks.
+/// 4. Make sure the state of the task is set to [`TaskState::Queued`].
+///    If it is not, then that means that the task is being executed by another process, or it is already done.
+/// 5. Set the state of the task to [`TaskState::Working`]
+/// 6. Set the [`Task::start_timestamp`] and [`Task::worker_info`] fields of the task to correct values.
+/// 7. Save the updated task info to the queue file.
+/// 8. Unlock the queue file.
+/// 9. Execute the job described in the task.
+///    After the task is finished (with either a failure or a success state), continue with the steps below.
+/// 10. Lock the queue file.
+/// 11. Read the queue file again (it may have changed by now!).
+/// 12. Find the task with the same UUID as before.
+/// 13. Update the task's state to [`TaskState::Done`] or [`TaskState::Failed`].
+/// 14. If the task was successful, update the [`Task::result`] field to the result of the task.
+/// 15. Update the [`Task::finish_timestamp`] field to the current timestamp.
+/// 16. Save the updated task info to the queue file.
+/// 17. Unlock the queue file.
+#[derive(Debug, Default)]
 pub struct TaskQueue {
     tasks: Vec<Task>,
-    lockfile: LockfileHandle,
 }
 
-#[derive(Debug)]
-pub struct TaskAlreadyExists;
+#[derive(Debug, Error)]
+#[error("task with the same UUID already exists: {0}")]
+pub struct TaskAlreadyExists(Uuid);
 
-impl fmt::Display for TaskAlreadyExists {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "task with the same UUID already exists")
-    }
-}
-
-impl std::error::Error for TaskAlreadyExists {}
-
-#[derive(Debug)]
-pub struct TaskNotFound;
-
-impl fmt::Display for TaskNotFound {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "task with this UUID was not found")
-    }
-}
-
-impl std::error::Error for TaskNotFound {}
+#[derive(Debug, Error)]
+#[error("task with this UUID was not found: {0}")]
+pub struct TaskNotFound(Uuid);
 
 impl TaskQueue {
+    pub const STANDARD_FILENAME: &str = "task_queue.jsonl";
+
     pub fn top_queued_task(&self) -> Option<&Task> {
         self.tasks.iter().find(|task| task.state == TaskState::Queued)
     }
@@ -52,7 +72,7 @@ impl TaskQueue {
             self.tasks.push(task);
             Ok(())
         } else {
-            Err(TaskAlreadyExists)
+            Err(TaskAlreadyExists(task.uuid.0))
         }
     }
 
@@ -67,7 +87,7 @@ impl TaskQueue {
             *old_task = task;
             Ok(())
         } else {
-            Err(TaskNotFound)
+            Err(TaskNotFound(task.uuid.0))
         }
     }
 
@@ -92,14 +112,13 @@ impl TaskQueue {
     pub fn get_task_mut(&mut self, task_uuid: Uuid) -> Option<&mut Task> {
         self.tasks.iter_mut().find(|task| task.uuid.0 == task_uuid)
     }
+}
 
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path)?;
-        let tasks = lockfile.read_from_jsonlines()?.unwrap_or_default();
-        Ok(Self { tasks, lockfile })
+impl FileLockableData for TaskQueue {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
+        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { tasks: y }))
     }
-
-    pub fn write_to_file(&self) -> lockfile::Result<()> {
-        Ok(self.lockfile.write_as_jsonlines(&self.tasks)?)
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
+        file_ex.write_as_jsonlines(&self.tasks)
     }
 }

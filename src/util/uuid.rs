@@ -1,3 +1,4 @@
+//! Module for [`UuidString`], a (de)serializable wrapper for [`Uuid`].
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::fmt::{self, Display};
 use std::str::FromStr;
@@ -13,7 +14,17 @@ use uuid::Uuid;
 /// You can convert between [`Uuid`] and [`UuidString`] easily by using `.into()`,
 /// or by reading the `.0` field of this struct,
 /// or by constructing this struct directly like this: `UuidString(uuid)`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+///
+/// # Example
+/// ```
+/// use uuid::Uuid;
+/// use scoretracker::util::uuid::UuidString;
+///
+/// let uuid = Uuid::now_v7();
+/// let uuid_string = UuidString::from(uuid);
+/// assert_eq!(uuid_string.0, uuid);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UuidString(pub Uuid);
 
 impl From<Uuid> for UuidString {

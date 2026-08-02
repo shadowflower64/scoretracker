@@ -1,0 +1,51 @@
+use crate::data::scoreboard::AnyValue;
+use crate::util::{command_line::AskError, uuid::UuidString};
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+
+pub type PerformanceMetadata = IndexMap<String, AnyValue>;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommonPerformanceInfo {
+    /// UUID of the performance.
+    pub uuid: UuidString,
+
+    /// Player UUID.
+    pub player_uuid: UuidString,
+
+    /// List of library entry UUIDs that are proof of this performance.
+    pub proof: Vec<UuidString>,
+
+    /// Optional user comment.
+    pub comment: Option<String>,
+
+    /// Any additional performance metadata.
+    pub metadata: PerformanceMetadata,
+}
+
+#[typetag::serde(tag = "game")]
+pub trait PerformanceTrait: Debug {
+    fn common(&self) -> &CommonPerformanceInfo;
+    fn uuid(&self) -> &UuidString {
+        &self.common().uuid
+    }
+    fn player_uuid(&self) -> &UuidString {
+        &self.common().player_uuid
+    }
+    fn proof(&self) -> &Vec<UuidString> {
+        &self.common().proof
+    }
+    fn comment(&self) -> &Option<String> {
+        &self.common().comment
+    }
+    fn metadata(&self) -> &PerformanceMetadata {
+        &self.common().metadata
+    }
+    fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
+        unimplemented!()
+    }
+    fn sorting_key(&self) -> f64;
+}
+
+pub type AnyPerformance = Box<dyn PerformanceTrait>;

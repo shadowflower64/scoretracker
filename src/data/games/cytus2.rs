@@ -1,0 +1,208 @@
+//! Data structures for Cytus 2.
+//!
+//! Progress status: All fields from the original spreadsheet are implemented.
+
+use crate::data::game::Game;
+use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
+use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::spreadsheet::ContinueOrQuit::Continue;
+use crate::spreadsheet::context::Context;
+use crate::spreadsheet::{BadRecordError, record::Record};
+use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
+use crate::util::command_line::AskError;
+use crate::util::percentage::Percentage;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Match {
+    #[serde(flatten)]
+    pub common: CommonMatchInfo,
+
+    /// String of the game version that was played on for this match.
+    /// None for unknown.
+    pub game_version: Option<String>,
+}
+
+#[typetag::serde(name = "cytus2")]
+impl MatchTrait for Match {
+    fn common(&self) -> &CommonMatchInfo {
+        &self.common
+    }
+    fn sorting_key(&self) -> f64 {
+        todo!()
+    }
+}
+
+/// Game mode.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    Normal,
+    Master,
+}
+
+/// Difficulty that the performance was played on.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Difficulty {
+    Easy,
+    Hard,
+    Chaos,
+    Glitch,
+    Crash,
+    Dream,
+    Drop,
+}
+
+impl TryFrom<&str> for Difficulty {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "easy" => Ok(Self::Easy),
+            "hard" => Ok(Self::Hard),
+            "chaos" => Ok(Self::Chaos),
+            "glitch" => Ok(Self::Glitch),
+            "crash" => Ok(Self::Crash),
+            "dream" => Ok(Self::Dream),
+            "drop" => Ok(Self::Drop),
+            _ => Err("cytus2::Difficulty"),
+        }
+    }
+}
+
+/// Clear type.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lamp {
+    None,
+    Clear,
+    FC,
+    PF,
+    PFPlus,
+    MaxMaster,
+}
+
+impl TryFrom<&Record> for Lamp {
+    type Error = BadRecordError;
+    fn try_from(record: &Record) -> Result<Self, Self::Error> {
+        let mut lamp = Lamp::None;
+        if record.bool("clear")? {
+            lamp = Lamp::Clear;
+        }
+        if record.bool("fc")? {
+            lamp = Lamp::FC;
+        }
+        if record.bool("pf")? {
+            lamp = Lamp::PF;
+        }
+        if record.bool("pf+")? {
+            lamp = Lamp::PFPlus;
+        }
+        if record.bool_opt("max_master")?.unwrap_or(false) {
+            lamp = Lamp::MaxMaster;
+        }
+        Ok(lamp)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Performance {
+    #[serde(flatten)]
+    pub common: CommonPerformanceInfo,
+
+    /// Mode that this performance was played on.
+    pub mode: Mode,
+
+    /// Difficulty level of the chart.
+    pub difficulty: Difficulty,
+
+    /// Clear type.
+    pub lamp: Lamp,
+
+    /// Count of master judgements. Only present for Master Mode.
+    pub master: Option<u32>,
+
+    /// Count of colored perfect judgements.
+    pub color_perfect: u32,
+
+    /// Count of perfect judgements.
+    pub perfect: u32,
+
+    /// Count of good judgements.
+    pub good: u32,
+
+    /// Count of bad judgements.
+    pub bad: u32,
+
+    /// Count of miss judgements.
+    pub miss: u32,
+
+    /// Score in range [0..1_000_000]. Only present for Normal mode.
+    pub score: Option<u32>,
+}
+
+impl Performance {
+    pub fn tp(&self) -> Percentage {
+        todo!("implement TP formula from spreadsheet")
+    }
+    pub fn mtp(&self) -> Option<Percentage> {
+        todo!("implement MTP formula from spreadsheet")
+    }
+    pub fn mtp_lower_bound(&self) -> Percentage {
+        todo!("implement MTP formula from spreadsheet - for normal mode plays")
+    }
+}
+
+#[typetag::serde(name = "cytus2")]
+impl PerformanceTrait for Performance {
+    fn common(&self) -> &CommonPerformanceInfo {
+        &self.common
+    }
+    fn sorting_key(&self) -> f64 {
+        self.mtp_lower_bound().0
+    }
+    fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Cytus;
+
+#[typetag::serde(name = "cytus2")]
+impl Game for Cytus {
+    fn pretty_name(&self) -> &'static str {
+        "Cytus 2"
+    }
+    fn url_shortname(&self) -> &'static str {
+        "cytus2"
+    }
+
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+        // println!("{record}");
+        let master = record.int_opt("master")?;
+        let perfect = record.int("perfect").or_skip()?;
+        let performance_data = Performance {
+            common: ctx.create_common_p(record)?,
+            mode: if master.is_some() { Mode::Master } else { Mode::Normal },
+            difficulty: record.string_enum("difficulty")?,
+            lamp: record.try_into()?,
+            master,
+            color_perfect: record.int("color_perfect")?,
+            perfect,
+            good: record.int("good")?,
+            bad: record.int("bad")?,
+            miss: record.int("miss")?,
+            score: record.int_opt("score")?,
+        };
+        let match_data = Match {
+            common: ctx.create_common_m(record, &[&performance_data])?,
+            game_version: None,
+        };
+        Ok((Box::new(match_data), vec![Box::new(performance_data)]))
+    }
+
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+        Err(Continue(BadRecordError::NotImplemented)) // TODO
+    }
+}
