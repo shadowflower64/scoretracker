@@ -67,18 +67,18 @@ impl Context<'_> {
     }
 
     fn create_proof(&mut self, record: &Record) -> Result<Vec<UuidString>, BadRecordError> {
-        if let Some(string) = record.string_var("video")? {
-            if string == ":(" || string == "-" {
-                // `:(` => Proof got corrupted before it could be uploaded.
-                // `-` => Proof never existed at all most likely.
-                return Ok(Vec::new());
-            }
+        if let Some(string) = record.string_var("video")?
+            && (string == ":(" || string == "-")
+        {
+            // `:(` => Proof got corrupted before it could be uploaded.
+            // `-` => Proof never existed at all most likely.
+            return Ok(Vec::new());
         }
-        if let Some(hyperlink) = record.hyperlink_var("video")? {
-            if hyperlink.displayed_text == Some("YouTube".to_string()) {
-                let proof_uuid = self.get_or_insert_proof_by_hyperlink(hyperlink)?;
-                return Ok(vec![proof_uuid]);
-            }
+        if let Some(hyperlink) = record.hyperlink_var("video")?
+            && hyperlink.displayed_text == Some("YouTube".to_string())
+        {
+            let proof_uuid = self.get_or_insert_proof_by_hyperlink(hyperlink)?;
+            return Ok(vec![proof_uuid]);
         }
         if record.is_empty("video")? {
             return Ok(Vec::new());
@@ -102,7 +102,7 @@ impl Context<'_> {
         };
         Ok(CommonPerformanceInfo {
             uuid: Uuid::now_v7().into(),
-            player_uuid: self.find_player_by_name(&record.string("player")?)?.uuid,
+            player_uuid: self.find_player_by_name(record.string("player")?)?.uuid,
             proof: self.create_proof(record)?,
             comment,
             metadata: IndexMap::new(),

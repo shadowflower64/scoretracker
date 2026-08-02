@@ -204,10 +204,10 @@ impl Game for FortniteFestival {
         let instrument: Instrument = record.string_enum("instrument")?;
 
         fn create_lb_placement(record: &Record) -> Result<Option<u32>, BadRecordError> {
-            if let Some(string) = record.string_var("leaderboard_placement")? {
-                if string == "-" || string == "?" {
-                    return Ok(None);
-                }
+            if let Some(string) = record.string_var("leaderboard_placement")?
+                && (string == "-" || string == "?")
+            {
+                return Ok(None);
             }
             if let Some(int) = record.int_var("leaderboard_placement")? {
                 return Ok(Some(int));
