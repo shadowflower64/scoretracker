@@ -17,6 +17,8 @@ pub struct Context<'a> {
     pub library_database: &'a LibraryDatabase,
     pub proofs_to_insert: Vec<LibraryEntry>,
     pub tz: Tz,
+    pub ok_match_record_count: u32,
+    pub ok_song_record_count: u32,
     pub throwaway_match_records: Vec<BadRecordErrorWithContext>,
     pub throwaway_song_records: Vec<BadRecordErrorWithContext>,
     pub fixable_match_records: Vec<BadRecordErrorWithContext>,

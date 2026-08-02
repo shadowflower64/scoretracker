@@ -1,14 +1,14 @@
 use crate::spreadsheet::field_value::{CellContents, parse_cell_contents};
-use crate::spreadsheet::{FieldPath, FieldValue, BadRecordError};
+use crate::spreadsheet::{BadRecordError, FieldPath, FieldValue};
 use crate::util::timestamp::NsTimestamp;
 use crate::{info, log_fn_name};
 use calamine::{Data, Hyperlink, Range};
 use chrono::NaiveDate;
 use chrono_tz::Tz;
 use indexmap::IndexMap;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Record(IndexMap<FieldPath, CellContents>);
 
 impl Record {
@@ -96,7 +96,9 @@ impl Record {
     pub fn i64<K: Into<FieldPath>>(&self, key: K) -> Result<i64, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
-        value.as_i64().ok_or_else(|| BadRecordError::NotAnInt(path, Box::new(value.clone())))
+        value
+            .as_i64()
+            .ok_or_else(|| BadRecordError::NotAnInt(path, Box::new(value.clone())))
     }
 
     /// Parse the field as an `Option<i64>`.
@@ -166,7 +168,9 @@ impl Record {
     pub fn f64<K: Into<FieldPath>>(&self, key: K) -> Result<f64, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
-        value.as_f64().ok_or_else(|| BadRecordError::NotAFloat(path, Box::new(value.clone())))
+        value
+            .as_f64()
+            .ok_or_else(|| BadRecordError::NotAFloat(path, Box::new(value.clone())))
     }
 
     /// Parse the field as something convertible from `f64`.
@@ -188,7 +192,9 @@ impl Record {
     pub fn bool<K: Into<FieldPath>>(&self, key: K) -> Result<bool, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
-        value.as_bool().ok_or_else(|| BadRecordError::NotABool(path, Box::new(value.clone())))
+        value
+            .as_bool()
+            .ok_or_else(|| BadRecordError::NotABool(path, Box::new(value.clone())))
     }
 
     /// Parse the field as an `Option<bool>`.
@@ -223,7 +229,9 @@ impl Record {
     pub fn date_only<K: Into<FieldPath>>(&self, key: K) -> Result<NaiveDate, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
-        value.as_date().ok_or_else(|| BadRecordError::NotADate(path, Box::new(value.clone())))
+        value
+            .as_date()
+            .ok_or_else(|| BadRecordError::NotADate(path, Box::new(value.clone())))
     }
 
     /// Parse the field as a `Hyperlink`.
@@ -265,7 +273,8 @@ impl Record {
     pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str, Error = &'static str>>(&self, key: K) -> Result<T, BadRecordError> {
         let path = key.into();
         let string = self.string(path.clone())?;
-        T::try_from(string.as_str()).map_err(|enum_name| BadRecordError::NotAValidEnumVariant(path, enum_name.to_string(), string.to_owned()))
+        T::try_from(string.as_str())
+            .map_err(|enum_name| BadRecordError::NotAValidEnumVariant(path, enum_name.to_string(), string.to_owned()))
     }
 }
 
@@ -281,7 +290,7 @@ impl AsMut<IndexMap<FieldPath, CellContents>> for Record {
 }
 
 impl Display for Record {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut first = true;
         write!(f, "<Record: ")?;
         for (key, value) in &self.0 {

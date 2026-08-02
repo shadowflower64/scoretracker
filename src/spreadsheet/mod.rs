@@ -130,14 +130,11 @@ pub struct BadRecordErrorWithContext {
 
 impl fmt::Display for BadRecordErrorWithContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let str = format!("for game '{}', row {}: {}", self.game_id, self.row, self.error);
         if let Some(record) = &self.record {
-            write!(
-                f,
-                "for game '{}', row {}: {};\nrecord = {record}",
-                self.game_id, self.row, self.error
-            )
+            write!(f, "{str:60};\trecord = {record}",)
         } else {
-            write!(f, "for game '{}', row {}: {}", self.game_id, self.row, self.error)
+            write!(f, "{}", str)
         }
     }
 }
@@ -166,14 +163,12 @@ pub enum SpreadsheetImportError {
     ParseSongError(BadRecordErrorWithContext),
 }
 
-// TODO: rework these verbosity levels
-pub const VERBOSE_CORRECT: bool = false;
-pub const VERBOSE_THROWAWAYS: bool = true;
-pub const VERBOSE_FIXABLES: bool = true;
-pub const PRINT_RECORD_FOR_THROWAWAYS: bool = false;
-pub const PRINT_RECORD_FOR_FIXABLES: bool = false;
-pub const PRINT_RECORD_FOR_UNDEFINED: bool = false;
-pub const STOP_FOR_FIXABLES: bool = false;
+const VERBOSE_CORRECT: bool = false;
+const VERBOSE_THROWAWAYS: bool = true;
+const VERBOSE_FIXABLES: bool = true;
+const PRINT_RECORD_FOR_THROWAWAYS: bool = false;
+const PRINT_RECORD_FOR_FIXABLES: bool = true;
+const STOP_FOR_FIXABLES: bool = false;
 
 // idk anymore
 fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_record: bool) -> BadRecordErrorWithContext {
@@ -189,7 +184,7 @@ fn import_org_spreadsheet_page<
     T: fmt::Debug,
     E: Fn(BadRecordErrorWithContext) -> SpreadsheetImportError,
     F: Fn(&Box<dyn Game>, &Record, &mut Context) -> ParseRecordResult<T>,
-    G: FnMut(T) -> (),
+    G: FnMut(T, &mut Context) -> (),
     H: Fn(BadRecordErrorWithContext, &mut Context) -> (),
     I: Fn(BadRecordErrorWithContext, &mut Context) -> (),
 >(
@@ -217,7 +212,7 @@ fn import_org_spreadsheet_page<
                 } else {
                     success!("{game_id}:{row} | {page_type} parsed successfully ");
                 }
-                on_success(parser_output);
+                on_success(parser_output, ctx);
             }
             Err(Continue(e)) => {
                 if throwaway == Some(true) {
@@ -278,9 +273,10 @@ fn import_org_spreadsheet_matches(
         "match",
         ParseMatchError,
         |game, record, ctx| game.create_match_and_performance_from_spreadsheet_record(record, ctx),
-        |(match_data, performance_data)| {
+        |(match_data, performance_data), ctx| {
             matches.push(match_data);
             performances.extend(performance_data);
+            ctx.ok_match_record_count += 1;
         },
         |e, ctx| {
             ctx.throwaway_match_records.push(e);
@@ -308,8 +304,9 @@ fn import_org_spreadsheet_songs(
         "song",
         ParseSongError,
         |game, record, ctx| game.create_song_from_spreadsheet_record(record, ctx),
-        |song| {
+        |song, ctx| {
             song_list.push(song);
+            ctx.ok_song_record_count += 1;
         },
         |e, ctx| {
             ctx.throwaway_song_records.push(e);
@@ -354,6 +351,8 @@ where
         library_database: &library_database,
         proofs_to_insert: Vec::new(),
         tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
+        ok_match_record_count: 0,
+        ok_song_record_count: 0,
         throwaway_match_records: Vec::new(),
         throwaway_song_records: Vec::new(),
         fixable_match_records: Vec::new(),
@@ -387,7 +386,12 @@ where
         }
     }
 
-    info!(
+    success!(
+        "successfully imported {} match records and {} song records",
+        ctx.ok_match_record_count,
+        ctx.ok_song_record_count
+    );
+    success!(
         "{} match records thrown away, {} song records thrown away, {} fixable match records skipped, {} fixable song records skipped",
         ctx.throwaway_match_records.len(),
         ctx.throwaway_song_records.len(),
@@ -401,7 +405,7 @@ where
         &fixable_match_path,
         ctx.fixable_match_records
             .iter()
-            .map(|line| format!("{line:?}\n"))
+            .map(|line| format!("{line}\n"))
             .collect::<Vec<_>>()
             .join(""),
     )
@@ -412,7 +416,7 @@ where
         &fixable_song_path,
         ctx.fixable_song_records
             .iter()
-            .map(|line| format!("{line:?}\n"))
+            .map(|line| format!("{line}\n"))
             .collect::<Vec<_>>()
             .join(""),
     )
