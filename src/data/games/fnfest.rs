@@ -7,7 +7,7 @@ use crate::data::game::Game;
 use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
-use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
 use crate::{spreadsheet::record::Record, util::command_line::AskError};

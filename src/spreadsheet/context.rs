@@ -8,7 +8,7 @@ use crate::data::scoreboard::r#match::CommonMatchInfo;
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
 use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{BadRecordError, ParseRecordResult, RecordErrorWithContext, SkipOrQuit};
+use crate::spreadsheet::{BadRecordError, BadRecordErrorWithContext, ParseRecordResult, SkipOrQuit};
 use crate::util::uuid::UuidString;
 use crate::util::youtube_id;
 
@@ -17,10 +17,10 @@ pub struct Context<'a> {
     pub library_database: &'a LibraryDatabase,
     pub proofs_to_insert: Vec<LibraryEntry>,
     pub tz: Tz,
-    pub incomplete_match_records: Vec<RecordErrorWithContext>,
-    pub incomplete_song_records: Vec<RecordErrorWithContext>,
-    pub throwaway_match_record_count: u32,
-    pub throwaway_song_record_count: u32,
+    pub throwaway_match_records: Vec<BadRecordErrorWithContext>,
+    pub throwaway_song_records: Vec<BadRecordErrorWithContext>,
+    pub fixable_match_records: Vec<BadRecordErrorWithContext>,
+    pub fixable_song_records: Vec<BadRecordErrorWithContext>,
 }
 
 impl Context<'_> {

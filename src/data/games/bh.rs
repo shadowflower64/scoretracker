@@ -8,7 +8,7 @@ use crate::data::scoreboard::r#match::MatchTrait;
 use crate::data::scoreboard::performance::CommonPerformanceInfo;
 use crate::data::scoreboard::performance::PerformanceTrait;
 use crate::spreadsheet::BadRecordError;
-use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::SkipOrQuit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;

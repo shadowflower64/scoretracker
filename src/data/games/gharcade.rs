@@ -2,7 +2,7 @@
 
 use crate::data::game::Game;
 use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{BadRecordError, IncompleteOrCritical::Continue, ParseSongRecordResult, context::Context};
+use crate::spreadsheet::{BadRecordError, ContinueOrQuit::Continue, ParseSongRecordResult, context::Context};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]

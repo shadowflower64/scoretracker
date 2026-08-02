@@ -1,7 +1,7 @@
 pub mod song;
 
 use crate::data::scoreboard::performance::AnyPerformance;
-use crate::spreadsheet::IncompleteOrCritical::Critical;
+use crate::spreadsheet::ContinueOrQuit::Quit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
 use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult};
@@ -19,11 +19,11 @@ pub trait Game: Debug {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
-        Err(Critical(BadRecordError::NotImplemented))
+        Err(Quit(BadRecordError::NotImplemented))
     }
 
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
-        Err(Critical(BadRecordError::NotImplemented))
+        Err(Quit(BadRecordError::NotImplemented))
     }
 }
 

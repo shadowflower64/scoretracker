@@ -10,7 +10,7 @@ use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::data::scoreboard::player::PlayerDatabase;
-use crate::spreadsheet::IncompleteOrCritical::{Continue, Critical};
+use crate::spreadsheet::ContinueOrQuit::{Continue, Quit};
 use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::field_path::FieldPath;
@@ -25,19 +25,19 @@ use calamine::{Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_wo
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Europe::Warsaw;
 use chrono_tz::Tz;
-use std::convert::identity;
+use std::env::temp_dir;
 use std::error::Error;
-use std::fmt;
 use std::path::Path;
+use std::{fmt, fs};
 use thiserror::Error;
 
 pub type SongList = Vec<AnySong>;
 
-pub enum IncompleteOrCritical<E> {
+pub enum ContinueOrQuit<E> {
     Continue(E),
-    Critical(E),
+    Quit(E),
 }
-pub type ParseRecordResult<T> = Result<T, IncompleteOrCritical<BadRecordError>>;
+pub type ParseRecordResult<T> = Result<T, ContinueOrQuit<BadRecordError>>;
 
 pub trait SkipOrQuit<T> {
     fn or_skip(self) -> ParseRecordResult<T>;
@@ -46,16 +46,16 @@ pub trait SkipOrQuit<T> {
 
 impl<T> SkipOrQuit<T> for Result<T, BadRecordError> {
     fn or_quit(self) -> ParseRecordResult<T> {
-        self.map_err(IncompleteOrCritical::Critical)
+        self.map_err(ContinueOrQuit::Quit)
     }
     fn or_skip(self) -> ParseRecordResult<T> {
-        self.map_err(IncompleteOrCritical::Continue)
+        self.map_err(ContinueOrQuit::Continue)
     }
 }
 
-impl From<BadRecordError> for IncompleteOrCritical<BadRecordError> {
+impl From<BadRecordError> for ContinueOrQuit<BadRecordError> {
     fn from(value: BadRecordError) -> Self {
-        IncompleteOrCritical::Critical(value)
+        ContinueOrQuit::Quit(value)
     }
 }
 
@@ -121,14 +121,14 @@ pub enum BadRecordError {
 }
 
 #[derive(Debug, Error)]
-pub struct RecordErrorWithContext {
+pub struct BadRecordErrorWithContext {
     pub game_id: String,
     pub row: usize,
     pub error: Box<BadRecordError>,
     pub record: Option<Record>,
 }
 
-impl fmt::Display for RecordErrorWithContext {
+impl fmt::Display for BadRecordErrorWithContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(record) = &self.record {
             write!(
@@ -161,26 +161,106 @@ pub enum SpreadsheetImportError {
     #[error("cannot read library database: {0}")]
     CannotReadLibraryDatabase(lockfile::Error),
     #[error("cannot parse performance: {0}")]
-    ParseMatchError(RecordErrorWithContext),
+    ParseMatchError(BadRecordErrorWithContext),
     #[error("cannot parse song: {0}")]
-    ParseSongError(RecordErrorWithContext),
+    ParseSongError(BadRecordErrorWithContext),
 }
 
 // TODO: rework these verbosity levels
-pub const VERBOSE_COMPLETE: bool = false;
-pub const VERBOSE_INCOMPLETE: bool = true;
-pub const EVEN_MORE_VERBOSE_INCOMPLETE: bool = false;
-pub const CRITICAL_WARNINGS_UNLESS_THROWAWAY_MATCHES: bool = false; //true;
-pub const CRITICAL_WARNINGS_UNLESS_THROWAWAY_SONGS: bool = false;
+pub const VERBOSE_CORRECT: bool = false;
+pub const VERBOSE_THROWAWAYS: bool = true;
+pub const VERBOSE_FIXABLES: bool = true;
+pub const PRINT_RECORD_FOR_THROWAWAYS: bool = false;
+pub const PRINT_RECORD_FOR_FIXABLES: bool = false;
+pub const PRINT_RECORD_FOR_UNDEFINED: bool = false;
+pub const STOP_FOR_FIXABLES: bool = false;
 
 // idk anymore
-fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_record: bool) -> RecordErrorWithContext {
-    RecordErrorWithContext {
+fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_record: bool) -> BadRecordErrorWithContext {
+    BadRecordErrorWithContext {
         game_id: game_id.to_owned(),
         row: i + 2,
         record: show_record.then_some(record.to_owned()),
         error: Box::new(e),
     }
+}
+
+fn import_org_spreadsheet_page<
+    T: fmt::Debug,
+    E: Fn(BadRecordErrorWithContext) -> SpreadsheetImportError,
+    F: Fn(&Box<dyn Game>, &Record, &mut Context) -> ParseRecordResult<T>,
+    G: FnMut(T) -> (),
+    H: Fn(BadRecordErrorWithContext, &mut Context) -> (),
+    I: Fn(BadRecordErrorWithContext, &mut Context) -> (),
+>(
+    game: Box<dyn Game>,
+    game_id: &str,
+    records: Vec<Record>,
+    page_type: &str,
+    make_err: E,
+    parser_fn: F,
+    mut on_success: G,
+    on_throwaway: H,
+    on_fixable: I,
+    ctx: &mut Context,
+) -> Result<(), SpreadsheetImportError> {
+    log_fn_name!("import_org_spreadsheet_page");
+
+    for (i, record) in records.iter().enumerate() {
+        let row = i + 2;
+        let throwaway = record.field("throwaway").and_then(CellContents::val).and_then(FieldValue::as_bool);
+
+        match parser_fn(&game, record, ctx) {
+            Ok(parser_output) => {
+                if VERBOSE_CORRECT {
+                    success!("{game_id}:{row} | {page_type} parsed successfully: {parser_output:?}");
+                } else {
+                    success!("{game_id}:{row} | {page_type} parsed successfully ");
+                }
+                on_success(parser_output);
+            }
+            Err(Continue(e)) => {
+                if throwaway == Some(true) {
+                    // throwaway
+                    let e = throw_up(game_id, i, e, record, PRINT_RECORD_FOR_THROWAWAYS);
+                    if VERBOSE_THROWAWAYS {
+                        warn!("{game_id}:{row} | bad {page_type} record: {e}; but it was marked as throwaway; ignoring");
+                    } else {
+                        warn!("{game_id}:{row} | bad {page_type} record but it was marked as throwaway; ignoring");
+                    }
+                    on_throwaway(e, ctx);
+                } else if throwaway == Some(false) {
+                    // fixable
+                    if STOP_FOR_FIXABLES {
+                        warn!(
+                            "{game_id}:{row} | bad {page_type} record and it was not marked as throwaway - it needs to be fixed; exiting"
+                        );
+                        return Err(make_err(throw_up(game_id, i, e, record, true)));
+                    }
+
+                    let e = throw_up(game_id, i, e, record, PRINT_RECORD_FOR_FIXABLES);
+                    if VERBOSE_FIXABLES {
+                        warn!(
+                            "{game_id}:{row} | bad {page_type} record: {e}; and it was not marked as throwaway - it needs to be fixed; ignoring"
+                        );
+                    } else {
+                        warn!(
+                            "{game_id}:{row} | bad {page_type} record and it was not marked as throwaway - it needs to be fixed; ignoring"
+                        );
+                    }
+                    on_fixable(e, ctx);
+                } else {
+                    warn!("{game_id}:{row} | bad {page_type} record and the throwaway marker is not defined; exiting");
+                    return Err(make_err(throw_up(game_id, i, e, record, true)));
+                }
+            }
+            Err(Quit(e)) => {
+                let e = throw_up(game_id, i, e, record, true);
+                return Err(make_err(e));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn import_org_spreadsheet_matches(
@@ -191,47 +271,25 @@ fn import_org_spreadsheet_matches(
     performances: &mut Vec<AnyPerformance>,
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
-    log_fn_name!("import_org_spreadsheet_matches");
-
-    for (i, record) in records.iter().enumerate() {
-        let throwaway = record
-            .field("throwaway")
-            .and_then(CellContents::val)
-            .and_then(FieldValue::as_bool)
-            .is_some_and(identity);
-
-        match game.create_match_and_performance_from_spreadsheet_record(record, ctx) {
-            Ok((match_data, performance_data)) => {
-                if VERBOSE_COMPLETE {
-                    success!(
-                        "{game_id}:{} | match parsed successfully: {match_data:?} + {performance_data:?}",
-                        i + 2
-                    );
-                } else {
-                    success!("{game_id}:{} | match parsed successfully ", i + 2);
-                }
-                matches.push(match_data);
-                performances.extend(performance_data);
-            }
-            Err(Continue(e)) => {
-                let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
-                if CRITICAL_WARNINGS_UNLESS_THROWAWAY_MATCHES && !throwaway {
-                    return Err(ParseMatchError(e));
-                }
-
-                if VERBOSE_INCOMPLETE {
-                    warn!("{game_id}:{} | incomplete match record: {e}; ignoring", i + 2);
-                } else {
-                    warn!("{game_id}:{} | incomplete match record; ignoring", i + 2);
-                }
-                ctx.incomplete_match_records.push(e);
-            }
-            Err(Critical(e)) => {
-                return Err(ParseMatchError(throw_up(game_id, i, e, record, true)));
-            }
-        }
-    }
-    Ok(())
+    import_org_spreadsheet_page(
+        game,
+        game_id,
+        records,
+        "match",
+        ParseMatchError,
+        |game, record, ctx| game.create_match_and_performance_from_spreadsheet_record(record, ctx),
+        |(match_data, performance_data)| {
+            matches.push(match_data);
+            performances.extend(performance_data);
+        },
+        |e, ctx| {
+            ctx.throwaway_match_records.push(e);
+        },
+        |e, ctx| {
+            ctx.fixable_match_records.push(e);
+        },
+        ctx,
+    )
 }
 
 fn import_org_spreadsheet_songs(
@@ -241,43 +299,27 @@ fn import_org_spreadsheet_songs(
     song_lists: &mut Vec<Vec<AnySong>>,
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
-    log_fn_name!("import_org_spreadsheet_songs");
+    let mut song_list = Vec::new();
 
-    let mut song_list: Vec<AnySong> = Vec::new();
-    for (i, record) in records.iter().enumerate() {
-        let throwaway = record
-            .field("throwaway")
-            .and_then(CellContents::val)
-            .and_then(FieldValue::as_bool)
-            .is_some_and(identity);
+    import_org_spreadsheet_page(
+        game,
+        game_id,
+        records,
+        "song",
+        ParseSongError,
+        |game, record, ctx| game.create_song_from_spreadsheet_record(record, ctx),
+        |song| {
+            song_list.push(song);
+        },
+        |e, ctx| {
+            ctx.throwaway_song_records.push(e);
+        },
+        |e, ctx| {
+            ctx.fixable_song_records.push(e);
+        },
+        ctx,
+    )?;
 
-        match game.create_song_from_spreadsheet_record(record, ctx) {
-            Ok(song) => {
-                if VERBOSE_COMPLETE {
-                    success!("{game_id}:{} | song parsed successfully: {song:?}", i + 2);
-                } else {
-                    success!("{game_id}:{} | song parsed successfully", i + 2);
-                }
-                song_list.push(song);
-            }
-            Err(Continue(e)) => {
-                let e = throw_up(game_id, i, e, record, EVEN_MORE_VERBOSE_INCOMPLETE);
-                if CRITICAL_WARNINGS_UNLESS_THROWAWAY_SONGS && !throwaway {
-                    return Err(ParseSongError(e));
-                }
-
-                if VERBOSE_INCOMPLETE {
-                    warn!("{game_id}:{} | incomplete song record: {e}; ignoring", i + 2);
-                } else {
-                    warn!("{game_id}:{} | incomplete song record; ignoring", i + 2);
-                }
-                ctx.incomplete_song_records.push(e);
-            }
-            Err(Critical(e)) => {
-                return Err(ParseSongError(throw_up(game_id, i, e, record, true)));
-            }
-        }
-    }
     song_lists.push(song_list);
     Ok(())
 }
@@ -312,10 +354,10 @@ where
         library_database: &library_database,
         proofs_to_insert: Vec::new(),
         tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
-        incomplete_match_records: Vec::new(),
-        incomplete_song_records: Vec::new(),
-        throwaway_match_record_count: 0,
-        throwaway_song_record_count: 0,
+        throwaway_match_records: Vec::new(),
+        throwaway_song_records: Vec::new(),
+        fixable_match_records: Vec::new(),
+        fixable_song_records: Vec::new(),
     };
 
     for (sheet_name, range) in worksheets {
@@ -339,17 +381,43 @@ where
                 import_org_spreadsheet_matches(game, game_id, records, &mut matches, &mut performances, &mut ctx)?;
             }
             "songs" => {
-                import_org_spreadsheet_songs(game, game_id, records, &mut song_lists, &mut ctx)?;
+                let _ = import_org_spreadsheet_songs(game, game_id, records, &mut song_lists, &mut ctx); // TODO: ignore song errors for now
             }
             a => Err(SpreadsheetImportError::InvalidTableType(a.to_owned()))?,
         }
     }
 
     info!(
-        "{} match records skipped, {} song records skipped",
-        ctx.incomplete_match_records.len(),
-        ctx.incomplete_song_records.len()
+        "{} match records thrown away, {} song records thrown away, {} fixable match records skipped, {} fixable song records skipped",
+        ctx.throwaway_match_records.len(),
+        ctx.throwaway_song_records.len(),
+        ctx.fixable_match_records.len(),
+        ctx.fixable_song_records.len()
     );
+
+    let fixable_match_path = temp_dir().join("scoretracker/fixable_match_records.txt");
+    fs::create_dir_all(fixable_match_path.parent().unwrap()).expect("could not create dirs");
+    fs::write(
+        &fixable_match_path,
+        ctx.fixable_match_records
+            .iter()
+            .map(|line| format!("{line:?}\n"))
+            .collect::<Vec<_>>()
+            .join(""),
+    )
+    .expect("could not write to file");
+    let fixable_song_path = temp_dir().join("scoretracker/fixable_song_records.txt");
+
+    fs::write(
+        &fixable_song_path,
+        ctx.fixable_song_records
+            .iter()
+            .map(|line| format!("{line:?}\n"))
+            .collect::<Vec<_>>()
+            .join(""),
+    )
+    .expect("could not write to file");
+    info!("fixables written to {fixable_match_path:?} and {fixable_song_path:?}");
 
     Ok(SpreadsheetImportResults {
         song_lists,

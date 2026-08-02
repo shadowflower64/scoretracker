@@ -2,7 +2,7 @@
 
 use crate::data::game::Game;
 use crate::spreadsheet::BadRecordError;
-use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::ParseSongRecordResult;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;

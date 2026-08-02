@@ -1,7 +1,7 @@
 //! Data structures for Hatsune Miku: Project DIVA Mega Mix+.
 
 use crate::data::game::Game;
-use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::{BadRecordError, ParseSongRecordResult, context::Context, record::Record};
 use serde::{Deserialize, Serialize};
 

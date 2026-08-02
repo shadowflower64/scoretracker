@@ -1,6 +1,6 @@
 //! Data structures for Phigros.
 
-use crate::spreadsheet::IncompleteOrCritical::Continue;
+use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, ParseSongRecordResult};
 use crate::{data::game::Game, spreadsheet::context::Context};
