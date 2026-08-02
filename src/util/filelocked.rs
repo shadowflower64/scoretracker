@@ -104,12 +104,12 @@ impl<T: FileLockableData> FileLocked<T> {
         Ok(T::_inner_write(&self.inner, &self.lockfile)?)
     }
 
-    pub fn unlock_and_save(self) -> lockfile::Result<()> {
+    pub fn save_and_unlock(self) -> lockfile::Result<()> {
         self.save_to_file()?;
         self.unlock_without_saving()
     }
 
-    pub fn close_and_save(self) -> lockfile::Result<ClosedFileLocked<T>> {
+    pub fn save_and_close(self) -> lockfile::Result<ClosedFileLocked<T>> {
         self.save_to_file()?;
         self.close_without_saving()
     }

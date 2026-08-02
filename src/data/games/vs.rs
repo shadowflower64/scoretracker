@@ -61,6 +61,9 @@ impl TryFrom<&str> for Difficulty {
 pub enum Lamp {
     None,
     C,
+    /// "FC" in vivid/stasis is not actually a lamp for "Full Combo" (as in, the maximum possible combo).
+    /// The "FC" lamp can be acquired with "good" judgements, which do not increment the combo, but do not reset it either;
+    /// meaning that the "FC" lamp in vivid/stasis is actually a "No Miss" lamp.
     FC,
     AC,
     VS,

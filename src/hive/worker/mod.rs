@@ -95,7 +95,7 @@ impl Worker {
     }
 
     pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
-        TaskQueue::lock_and_read_or_default(self.config.library_database_path(), Some(self.worker_info())).map_err(Error::CannotReadQueue)
+        TaskQueue::lock_and_read_or_default(self.config.task_queue_path(), Some(self.worker_info())).map_err(Error::CannotReadQueue)
     }
 
     /// Execute a task in the current thread.
@@ -106,10 +106,10 @@ impl Worker {
     /// The queue file should be written to before calling this method.
     ///
     /// The result of the task should also be saved to the queue after this method finishes, so that no data is lost and the task is not done twice.
-    fn execute_task_body(&self, task: &mut Task) {
+    async fn execute_task_body(&self, task: &mut Task) {
         log_fn_name!("worker:execute task");
 
-        match task.job.run(&self.config, Some(self.worker_info())) {
+        match task.job.run(&self.config, Some(self.worker_info())).await {
             Ok(success) => {
                 success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
                 task.state = TaskState::Done;
@@ -131,7 +131,7 @@ impl Worker {
     /// This function will mark the task as being worked on and write to the [`TaskQueue`] file using [`lockfile`];
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
-    pub fn execute_task<F: Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>>(
+    pub async fn execute_task<F: Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>>(
         &self,
         mut queue: FileLocked<TaskQueue>,
         task_getter: F,
@@ -149,10 +149,11 @@ impl Worker {
         info!("taking on task with uuid: {}", task.uuid.0);
 
         // Drop file lock here to and let other processes access the queue
-        let queue = queue.close_and_save().map_err(Error::CannotWriteQueue)?;
+        let queue = queue.save_and_close().map_err(Error::CannotWriteQueue)?;
 
         // Do some task if there is something to do
-        self.execute_task_body(&mut task);
+        info!("starting task: {:?}", task);
+        self.execute_task_body(&mut task).await;
 
         // Update the queue file again to update the state of the task
         let mut queue = queue.reopen().map_err(Error::CannotReopenQueue)?;
@@ -166,9 +167,10 @@ impl Worker {
     /// Please note that executing a task may take a long time.
     ///
     /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
-    pub fn execute_task_with_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
+    pub async fn execute_task_with_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
         let queue = self.open_queue()?;
-        self.execute_task(queue, |q| q.get_task_mut(task_uuid).ok_or(Error::TaskNotFound(task_uuid)))?;
+        self.execute_task(queue, |q| q.get_task_mut(task_uuid).ok_or(Error::TaskNotFound(task_uuid)))
+            .await?;
         Ok(())
     }
 
@@ -177,9 +179,10 @@ impl Worker {
     /// Please note that executing a task may take a long time.
     ///
     /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
-    pub fn take_on_task(&self) -> Result<(), Error> {
+    pub async fn take_on_task(&self) -> Result<(), Error> {
         let queue = self.open_queue()?;
-        self.execute_task(queue, |q| q.top_queued_task_mut().ok_or(Error::NoTopQueuedTask))?;
+        self.execute_task(queue, |q| q.top_queued_task_mut().ok_or(Error::NoTopQueuedTask))
+            .await?;
         Ok(())
     }
 }

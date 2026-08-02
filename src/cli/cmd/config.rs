@@ -73,7 +73,7 @@ pub fn set(key: String, value: String) -> Result<(), CmdError> {
         key => Err(CmdError::InvalidConfigKey(key.to_string()))?,
     }
 
-    config.unlock_and_save().map_err(CmdError::ConfigWriteError)?;
+    config.save_and_unlock().map_err(CmdError::ConfigWriteError)?;
     success_npr!("successfully updated config");
 
     Ok(())

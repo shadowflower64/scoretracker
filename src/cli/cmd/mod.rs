@@ -19,6 +19,7 @@ pub mod library;
 pub mod performance;
 pub mod player;
 pub mod spreadsheet;
+pub mod vitals;
 
 #[derive(Debug, Error)]
 pub enum CmdError {
@@ -232,7 +233,17 @@ pub fn handle_command(args: &[String]) -> Result<(), CmdError> {
                     arg!(persistent: bool, "should the worker stay alive after finishing a task?", fcn, args, 4);
                     cmd::hive::spawn_worker(persistent)
                 }
+            ),
+            "task" => cmd!(fcn, args, 3,
+                "add" => {
+                    cmd::hive::add_task()
+                }
             )
+        ),
+        "vitals" => cmd!(fcn, args, 2,
+            "all" => {
+                cmd::vitals::check_all()
+            }
         ),
         "performance" => cmd!(fcn, args, 2,
             "add" => {

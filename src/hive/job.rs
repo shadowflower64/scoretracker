@@ -5,7 +5,7 @@
 use crate::data::library::database::LibraryEntry;
 use crate::data::library::scan_register_added_file;
 use crate::data::library::stpl_url::StplUrl;
-use crate::ffmpeg::ffmpeg_cut_video;
+use crate::ffmpeg::ffmpeg_cut_video_streamcopy;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableDataDefault};
 use crate::util::uuid::UuidString;
 use crate::{config::Config, data::library::database::LibraryDatabase, hive::worker::WorkerInfo, info, log_fn_name};
@@ -83,7 +83,7 @@ pub enum Job {
 }
 
 impl Job {
-    pub fn run(&self, config: &Config, worker_info: Option<&WorkerInfo>) -> Result<Success, Failure> {
+    pub async fn run(&self, config: &Config, worker_info: Option<&WorkerInfo>) -> Result<Success, Failure> {
         // Helper functions
         let _open_library_db_readwrite = || {
             LibraryDatabase::lock_and_read_or_default(config.library_database_path(), worker_info)
@@ -142,12 +142,13 @@ impl Job {
                 }
 
                 // Launch ffmpeg to cut the video losslessly
-                ffmpeg_cut_video(
+                ffmpeg_cut_video_streamcopy(
                     source_path,
                     destination_path,
                     cut_point_start_ms.to_owned(),
                     cut_point_end_ms.to_owned(),
-                );
+                )
+                .await;
 
                 // Get library info of the destination file
                 let destination_library_dir = get_library_dir_of_path(source_path).unwrap(); // TODO: error handling

@@ -197,7 +197,7 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
         .collect();
 
     // Write all results to cache (if they haven't been already saved by the autosave)
-    cache.unlock_and_save().map_err(E::CannotWriteCache)?;
+    cache.save_and_unlock().map_err(E::CannotWriteCache)?;
 
     // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
     info!("[scan] getting uuids from database");
@@ -292,8 +292,8 @@ pub fn scan_register_removed_files(
         };
     }
 
-    library_index.unlock_and_save().map_err(E::CannotWriteIndexLockfile)?;
-    library_db.unlock_and_save().map_err(E::CannotWriteDatabase)?;
+    library_index.save_and_unlock().map_err(E::CannotWriteIndexLockfile)?;
+    library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
     Ok(())
 }
 
@@ -343,7 +343,7 @@ pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lock
             unused_proof_uuids_in_index.remove(&entry.uuid);
         }
     }
-    library_db.unlock_and_save().expect("cannot write database file"); // TODO: error handling
+    library_db.save_and_unlock().expect("cannot write database file"); // TODO: error handling
 
     // Check if any of the proof UUIDs that are in the index were not present in the database
     for absent_uuid in unused_proof_uuids_in_index {
@@ -400,6 +400,6 @@ pub fn remove_library_domain_from_db(
         // Remove all old URLs that reference this library, without touching all of the other ones.
         entry.library_urls.retain(|url| url.domain != library_domain);
     }
-    library_db.unlock_and_save()?;
+    library_db.save_and_unlock()?;
     Ok(())
 }

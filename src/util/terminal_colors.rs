@@ -20,3 +20,11 @@ pub const ANSI_COLOR_BOLD_MAGENTA: &str = "\x1b[1;35m";
 
 /// Enable bold font and cyan text color.
 pub const ANSI_COLOR_BOLD_CYAN: &str = "\x1b[1;36m";
+
+/// Move writing cursor to the left by a given amount.
+pub fn ansi_move_cursor_left(columns: u32) -> String {
+    format!("\x1b[{columns}D")
+}
+
+/// Erase from cursor to end of line.
+pub const ANSI_ERASE_TO_END: &str = "\x1b[0K";

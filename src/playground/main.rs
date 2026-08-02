@@ -110,7 +110,7 @@ pub fn test_timestamp(_args: &[String]) {
 }
 
 #[allow(unused)]
-pub fn test_queue(_args: &[String]) {
+pub async fn test_queue(_args: &[String]) {
     log_fn_name!("playground:queue");
 
     let mut currently_doing_task_opt = None;
@@ -150,7 +150,7 @@ pub fn test_queue(_args: &[String]) {
 
     // Do some task if there is something to do
     if let Some(mut task) = currently_doing_task_opt {
-        match task.job.run(&Config::load().unwrap(), None) {
+        match task.job.run(&Config::load().unwrap(), None).await {
             Ok(results) => {
                 //
                 task.state = TaskState::Done
