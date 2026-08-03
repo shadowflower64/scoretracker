@@ -39,7 +39,7 @@ use uuid::Uuid;
 /// 17. Unlock the queue file.
 #[derive(Debug, Default)]
 pub struct TaskQueue {
-    tasks: Vec<Task>,
+    pub tasks: Vec<Task>,
 }
 
 #[derive(Debug, Error)]
@@ -111,6 +111,14 @@ impl TaskQueue {
 
     pub fn get_task_mut(&mut self, task_uuid: Uuid) -> Option<&mut Task> {
         self.tasks.iter_mut().find(|task| task.uuid.0 == task_uuid)
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.tasks.len()
+    }
+
+    pub fn count(&self, state: TaskState) -> usize {
+        self.tasks.iter().filter(|task| task.state == state).count()
     }
 }
 
