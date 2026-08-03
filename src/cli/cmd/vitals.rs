@@ -38,7 +38,7 @@ fn print_check_warn<E: fmt::Display>(warning: &E) {
     println!("{ANSI_ERASE_TO_END}{ANSI_COLOR_BOLD_YELLOW}warning: {ANSI_COLOR_RESET}{warning}");
 }
 
-fn print_check_warn_msg(msg: &str) {
+fn _print_check_warn_msg(msg: &str) {
     println!("{ANSI_ERASE_TO_END}{ANSI_COLOR_BOLD_YELLOW}warning: {ANSI_COLOR_RESET}{msg}");
 }
 

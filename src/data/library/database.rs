@@ -183,10 +183,10 @@ pub struct ClothInfo {
     pub uuid: UuidString,
 
     /// Start point of the cut-out video within the cloth, in nanoseconds.
-    pub start_point: NsTimestamp,
+    pub start_point: Option<NsTimestamp>,
 
     /// End point of the cut-out video within the cloth, in nanoseconds.
-    pub end_point: NsTimestamp,
+    pub end_point: Option<NsTimestamp>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

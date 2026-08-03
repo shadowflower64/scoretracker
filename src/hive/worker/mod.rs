@@ -1,15 +1,19 @@
 mod ipc;
+pub mod status;
 
 use crate::config::Config;
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::ipc::start_listener_thread;
+use crate::hive::worker::ipc::{IncomingMessage, OutgoingMessage, TERMINATION_REQUEST_EXIT_CODE, VERBOSE_CONNECTION_HANDLER, send_message};
+use crate::hive::worker::status::WorkerStatus;
 use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::lockfile;
 use crate::util::timestamp::NsTimestamp;
-use crate::{error, info, log_fn_name, success};
+use crate::{debug, error, info, log_fn_name, log_should_print_debug, success};
 use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::{Arc, Mutex, mpsc};
 use std::{io, process};
 use thiserror::Error;
 use uuid::Uuid;
@@ -52,12 +56,7 @@ pub struct WorkerInfo {
 pub struct Worker {
     info: WorkerInfo,
     config: Config,
-}
-
-impl Default for Worker {
-    fn default() -> Self {
-        Self::new_default().expect("could not create default worker")
-    }
+    worker_status: Arc<Mutex<WorkerStatus>>,
 }
 
 impl Worker {
@@ -69,10 +68,14 @@ impl Worker {
         &self.config
     }
 
+    pub fn fetch_progress(&self) -> String {
+        return "Fetch progress".to_owned();
+    }
+
     pub fn new_with_listener(name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
         let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
-        start_listener_thread(listener);
-        Ok(Worker {
+        let worker_status = Arc::new(Mutex::new(WorkerStatus::default()));
+        let worker = Worker {
             info: WorkerInfo {
                 name,
                 pid: process::id(),
@@ -80,7 +83,11 @@ impl Worker {
                 address,
             },
             config,
-        })
+            worker_status: worker_status.clone(),
+        };
+        let (tx, rx) = crossbeam_channel::unbounded();
+        start_listener_thread(listener, worker_status, rx);
+        Ok(worker)
     }
 
     pub fn new(name: String, config: Config) -> Result<Self, WorkerCreateError> {

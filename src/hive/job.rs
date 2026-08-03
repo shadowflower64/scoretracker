@@ -2,13 +2,16 @@
 //!
 //! A job is one action that has to be done by a [`crate::hive::worker`].
 //! One worker may take on a job, and then report a success, or a failure.
-use crate::data::library::database::LibraryEntry;
+use crate::data::library::database::{ClothInfo, LibraryEntry};
+use crate::data::library::index::LibraryIndex;
 use crate::data::library::scan_register_added_file;
 use crate::data::library::stpl_url::StplUrl;
 use crate::ffmpeg::ffmpeg_cut_video_streamcopy;
-use crate::util::filelocked::{ClosedFileLocked, FileLockableDataDefault};
+use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault};
+use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
 use crate::{config::Config, data::library::database::LibraryDatabase, hive::worker::WorkerInfo, info, log_fn_name};
+use relative_path::RelativePathBuf;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::{path::PathBuf, thread::sleep, time::Duration};
@@ -16,6 +19,9 @@ use thiserror::Error;
 use uuid::Uuid;
 
 fn create_stpl_url_to_file(_library_dir: &Path, _file_path: &Path) -> StplUrl {
+    todo!()
+}
+fn create_internal_path_to_file(_library_dir: &Path, _file_path: &Path) -> RelativePathBuf {
     todo!()
 }
 fn get_library_dir_of_path(_path: &Path) -> Option<PathBuf> {
@@ -50,7 +56,7 @@ pub enum Failure {
 pub enum Success {
     Void,
     ProcessedVideo { dry: UuidString, wet: UuidString },
-    CutVideo { cloth: UuidString, fragment: UuidString },
+    CutVideo { cloth: ClothInfo, fragment: UuidString },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,10 +74,9 @@ pub enum Job {
         time_nanos: u64,
     },
     CutLibraryVideo {
-        source_proof_uuid: UuidString,
         source_path: PathBuf,
-        cut_point_start_ms: Option<u64>,
-        cut_point_end_ms: Option<u64>,
+        cut_start_point: Option<NsTimestamp>,
+        cut_end_point: Option<NsTimestamp>,
         destination_path: PathBuf,
     },
     ProcessVideo {
@@ -113,23 +118,26 @@ impl Job {
                 Ok(Success::Void)
             }
             Job::CutLibraryVideo {
-                source_proof_uuid,
                 source_path,
-                cut_point_start_ms,
-                cut_point_end_ms,
+                cut_start_point,
+                cut_end_point,
                 destination_path,
             } => {
-                let library_db = open_library_db_readonly()?;
+                // Fetch the source proof UUID from the local index
+                let source_library_dir = get_library_dir_of_path(source_path).expect("todo");
+                let source_library_index =
+                    LibraryIndex::read_without_locking(source_library_dir.join(LibraryIndex::STANDARD_FILENAME)).expect("todo");
+
+                let internal_source_path = create_internal_path_to_file(&source_library_dir, source_path);
+                let source_proof_uuid = source_library_index.files.get(&internal_source_path).expect("todo");
 
                 // Get source proof entry from the database
+                let library_db = open_library_db_readonly()?;
                 let proof_entry = library_db
                     .find_entry_by_uuid(*source_proof_uuid)
                     .ok_or(Failure::EntryNotFound(*source_proof_uuid))?
                     .to_owned();
                 drop(library_db);
-
-                // Get library info of the source file
-                let source_library_dir = get_library_dir_of_path(source_path).unwrap();
 
                 // Sanity check - proof entry with the given UUID should contain the given URL.
                 // If it doesn't, that means the library needs to be rescanned or the request was invalid.
@@ -145,8 +153,8 @@ impl Job {
                 ffmpeg_cut_video_streamcopy(
                     source_path,
                     destination_path,
-                    cut_point_start_ms.to_owned(),
-                    cut_point_end_ms.to_owned(),
+                    cut_start_point.map(|x| x.as_millis() as u64),
+                    cut_end_point.map(|x| x.as_millis() as u64),
                 )
                 .await;
 
@@ -166,7 +174,11 @@ impl Job {
                 })?;
 
                 Ok(Success::CutVideo {
-                    cloth: *source_proof_uuid,
+                    cloth: ClothInfo {
+                        uuid: *source_proof_uuid,
+                        start_point: *cut_start_point,
+                        end_point: *cut_end_point,
+                    },
                     fragment: Uuid::now_v7().into(),
                 })
             }

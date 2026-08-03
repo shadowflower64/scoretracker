@@ -2,6 +2,7 @@ use crate::cmd::{self};
 use scoretracker::config::Config;
 use scoretracker::data::library::LibraryScanError;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
+use scoretracker::hive::job::Job;
 use scoretracker::hive::worker::WorkerCreateError;
 use scoretracker::info_npr;
 use scoretracker::spreadsheet::SpreadsheetImportError;
@@ -235,9 +236,15 @@ pub fn handle_command(args: &[String]) -> Result<(), CmdError> {
                 }
             ),
             "task" => cmd!(fcn, args, 3,
-                "add" => {
-                    cmd::hive::add_task()
-                }
+                "add" => cmd!(fcn, args, 4,
+                    "cut-video" => {
+                        arg!(source_path: PathBuf, "source path to cloth video", fcn, args, 5);
+                        arg!(destination_path: PathBuf, "destination path to fragment video", fcn, args, 6);
+                        // arg!(cut_start_point: Option<f64>, "timestamp to start of cut (in seconds)", fcn, args, 7);
+                        // arg!(cut_end_point: Option<f64>, "timestamp to end of cut (in seconds)", fcn, args, 8);
+                        cmd::hive::add_task(Job::CutLibraryVideo { source_path, cut_start_point: None, cut_end_point: None, destination_path })
+                    }
+                )
             )
         ),
         "vitals" => cmd!(fcn, args, 2,

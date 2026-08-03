@@ -19,7 +19,7 @@ pub async fn ffmpeg_cut_video_streamcopy(
     } else {
         input
     };
-    FFmpegBuilder::new()
+    let ffmpeg = FFmpegBuilder::new()
         .expect("todo")
         .input(input)
         .output(
@@ -29,9 +29,9 @@ pub async fn ffmpeg_cut_video_streamcopy(
         )
         .on_progress(|p| {
             println!("Progress: {:?}", p);
-        })
-        .run()
-        .await
-        .expect("todo2");
+        });
+    let command = ffmpeg.command().expect("todocommand");
+    todo!("running ffmpeg with cmd: {command}");
+    ffmpeg.run().await.expect("todo2");
     todo!()
 }
