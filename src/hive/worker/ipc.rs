@@ -1,12 +1,10 @@
-use crate::hive::worker::Worker;
 use crate::hive::worker::status::WorkerStatus;
 use crate::{debug, error, info, log_fn_name, log_should_print_debug};
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, RecvError};
 use serde::{Deserialize, Serialize};
-use std::io::Read;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::{process, thread};
 use thiserror::Error;
 
@@ -18,8 +16,6 @@ pub const VERBOSE_CONNECTION_HANDLER: bool = true;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("would block")]
-    WouldBlock,
     #[error("failed to read size of the incoming message: {0}")]
     IncomingMessageSizeNotRead(io::Error),
     #[error("incoming message too large: {0} bytes (max {INCOMING_MESSAGE_SIZE_LIMIT} bytes)")]
@@ -36,12 +32,24 @@ pub enum Error {
     OutgoingMessageSizeNotSent(io::Error),
     #[error("failed to send content of the outgoing message: {0}")]
     OutgoingMessageContentNotSent(io::Error),
+    #[error("could not receive from channel: {0}")]
+    CouldNotReceiveFromChannel(RecvError),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Subscription {
+    WorkerStatus,
+    TaskProgress,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum IncomingMessage {
     WhoAreYou,
+    FetchWorkerStatus,
+    Subscribe { subscription: Subscription },
+    Unsubscribe { subscription: Subscription },
     TerminationRequest,
 }
 
@@ -57,15 +65,25 @@ impl IncomingMessage {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum OutgoingMessage {
+    WhoAreYouResponse { name: String, pid: u32 },
+    WorkerStatusResponse { worker_status: WorkerStatus },
+}
+
+#[derive(Default)]
+pub struct ConnectionInfo {
+    pub subscription_worker_status: bool,
+    pub subscription_task_progress: bool,
+}
+
 fn receive_message_bytes(tcp_stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
-    log_fn_name!("incoming_message:receive");
+    log_fn_name!("receive_message_bytes");
     log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
 
     let mut size_bytes = MessageSize::default().to_le_bytes();
-    tcp_stream.read_exact(&mut size_bytes).map_err(|e| match e.kind() {
-        io::ErrorKind::WouldBlock => Error::WouldBlock,
-        _ => Error::IncomingMessageSizeNotRead(e),
-    })?;
+    tcp_stream.read_exact(&mut size_bytes).map_err(Error::IncomingMessageSizeNotRead)?;
 
     let size = MessageSize::from_le_bytes(size_bytes);
     debug!("received size: {size} {size_bytes:?}");
@@ -75,22 +93,13 @@ fn receive_message_bytes(tcp_stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     let size = size as usize;
 
     let mut content = vec![0u8; size];
-    tcp_stream.read_exact(&mut content).map_err(|e| match e.kind() {
-        io::ErrorKind::WouldBlock => Error::WouldBlock, //TODO: this basically requires a state machine to return here... so really this should just use async/await
-        _ => Error::IncomingMessageContentNotRead(e),
-    })?;
+    tcp_stream.read_exact(&mut content).map_err(Error::IncomingMessageContentNotRead)?;
     debug!("received message content: {content:?}");
     Ok(content)
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum OutgoingMessage {
-    WhoAreYouResponse { name: String, pid: u32 },
-}
-
-pub fn send_message(message: &OutgoingMessage, tcp_stream: &mut TcpStream) -> Result<(), Error> {
-    log_fn_name!("outgoing_message:send");
+pub fn send_message(tcp_stream: &mut TcpStream, message: &OutgoingMessage) -> Result<(), Error> {
+    log_fn_name!("send_message");
     log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
 
     debug!("outgoing message: {message:?}");
@@ -110,48 +119,81 @@ pub fn send_message(message: &OutgoingMessage, tcp_stream: &mut TcpStream) -> Re
     let size_bytes = size.to_le_bytes();
     debug!("outgoing size: {size} {size_bytes:?}");
 
-    tcp_stream.write_all(&size_bytes).map_err(Error::OutgoingMessageSizeNotSent)?;
-    tcp_stream.write_all(content).map_err(Error::OutgoingMessageContentNotSent)?;
+    pub const WRITELOCK: LazyLock<Arc<Mutex<()>>> = LazyLock::new(|| Arc::new(Mutex::new(())));
+    let arc = Arc::clone(&WRITELOCK);
+    {
+        let _guard = arc.lock().unwrap();
+        tcp_stream.write_all(&size_bytes).map_err(Error::OutgoingMessageSizeNotSent)?;
+        tcp_stream.write_all(content).map_err(Error::OutgoingMessageContentNotSent)?;
+    }
+
     debug!("message sent successfully!");
     Ok(())
 }
 
-fn handle_incoming_message(tcp_stream: &mut TcpStream, message: IncomingMessage, worker_status: Arc<Mutex<WorkerStatus>>) {
-    log_fn_name!("worker:handle_message");
+fn handle_incoming_message(
+    tcp_stream: &mut TcpStream,
+    message: IncomingMessage,
+    connection_info: &Arc<Mutex<ConnectionInfo>>,
+    _worker_status: &Arc<Mutex<WorkerStatus>>,
+) {
+    log_fn_name!("handle_incoming_message");
     log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
 
     match message {
         IncomingMessage::WhoAreYou => {
             debug!("responding to 'who are you' message");
             let _ = send_message(
+                tcp_stream,
                 &OutgoingMessage::WhoAreYouResponse {
                     name: "test name".to_string(), // todo
                     pid: process::id(),
                 },
-                tcp_stream,
             )
             .inspect_err(|e| error!("failed to send message: {e}; continuing"));
+        }
+        IncomingMessage::Subscribe {
+            subscription: Subscription::WorkerStatus,
+        } => {
+            connection_info.lock().unwrap().subscription_worker_status = true;
+        }
+        IncomingMessage::Unsubscribe {
+            subscription: Subscription::WorkerStatus,
+        } => {
+            connection_info.lock().unwrap().subscription_worker_status = false;
         }
         IncomingMessage::TerminationRequest => {
             info!("received termination request, exiting with code {TERMINATION_REQUEST_EXIT_CODE}");
             process::exit(TERMINATION_REQUEST_EXIT_CODE);
         }
+        a => todo!("not done yet: {a:?}"),
     }
 }
 
-fn connection_loop(tcp_stream: &mut TcpStream, worker_status: Arc<Mutex<WorkerStatus>>) -> Result<(), Error> {
-    log_fn_name!("connection_loop");
+fn recv_connection_loop(
+    tcp_stream: &mut TcpStream,
+    connection_info: &Arc<Mutex<ConnectionInfo>>,
+    worker_status: &Arc<Mutex<WorkerStatus>>,
+) -> Result<(), Error> {
+    log_fn_name!("recv_connection_loop");
 
-    match receive_message_bytes(tcp_stream)? {
-        Ok(message_bytes) => match IncomingMessage::parse(&message_bytes) {
-            Ok(message) => handle_incoming_message(tcp_stream, message, worker_status),
-            Err(e) => {
-                let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
-                error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}; continuing");
-            }
-        },
-        Err(Error::WouldBlock) => {}
+    let message_bytes = receive_message_bytes(tcp_stream)?;
+    match IncomingMessage::parse(&message_bytes) {
+        Ok(message) => handle_incoming_message(tcp_stream, message, connection_info, &worker_status),
+        Err(e) => {
+            let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
+            error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}; continuing");
+        }
     }
+    Ok(())
+}
+
+fn send_connection_loop(tcp_stream: &mut TcpStream, worker_status_update_rx: &Receiver<WorkerStatus>) -> Result<(), Error> {
+    // log_fn_name!("send_connection_loop");
+
+    let worker_status = worker_status_update_rx.recv().map_err(Error::CouldNotReceiveFromChannel)?;
+    send_message(tcp_stream, &OutgoingMessage::WorkerStatusResponse { worker_status })?;
+
     Ok(())
 }
 
@@ -161,19 +203,47 @@ fn start_connection_thread(
     worker_status: Arc<Mutex<WorkerStatus>>,
     worker_status_update_rx: Receiver<WorkerStatus>,
 ) {
-    if let Err(e) = tcp_stream.set_nonblocking(true) {
-        error!("failed to change tcp stream to nonblocking mode: {e}");
-        return;
-    }
+    log_fn_name!("start_connection_thread");
 
+    let connection_info = Arc::new(Mutex::new(ConnectionInfo::default()));
     if let Err(e) = thread::Builder::new()
         .name(format!("worker:conn:{}", peer_addr.port()))
         .spawn(move || {
             log_fn_name!("connection_handler");
             info!("established connection with: {peer_addr}");
 
+            let connection_info = connection_info.clone();
+            let mut sending_stream = match tcp_stream.try_clone() {
+                Ok(a) => a,
+                Err(e) => {
+                    error!("failed to create connection writer thread: {e}");
+                    return;
+                }
+            };
+
+            if let Err(e) = thread::Builder::new()
+                .name(format!("worker:connsend:{}", peer_addr.port()))
+                .spawn(move || {
+                    log_fn_name!("connection_handler");
+
+                    loop {
+                        if let Err(e) = send_connection_loop(&mut sending_stream, &worker_status_update_rx) {
+                            error!("a fatal error occured in the connection: {e}; the connection must be terminated");
+                            if let Err(e) = sending_stream.shutdown(Shutdown::Both) {
+                                error!("failed to shutdown connection gracefully: {e}")
+                            }
+                            info!("shutdown connection with: {peer_addr}");
+                            break;
+                        }
+                    }
+                })
+            {
+                error!("failed to create connection writer thread: {e}");
+                return;
+            }
+
             loop {
-                if let Err(e) = connection_loop(&mut tcp_stream, worker_status) {
+                if let Err(e) = recv_connection_loop(&mut tcp_stream, &connection_info, &worker_status) {
                     error!("a fatal error occured in the connection: {e}; the connection must be terminated");
                     if let Err(e) = tcp_stream.shutdown(Shutdown::Both) {
                         error!("failed to shutdown connection gracefully: {e}")
@@ -184,7 +254,7 @@ fn start_connection_thread(
             }
         })
     {
-        error!("failed to create handler thread: {e}");
+        error!("failed to create connection handler thread: {e}");
         return;
     }
 }
@@ -194,6 +264,8 @@ pub fn start_listener_thread(
     worker_status: Arc<Mutex<WorkerStatus>>,
     worker_status_update_rx: Receiver<WorkerStatus>,
 ) {
+    log_fn_name!("listener");
+
     let local_address = match listener.local_addr() {
         Ok(addr) => addr,
         Err(e) => {
@@ -202,7 +274,6 @@ pub fn start_listener_thread(
         }
     };
     if let Err(e) = thread::Builder::new().name("worker:tcp_listener".to_string()).spawn(move || {
-        log_fn_name!("listener");
         info!("start listening on {local_address}");
         loop {
             match listener.accept() {

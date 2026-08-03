@@ -5,15 +5,14 @@ use crate::config::Config;
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::ipc::start_listener_thread;
-use crate::hive::worker::ipc::{IncomingMessage, OutgoingMessage, TERMINATION_REQUEST_EXIT_CODE, VERBOSE_CONNECTION_HANDLER, send_message};
 use crate::hive::worker::status::WorkerStatus;
 use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::lockfile;
 use crate::util::timestamp::NsTimestamp;
-use crate::{debug, error, info, log_fn_name, log_should_print_debug, success};
+use crate::{error, info, log_fn_name, success};
 use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::{Arc, Mutex, mpsc};
+use std::net::{SocketAddr, TcpListener};
+use std::sync::{Arc, Mutex};
 use std::{io, process};
 use thiserror::Error;
 use uuid::Uuid;
@@ -85,7 +84,7 @@ impl Worker {
             config,
             worker_status: worker_status.clone(),
         };
-        let (tx, rx) = crossbeam_channel::unbounded();
+        let (_tx, rx) = crossbeam_channel::unbounded();
         start_listener_thread(listener, worker_status, rx);
         Ok(worker)
     }
@@ -160,7 +159,17 @@ impl Worker {
 
         // Do some task if there is something to do
         info!("starting task: {:?}", task);
+        {
+            let mut status = self.worker_status.lock().unwrap();
+            status.working = true;
+            status.current_task = Some(task.uuid);
+        }
         self.execute_task_body(&mut task).await;
+        {
+            let mut status = self.worker_status.lock().unwrap();
+            status.working = false;
+            status.current_task = None;
+        }
 
         // Update the queue file again to update the state of the task
         let mut queue = queue.reopen().map_err(Error::CannotReopenQueue)?;

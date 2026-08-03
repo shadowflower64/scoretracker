@@ -1,8 +1,8 @@
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct WorkerStatus {
-    working: bool,
-    current_task: Option<UuidString>,
+    pub working: bool,
+    pub current_task: Option<UuidString>,
 }
