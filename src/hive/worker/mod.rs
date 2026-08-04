@@ -1,10 +1,12 @@
 mod ipc;
+pub mod names;
 pub mod status;
 
 use crate::config::Config;
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::ipc::start_listener_thread;
+use crate::hive::worker::names::random_name;
 use crate::hive::worker::status::WorkerStatus;
 use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::lockfile;
@@ -68,10 +70,12 @@ impl Worker {
     }
 
     pub fn fetch_progress(&self) -> String {
-        return "Fetch progress".to_owned();
+        return "Fetch progress".to_owned(); // todo
     }
 
     pub fn new_with_listener(name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
+        log_fn_name!("worker:new_with_listener");
+        info!("creating worker with name: '{name}'");
         let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
         let worker_status = Arc::new(Mutex::new(WorkerStatus::default()));
         let worker = Worker {
@@ -84,8 +88,9 @@ impl Worker {
             config,
             worker_status: worker_status.clone(),
         };
-        let (_tx, rx) = crossbeam_channel::unbounded();
-        start_listener_thread(listener, worker_status, rx);
+        let (worker_status_tx, worker_status_rx) = crossbeam_channel::unbounded();
+        let (task_progress_tx, task_progress_rx) = crossbeam_channel::unbounded();
+        start_listener_thread(listener, worker_status, worker_status_rx, task_progress_rx);
         Ok(worker)
     }
 
@@ -97,7 +102,8 @@ impl Worker {
     pub fn new_default() -> Result<Self, WorkerCreateError> {
         let pid = process::id();
         let config = Config::load()?;
-        Self::new(format!("defaultworker{pid}.scoretracker.local"), config)
+        let random_name = random_name().to_lowercase();
+        Self::new(format!("{random_name}{pid}.scoretracker-worker.local"), config)
     }
 
     pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
