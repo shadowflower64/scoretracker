@@ -1,6 +1,7 @@
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
+use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
@@ -26,10 +27,10 @@ impl TryFrom<String> for LibraryDomainName {
     }
 }
 
-impl TryFrom<&String> for LibraryDomainName {
-    type Error = StplUrlError;
-    fn try_from(value: &String) -> Result<Self, Self::Error> {
-        Self::try_from(value.to_owned())
+impl FromStr for LibraryDomainName {
+    type Err = StplUrlError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from(s.to_string())
     }
 }
 
@@ -97,10 +98,10 @@ impl TryFrom<String> for LibraryDomain {
     }
 }
 
-impl TryFrom<&String> for LibraryDomain {
-    type Error = StplUrlError;
-    fn try_from(value: &String) -> Result<Self, Self::Error> {
-        Self::try_from(value.to_owned())
+impl FromStr for LibraryDomain {
+    type Err = StplUrlError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from(s.to_string())
     }
 }
 

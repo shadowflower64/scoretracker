@@ -188,13 +188,48 @@ fn recv_connection_loop(
     Ok(())
 }
 
-fn send_connection_loop(tcp_stream: &mut TcpStream, worker_status_update_rx: &Receiver<WorkerStatus>) -> Result<(), Error> {
+fn send_connection_loop(
+    tcp_stream: &mut TcpStream,
+    connection_info: &Arc<Mutex<ConnectionInfo>>,
+    worker_status_update_rx: &Receiver<WorkerStatus>,
+) -> Result<(), Error> {
     // log_fn_name!("send_connection_loop");
 
     let worker_status = worker_status_update_rx.recv().map_err(Error::CouldNotReceiveFromChannel)?;
-    send_message(tcp_stream, &OutgoingMessage::WorkerStatusResponse { worker_status })?;
+    if connection_info.lock().unwrap().subscription_worker_status {
+        send_message(tcp_stream, &OutgoingMessage::WorkerStatusResponse { worker_status })?;
+    }
 
     Ok(())
+}
+
+fn start_connsend_thread(
+    mut tcp_stream: TcpStream,
+    peer_addr: SocketAddr,
+    connection_info: Arc<Mutex<ConnectionInfo>>,
+    worker_status_update_rx: Receiver<WorkerStatus>,
+) {
+    log_fn_name!("start_connsend_thread");
+
+    if let Err(e) = thread::Builder::new()
+        .name(format!("worker:connsend:{}", peer_addr.port()))
+        .spawn(move || {
+            log_fn_name!("connection_handler");
+            loop {
+                if let Err(e) = send_connection_loop(&mut tcp_stream, &connection_info, &worker_status_update_rx) {
+                    error!("a fatal error occured in the connection: {e}; the connection must be terminated");
+                    if let Err(e) = tcp_stream.shutdown(Shutdown::Both) {
+                        error!("failed to shutdown connection gracefully: {e}")
+                    }
+                    info!("shutdown connection with: {peer_addr}");
+                    break;
+                }
+            }
+        })
+    {
+        error!("failed to create connection writer thread: {e}");
+        return;
+    }
 }
 
 fn start_connection_thread(
@@ -212,38 +247,19 @@ fn start_connection_thread(
             log_fn_name!("connection_handler");
             info!("established connection with: {peer_addr}");
 
-            let connection_info = connection_info.clone();
-            let mut sending_stream = match tcp_stream.try_clone() {
+            let connection_info_clone = connection_info.clone();
+            let sending_stream = match (&tcp_stream).try_clone() {
                 Ok(a) => a,
                 Err(e) => {
-                    error!("failed to create connection writer thread: {e}");
+                    error!("failed to clone tcp stream: {e}");
                     return;
                 }
             };
 
-            if let Err(e) = thread::Builder::new()
-                .name(format!("worker:connsend:{}", peer_addr.port()))
-                .spawn(move || {
-                    log_fn_name!("connection_handler");
-
-                    loop {
-                        if let Err(e) = send_connection_loop(&mut sending_stream, &worker_status_update_rx) {
-                            error!("a fatal error occured in the connection: {e}; the connection must be terminated");
-                            if let Err(e) = sending_stream.shutdown(Shutdown::Both) {
-                                error!("failed to shutdown connection gracefully: {e}")
-                            }
-                            info!("shutdown connection with: {peer_addr}");
-                            break;
-                        }
-                    }
-                })
-            {
-                error!("failed to create connection writer thread: {e}");
-                return;
-            }
+            start_connsend_thread(sending_stream, peer_addr, connection_info.clone(), worker_status_update_rx);
 
             loop {
-                if let Err(e) = recv_connection_loop(&mut tcp_stream, &connection_info, &worker_status) {
+                if let Err(e) = recv_connection_loop(&mut tcp_stream, &connection_info_clone, &worker_status) {
                     error!("a fatal error occured in the connection: {e}; the connection must be terminated");
                     if let Err(e) = tcp_stream.shutdown(Shutdown::Both) {
                         error!("failed to shutdown connection gracefully: {e}")

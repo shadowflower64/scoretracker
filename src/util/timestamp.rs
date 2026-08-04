@@ -233,6 +233,41 @@ impl NsTimestamp {
         Self((secs as i128) * 1_000_000_000i128)
     }
 
+    /// Create a [`NsTimestamp`] from the amount of seconds since [`UNIX_EPOCH`].
+    ///
+    /// The timestamp points to the beginning of the given second.
+    /// For example, for the "zeroth" second, the resulting timestamp is `0` nanoseconds,
+    /// for the "first" second, the resulting timestamp is `1_000_000_000` nanoseconds,
+    /// for the "negative first" (-1st) second, the resulting timestamp is `-1_000_000_000` nanoseconds.
+    ///
+    /// This function takes the number of seconds as an [`f64`] and it accepts fractions of seconds.
+    /// For very large values, the precision of [`f64`] may not be enough to store the timestamp accurately.
+    /// In that case, it is recommended to use the [`NsTimestamp::from_secs`] or [`NsTimestamp::from_millis`]
+    /// or similar functions instead.
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker::util::timestamp::NsTimestamp;
+    ///
+    /// assert_eq!(NsTimestamp::from_secs_f64(1.0).as_nanos(), 1_000_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(1.1).as_nanos(), 1_100_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(1.25).as_nanos(), 1_250_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(1.5).as_nanos(), 1_500_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(1.75).as_nanos(), 1_750_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(-1.0).as_nanos(), -1_000_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(-1.25).as_nanos(), -1_250_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(-1.5).as_nanos(), -1_500_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(-1.75).as_nanos(), -1_750_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(0.0).as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::from_secs_f64(1_000_000_000.0).as_nanos(), 1_000_000_000_000_000_000);
+    /// assert_eq!(NsTimestamp::from_secs_f64(1_000_000_000.1).as_nanos(), 1_000_000_000_100_000_023); // Accuracy loss at large values
+    /// ```
+    pub fn from_secs_f64(secs: f64) -> Self {
+        let seconds = (secs.floor() as i128) * 1_000_000_000;
+        let frac = (secs.rem_euclid(1.0) * 1_000_000_000f64) as i128;
+        Self(seconds + frac)
+    }
+
     /// Try to create a [`NsTimestamp`] from the amount of seconds since [`UNIX_EPOCH`].
     ///
     /// The timestamp points to the beginning of the given second.
