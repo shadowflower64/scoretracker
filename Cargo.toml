@@ -40,3 +40,5 @@ rust_ffmpeg = "1.0.0"
 smol = "2.0.2"
 crossbeam-channel = "0.5.16"
 rand = "0.10.2"
+toml = "1.1.4"
+toml_edit = { version = "0.25.13", features = ["serde"] }

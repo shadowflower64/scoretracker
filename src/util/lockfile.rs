@@ -5,6 +5,7 @@ use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
 use crate::{VERSION, debug, info, log_fn_name, log_should_print_debug, warn};
 use notify::{ErrorKind, Event, RecursiveMode, Watcher};
+use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, Write};
@@ -55,6 +56,50 @@ pub fn is_file_locked<T>(result: &Result<T>) -> bool {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LockfileContent {
+    version: String,
+    pid: u32,
+    lock_timestamp: NsTimestamp,
+    worker: Option<WorkerInfo>
+}
+
+impl LockfileContent {
+    /// This structure function converts the [`LockfileContent`] structure into a human-and-machine-readable TOML file.
+    /// 
+    /// Expected output:
+    /// ```toml
+    /// # File locked by scoretracker.
+    /// # WARNING - Do not edit the locked file. Editing the locked file may result in data loss.
+    ///
+    /// version = {version}
+    /// pid = {pid}
+    /// # lock_timestamp = {lock_timestamp_string}
+    /// lock_timestamp = {lock_timestamp}
+    /// 
+    /// [worker]
+    /// name = {worker.name}
+    /// pid = {worker.pid}
+    /// # birth_timestamp = {birth_timestamp_string}
+    /// birth_timestamp = {worker.birth_timestamp}
+    /// address = {worker.address}
+    /// ```
+    pub fn as_toml_pretty(&self) -> String {
+        let lock_timestamp_string = self.lock_timestamp.to_date_time_string_local();
+
+        let mut doc = toml_edit::ser::to_document(self).expect("serialization of the LockfileContent structure should never fail");
+        doc.decor_mut().set_prefix("# File locked by scoretracker.\n# WARNING - Do not edit the locked file. Editing the locked file may result in data loss.\n\n");
+        doc.key_mut("lock_timestamp").unwrap().leaf_decor_mut().set_prefix(format!("# lock_timestamp = {lock_timestamp_string}\n"));
+
+        if let Some(worker_info) = self.worker.as_ref() {
+            let birth_timestamp_string = worker_info.birth_timestamp.to_date_time_string_local();
+            doc.key_mut("worker.birth_timestamp").unwrap().leaf_decor_mut().set_prefix(format!("# birth_timestamp = {birth_timestamp_string}\n"));
+        }
+
+        todo!()
+    }
+}
+
 /// A lockfile handle.
 ///
 /// A lockfile is like a warning to other programs and processes, that says - if you write to this file, your changes will most likely be lost.
@@ -86,37 +131,8 @@ impl LockfileHandle {
     const VERBOSE: bool = true;
 
     fn generate_lockfile_contents(worker_info: Option<&WorkerInfo>) -> String {
-        let timestamp = NsTimestamp::now();
-        let timestamp_num = timestamp.as_nanos();
-        let timestamp_string = timestamp.to_date_time_string_local();
-        let pid = process::id();
-        let worker_info_string = worker_info
-            .map(|worker| {
-                let name = &worker.name;
-                let timestamp_num = worker.birth_timestamp.as_nanos();
-                let timestamp_string = worker.birth_timestamp.to_date_time_string_local();
-                let address = worker.address;
-                format!(
-                    "
-worker_name: {name}
-worker_birth_timestamp: {timestamp_num}
-# worker_birth_timestamp: {timestamp_string}
-worker_address: {address}",
-                )
-            })
-            .unwrap_or_default();
-
-        format!(
-            "# File locked by scoretracker.
-# WARNING - Do not edit the locked file. Editing the locked file may result in data loss.
-
-version: {VERSION}
-pid: {pid}
-lock_timestamp: {timestamp_num}
-# lock_timestamp: {timestamp_string}
-{worker_info_string}
-",
-        )
+        let content = LockfileContent { version: VERSION.to_string(), pid: process::id(), lock_timestamp: NsTimestamp::now(), worker: worker_info.cloned() };
+        content.as_toml_pretty()
     }
 
     fn create_lockfile_on_disk(lockfile_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<()> {
