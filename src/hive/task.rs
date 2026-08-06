@@ -5,7 +5,7 @@
 //! the worker that is currently working on the job, the input parameters for the job,
 //! and when it finishes, the results of the job.
 use crate::hive::job::{self, Job};
-use crate::hive::worker::WorkerInfo;
+use crate::hive::worker::data::WorkerInfo;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};

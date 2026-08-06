@@ -32,6 +32,6 @@ pub async fn ffmpeg_cut_video_streamcopy(
         });
     let command = ffmpeg.command().expect("todocommand");
     todo!("running ffmpeg with cmd: {command}");
-    ffmpeg.run().await.expect("todo2");
-    todo!()
+    // ffmpeg.run().await.expect("todo2");
+    // todo!()
 }

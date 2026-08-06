@@ -1,4 +1,4 @@
-use crate::hive::worker::status::{TaskProgress, WorkerStatus};
+use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerStatus};
 use crate::{debug, error, info, log_fn_name, log_should_print_debug, warn};
 use crossbeam_channel::{Receiver, RecvError};
 use serde::{Deserialize, Serialize};
@@ -143,7 +143,7 @@ fn handle_incoming_message<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, M
     tcp_stream: &mut TcpStream,
     message: IncomingMessage,
     conn: &Arc<Mutex<ConnectionInfo>>,
-    _worker_status: &Arc<Mutex<WorkerStatus>>,
+    _worker_data: &Arc<Mutex<WorkerData>>,
     make_worker_status_rx: MakeWorkerStatusRx,
     _make_task_progress_rx: MakeTaskProgressRx,
 ) -> Result<(), Error> {
@@ -209,7 +209,7 @@ fn handle_incoming_message<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, M
 fn recv_connection_loop<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, MakeTaskProgressRx: Fn() -> Receiver<TaskProgress>>(
     tcp_stream: &mut TcpStream,
     connection_info: &Arc<Mutex<ConnectionInfo>>,
-    worker_status: &Arc<Mutex<WorkerStatus>>,
+    worker_data: &Arc<Mutex<WorkerData>>,
     make_worker_status_rx: MakeWorkerStatusRx,
     make_task_progress_rx: MakeTaskProgressRx,
 ) -> Result<(), Error> {
@@ -221,7 +221,7 @@ fn recv_connection_loop<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, Make
             tcp_stream,
             message,
             connection_info,
-            &worker_status,
+            &worker_data,
             make_worker_status_rx,
             make_task_progress_rx,
         )?,
@@ -266,7 +266,7 @@ fn start_subscription_thread<F: Send + 'static + Fn(&mut TcpStream, &Arc<Mutex<C
 fn start_connection_thread(
     mut tcp_stream: TcpStream,
     peer_addr: SocketAddr,
-    worker_status: Arc<Mutex<WorkerStatus>>,
+    worker_data: Arc<Mutex<WorkerData>>,
     worker_status_rx: Arc<Receiver<WorkerStatus>>,
     task_progress_rx: Arc<Receiver<TaskProgress>>,
 ) {
@@ -286,7 +286,7 @@ fn start_connection_thread(
                 if let Err(e) = recv_connection_loop(
                     &mut tcp_stream,
                     &connection_info,
-                    &worker_status,
+                    &worker_data,
                     make_worker_status_rx,
                     make_task_progress_rx,
                 ) {
@@ -307,7 +307,7 @@ fn start_connection_thread(
 
 pub fn start_listener_thread(
     listener: TcpListener,
-    worker_status: Arc<Mutex<WorkerStatus>>,
+    worker_data: Arc<Mutex<WorkerData>>,
     worker_status_rx: Receiver<WorkerStatus>,
     task_progress_rx: Receiver<TaskProgress>,
 ) {
@@ -333,7 +333,7 @@ pub fn start_listener_thread(
                     start_connection_thread(
                         tcp_stream,
                         peer_addr,
-                        worker_status.clone(),
+                        worker_data.clone(),
                         worker_status_rx.clone(),
                         task_progress_rx.clone(),
                     );

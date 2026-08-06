@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::hive::worker::WorkerInfo;
+use crate::hive::worker::data::WorkerInfo;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self, LockfileHandle};
 use std::fs;

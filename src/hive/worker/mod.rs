@@ -1,21 +1,22 @@
 mod ipc;
 pub mod names;
 pub mod status;
+pub mod data;
 
 use crate::config::Config;
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
+use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
 use crate::hive::worker::ipc::start_listener_thread;
 use crate::hive::worker::names::random_name;
-use crate::hive::worker::status::WorkerStatus;
 use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::lockfile;
 use crate::util::timestamp::NsTimestamp;
 use crate::{error, info, log_fn_name, success};
-use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, TcpListener};
+use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::{io, process};
+use crossbeam_channel::Sender;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -45,24 +46,17 @@ pub enum WorkerCreateError {
     TcpListenerLocalAddrError(io::Error),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkerInfo {
-    pub name: String,
-    pub pid: u32,
-    pub birth_timestamp: NsTimestamp,
-    pub address: SocketAddr,
-}
-
 #[derive(Debug)]
 pub struct Worker {
-    info: WorkerInfo,
     config: Config,
-    worker_status: Arc<Mutex<WorkerStatus>>,
+    data: Arc<Mutex<WorkerData>>,
+    worker_status_tx: Sender<WorkerStatus>,
+    task_progress_tx: Sender<TaskProgress>,
 }
 
 impl Worker {
-    pub fn worker_info(&self) -> &WorkerInfo {
-        &self.info
+    pub fn worker_data(&self) -> &Arc<Mutex<WorkerData>> {
+        &self.data
     }
 
     pub fn config(&self) -> &Config {
@@ -77,20 +71,24 @@ impl Worker {
         log_fn_name!("worker:new_with_listener");
         info!("creating worker with name: '{name}'");
         let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
-        let worker_status = Arc::new(Mutex::new(WorkerStatus::default()));
-        let worker = Worker {
-            info: WorkerInfo {
-                name,
-                pid: process::id(),
-                birth_timestamp: NsTimestamp::now(),
-                address,
-            },
-            config,
-            worker_status: worker_status.clone(),
-        };
         let (worker_status_tx, worker_status_rx) = crossbeam_channel::unbounded();
         let (task_progress_tx, task_progress_rx) = crossbeam_channel::unbounded();
-        start_listener_thread(listener, worker_status, worker_status_rx, task_progress_rx);
+        let worker = Worker {
+            config,
+            data: Arc::new(Mutex::new(WorkerData {
+                info: WorkerInfo {
+                    name,
+                    pid: process::id(),
+                    birth_timestamp: NsTimestamp::now(),
+                    address,
+                },
+                task_progress: None,
+                status: WorkerStatus::default(),
+            })),
+            worker_status_tx,
+            task_progress_tx,
+        };
+        start_listener_thread(listener, Arc::clone(worker.worker_data()), worker_status_rx, task_progress_rx);
         Ok(worker)
     }
 
@@ -99,15 +97,18 @@ impl Worker {
         Self::new_with_listener(name, config, listener)
     }
 
+    pub fn make_name(random_name: String, pid: u32) -> String {
+        format!("{random_name}-{pid}.scoretracker-worker.local")
+    }
+
     pub fn new_default() -> Result<Self, WorkerCreateError> {
-        let pid = process::id();
         let config = Config::load()?;
-        let random_name = random_name().to_lowercase();
-        Self::new(format!("{random_name}{pid}.scoretracker-worker.local"), config)
+        Self::new(Self::make_name(random_name().to_lowercase(), process::id()), config)
     }
 
     pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
-        TaskQueue::lock_and_read_or_default(self.config.task_queue_path(), Some(self.worker_info())).map_err(Error::CannotReadQueue)
+        let worker_data = self.worker_data().lock().unwrap();
+        TaskQueue::lock_and_read_or_default(self.config.task_queue_path(), Some(&worker_data.info)).map_err(Error::CannotReadQueue)
     }
 
     /// Execute a task in the current thread.
@@ -121,7 +122,8 @@ impl Worker {
     async fn execute_task_body(&self, task: &mut Task) {
         log_fn_name!("worker:execute task");
 
-        match task.job.run(&self.config, Some(self.worker_info())).await {
+        let worker_info = &self.worker_data().lock().unwrap().info;
+        match task.job.run(&self.config, Some(worker_info)).await {
             Ok(success) => {
                 success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
                 task.state = TaskState::Done;
@@ -154,7 +156,7 @@ impl Worker {
         let task_to_do = task_getter(&mut queue)?;
         task_to_do.state = TaskState::Working;
         task_to_do.start_timestamp = Some(NsTimestamp::now());
-        task_to_do.worker_info = Some(self.info.clone());
+        task_to_do.worker_info = Some(self.worker_data().lock().unwrap().info.clone());
         // task_to_do.comment = Some(String::from("this job was started by scoretracker"));
 
         let mut task = task_to_do.clone();
@@ -166,15 +168,15 @@ impl Worker {
         // Do some task if there is something to do
         info!("starting task: {:?}", task);
         {
-            let mut status = self.worker_status.lock().unwrap();
-            status.working = true;
-            status.current_task = Some(task.uuid);
+            let mut data = self.worker_data().lock().unwrap();
+            data.status.working = true;
+            data.status.current_task = Some(task.uuid);
         }
         self.execute_task_body(&mut task).await;
         {
-            let mut status = self.worker_status.lock().unwrap();
-            status.working = false;
-            status.current_task = None;
+            let mut data = self.worker_data().lock().unwrap();
+            data.status.working = false;
+            data.status.current_task = None;
         }
 
         // Update the queue file again to update the state of the task

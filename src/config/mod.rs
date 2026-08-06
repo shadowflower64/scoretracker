@@ -4,7 +4,7 @@ use crate::data::library::database::LibraryDatabase;
 use crate::data::library::index::LibraryIndex;
 use crate::data::scoreboard::player::PlayerDatabase;
 use crate::hive::queue::TaskQueue;
-use crate::hive::worker::WorkerInfo;
+use crate::hive::worker::data::WorkerInfo;
 use crate::util::dirs::config_dir;
 use crate::util::filelocked::{FileLockableDataJson, FileLockableDataWithDefaultPath};
 use crate::util::lockfile::{self};

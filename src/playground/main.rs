@@ -5,7 +5,7 @@ use scoretracker::data::library::scan_full;
 use scoretracker::hive::job::Job;
 use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::{Task, TaskState};
-use scoretracker::hive::worker::WorkerInfo;
+use scoretracker::hive::worker::data::WorkerInfo;
 use scoretracker::info;
 use scoretracker::log_fn_name;
 use scoretracker::util::filelocked::FileLockableDataDefault;
@@ -125,7 +125,7 @@ pub async fn test_queue(_args: &[String]) {
         task_todo.worker_info = Some(WorkerInfo {
             address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)),
             birth_timestamp: 0.into(),
-            name: "fake playground worker".to_string(),
+            name: "fake-playground-worker".to_string(),
             pid: process::id(),
         });
         task_todo.comment = Some(String::from("this job was started by the playground"));

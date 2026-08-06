@@ -1,5 +1,5 @@
 //! File lock handling.
-use crate::hive::worker::WorkerInfo;
+use crate::hive::worker::data::WorkerInfo;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
