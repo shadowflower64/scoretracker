@@ -4,16 +4,10 @@ use calamine::{Data, ExcelDateTime, Hyperlink};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, offset::LocalResult};
 use chrono_tz::Tz;
 
-use crate::{
-    debug, error, log_fn_name, log_should_print_debug,
-    spreadsheet::{
-        BadRecordError,
-        field_path::FieldPath,
-        field_value::CellContents::{Empty, Filled},
-    },
-    util::timestamp::NsTimestamp,
-    warn,
-};
+use crate::spreadsheet::field_value::CellContents::{Empty, Filled};
+use crate::spreadsheet::{BadRecordError, field_path::FieldPath};
+use crate::util::timestamp::{NsDuration, NsTimestamp};
+use crate::{debug, error, log_fn_name, log_should_print_debug, warn};
 
 #[derive(Debug, Clone)]
 pub enum FieldValue {
@@ -22,7 +16,7 @@ pub enum FieldValue {
     Int(i64),   // unused
     Float(f64),
     DateTime(NsTimestamp), // unused
-    Duration(NsTimestamp),
+    Duration(NsDuration),
     DateOnlyNoTz(NaiveDate),
     DateTimeNoTz(NaiveDateTime),
     DateTimeWithMsNoTz(NaiveDateTime),
@@ -197,7 +191,7 @@ pub fn parse_cell_contents(cell: &Data, hyperlink: Option<&Hyperlink>, formula_m
             if let Some(duration) = iso_duration.to_std() {
                 debug!("{log_prefix}parsing duration, success: {iso_duration} (millis: {millisecond})");
                 let duration = duration + Duration::from_millis(millisecond as u64);
-                return Filled(FieldValue::Duration(NsTimestamp::from(duration)));
+                return Filled(FieldValue::Duration(NsDuration::from(duration)));
             } else {
                 error!("{log_prefix}parsing duration, fail: {iso_duration} (millis: {millisecond}): cannot convert to std duration");
             }
@@ -267,7 +261,7 @@ pub fn parse_cell_contents(cell: &Data, hyperlink: Option<&Hyperlink>, formula_m
         let result = iso8601_duration::Duration::parse(cell);
         if let Ok(duration) = result {
             debug!("{log_prefix}parsing duration, success: {duration}");
-            return Filled(FieldValue::Duration(NsTimestamp::from(duration.to_std().expect("todo"))));
+            return Filled(FieldValue::Duration(NsDuration::from(duration.to_std().expect("todo"))));
         } else {
             warn!("{log_prefix}parsing duration, fail: {result:?}");
         }

@@ -61,12 +61,12 @@ pub struct LockfileContent {
     version: String,
     pid: u32,
     lock_timestamp: NsTimestamp,
-    worker: Option<WorkerInfo>
+    worker: Option<WorkerInfo>,
 }
 
 impl LockfileContent {
     /// This structure function converts the [`LockfileContent`] structure into a human-and-machine-readable TOML file.
-    /// 
+    ///
     /// Expected output:
     /// ```toml
     /// # File locked by scoretracker.
@@ -76,7 +76,7 @@ impl LockfileContent {
     /// pid = {pid}
     /// # lock_timestamp = {lock_timestamp_string}
     /// lock_timestamp = {lock_timestamp}
-    /// 
+    ///
     /// [worker]
     /// name = {worker.name}
     /// pid = {worker.pid}
@@ -88,12 +88,20 @@ impl LockfileContent {
         let lock_timestamp_string = self.lock_timestamp.to_date_time_string_local();
 
         let mut doc = toml_edit::ser::to_document(self).expect("serialization of the LockfileContent structure should never fail");
-        doc.decor_mut().set_prefix("# File locked by scoretracker.\n# WARNING - Do not edit the locked file. Editing the locked file may result in data loss.\n\n");
-        doc.key_mut("lock_timestamp").unwrap().leaf_decor_mut().set_prefix(format!("# lock_timestamp = {lock_timestamp_string}\n"));
+        doc.decor_mut().set_prefix(
+            "# File locked by scoretracker.\n# WARNING - Do not edit the locked file. Editing the locked file may result in data loss.\n\n",
+        );
+        doc.key_mut("lock_timestamp")
+            .unwrap()
+            .leaf_decor_mut()
+            .set_prefix(format!("# lock_timestamp = {lock_timestamp_string}\n"));
 
         if let Some(worker_info) = self.worker.as_ref() {
             let birth_timestamp_string = worker_info.birth_timestamp.to_date_time_string_local();
-            doc.key_mut("worker.birth_timestamp").unwrap().leaf_decor_mut().set_prefix(format!("# birth_timestamp = {birth_timestamp_string}\n"));
+            doc.key_mut("worker.birth_timestamp")
+                .unwrap()
+                .leaf_decor_mut()
+                .set_prefix(format!("# birth_timestamp = {birth_timestamp_string}\n"));
         }
 
         todo!()
@@ -131,7 +139,12 @@ impl LockfileHandle {
     const VERBOSE: bool = true;
 
     fn generate_lockfile_contents(worker_info: Option<&WorkerInfo>) -> String {
-        let content = LockfileContent { version: VERSION.to_string(), pid: process::id(), lock_timestamp: NsTimestamp::now(), worker: worker_info.cloned() };
+        let content = LockfileContent {
+            version: VERSION.to_string(),
+            pid: process::id(),
+            lock_timestamp: NsTimestamp::now(),
+            worker: worker_info.cloned(),
+        };
         content.as_toml_pretty()
     }
 

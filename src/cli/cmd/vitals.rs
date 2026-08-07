@@ -94,7 +94,7 @@ pub enum TaskQueueCheckError {
 }
 
 fn check_library_database(library_db_path: PathBuf) -> Result<(), LibraryDatabaseCheckError> {
-    print_check_name(&format!("checking library database"));
+    print_check_name("checking library database");
     print_check_status("waiting for filelock...");
     let library_db = LibraryDatabase::lock_and_read(library_db_path, None)?;
     let entry_count = library_db.entries.len();
@@ -111,7 +111,7 @@ fn check_library_database(library_db_path: PathBuf) -> Result<(), LibraryDatabas
 fn check_task_queue(task_queue_path: PathBuf) -> Result<(), LibraryDatabaseCheckError> {
     const THRESHOLD: usize = 500;
 
-    print_check_name(&format!("checking task queue"));
+    print_check_name("checking task queue");
     print_check_status("waiting for filelock...");
     let task_queue = TaskQueue::lock_and_read(task_queue_path, None)?;
     let total = task_queue.total_count();
@@ -127,7 +127,7 @@ fn check_task_queue(task_queue_path: PathBuf) -> Result<(), LibraryDatabaseCheck
         failed + done
     };
 
-    print_check_name(&format!("checking task queue size"));
+    print_check_name("checking task queue size");
     if finished > THRESHOLD {
         print_check_warn(&TaskQueueCheckError::Overfill {
             finished,
@@ -160,7 +160,7 @@ pub fn check_all() -> Result<(), CmdError> {
 
     let config_path = Config::default_path();
     println!("config located at: {config_path:?}");
-    print_check_name(&format!("checking config"));
+    print_check_name("checking config");
 
     let config = match Config::load() {
         Ok(config) => {

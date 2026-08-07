@@ -6,7 +6,7 @@ use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::hive::job::Job;
 use scoretracker::info_npr;
-use scoretracker::util::timestamp::NsTimestamp;
+use scoretracker::util::timestamp::NsLocalTimestamp;
 use std::path::PathBuf;
 
 pub mod automark;
@@ -153,8 +153,8 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                         let cut_end_point: Option<f64> = ctx.pull_arg_opt("cut_end_point", "timestamp to end of cut (in seconds)")?;
                         cmd::hive::add_task(Job::CutLibraryVideo {
                             source_path,
-                            cut_start_point: cut_start_point.map(NsTimestamp::from_secs_f64),
-                            cut_end_point: cut_end_point.map(NsTimestamp::from_secs_f64),
+                            cut_start_point: cut_start_point.map(NsLocalTimestamp::from_secs_f64),
+                            cut_end_point: cut_end_point.map(NsLocalTimestamp::from_secs_f64),
                             destination_path,
                         })
                     }

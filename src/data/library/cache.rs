@@ -171,10 +171,7 @@ impl LibraryCache {
         sha256: String,
     ) {
         if let Some(existing) = self.files.iter_mut().find(Self::cache_find_predicate_mut(
-            &filename,
-            file_size,
-            birth_timestamp,
-            modify_timestamp,
+            &filename, file_size, birth_timestamp, modify_timestamp,
         )) {
             existing.filename = filename;
             existing.file_size = file_size;

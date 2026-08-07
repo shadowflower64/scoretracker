@@ -7,7 +7,7 @@ use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
 use crate::util::file_ex::FileEx;
 use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
-use crate::util::timestamp::NsTimestamp;
+use crate::util::timestamp::{NsDuration, NsLocalTimestamp, NsTimestamp};
 use crate::util::uuid::UuidString;
 use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
@@ -183,10 +183,10 @@ pub struct ClothInfo {
     pub uuid: UuidString,
 
     /// Start point of the cut-out video within the cloth, in nanoseconds.
-    pub start_point: Option<NsTimestamp>,
+    pub start_point: Option<NsLocalTimestamp>,
 
     /// End point of the cut-out video within the cloth, in nanoseconds.
-    pub end_point: Option<NsTimestamp>,
+    pub end_point: Option<NsLocalTimestamp>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -303,7 +303,7 @@ pub struct LibraryEntry {
     ///
     /// Set this to [`None`] if this information is not known.
     /// Set this to 0 for singular images/frames.
-    pub duration: Option<NsTimestamp>,
+    pub duration: Option<NsDuration>,
 
     /// AutomaticContentDetectionInformation
     pub automatic_content_detection_information: Option<AutomaticContentDetectionInformation>,

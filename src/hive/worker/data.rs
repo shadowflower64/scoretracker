@@ -1,12 +1,11 @@
-
-use std::net::SocketAddr;
 use crate::util::{timestamp::NsTimestamp, uuid::UuidString};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerInfo {
     /// Name of the worker.
-    /// 
+    ///
     /// For standard scoretracker workers, this is generated with the [`super::Worker::make_name`] function.
     /// That function generates names in the format: `{random_name}-{pid}.scoretracker-worker.local`,
     /// where:
@@ -24,13 +23,11 @@ pub struct WorkerInfo {
     pub address: SocketAddr,
 }
 
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct WorkerStatus {
     pub working: bool,
     pub current_task: Option<UuidString>,
 }
-
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TaskProgress {
@@ -52,7 +49,6 @@ pub struct TaskProgress {
     /// Progress message
     pub current_stage_progress_msg: String,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct WorkerData {

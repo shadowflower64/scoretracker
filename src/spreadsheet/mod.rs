@@ -180,13 +180,14 @@ fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_re
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn import_org_spreadsheet_page<
     T: fmt::Debug,
     E: Fn(BadRecordErrorWithContext) -> SpreadsheetImportError,
     F: Fn(&Box<dyn Game>, &Record, &mut Context) -> ParseRecordResult<T>,
-    G: FnMut(T, &mut Context) -> (),
-    H: Fn(BadRecordErrorWithContext, &mut Context) -> (),
-    I: Fn(BadRecordErrorWithContext, &mut Context) -> (),
+    G: FnMut(T, &mut Context),
+    H: Fn(BadRecordErrorWithContext, &mut Context),
+    I: Fn(BadRecordErrorWithContext, &mut Context),
 >(
     game: Box<dyn Game>,
     game_id: &str,

@@ -127,7 +127,7 @@ pub fn send_message(tcp_stream: &mut TcpStream, message: &OutgoingMessage) -> Re
     let size_bytes = size.to_le_bytes();
     debug!("outgoing size: {size} {size_bytes:?}");
 
-    pub const WRITELOCK: LazyLock<Arc<Mutex<()>>> = LazyLock::new(|| Arc::new(Mutex::new(())));
+    pub static WRITELOCK: LazyLock<Arc<Mutex<()>>> = LazyLock::new(|| Arc::new(Mutex::new(())));
     let arc = Arc::clone(&WRITELOCK);
     {
         let _guard = arc.lock().unwrap();
@@ -221,7 +221,7 @@ fn recv_connection_loop<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, Make
             tcp_stream,
             message,
             connection_info,
-            &worker_data,
+            worker_data,
             make_worker_status_rx,
             make_task_progress_rx,
         )?,
@@ -242,7 +242,7 @@ fn start_subscription_thread<F: Send + 'static + Fn(&mut TcpStream, &Arc<Mutex<C
 
     let mut tcp_stream = tcp_stream.try_clone().map_err(Error::CloneTcpStream)?;
     let peer_addr = tcp_stream.peer_addr().map_err(Error::FetchPeerAddr)?;
-    let connection_info = Arc::clone(&connection_info);
+    let connection_info = Arc::clone(connection_info);
 
     thread::Builder::new()
         .name(format!("worker:connsend:{}", peer_addr.port()))
@@ -301,7 +301,6 @@ fn start_connection_thread(
         })
     {
         error!("failed to create connection handler thread: {e}");
-        return;
     }
 }
 
@@ -345,6 +344,5 @@ pub fn start_listener_thread(
         }
     }) {
         error!("failed to create listener thread: {e}");
-        return;
     }
 }

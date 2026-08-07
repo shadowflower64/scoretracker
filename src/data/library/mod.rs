@@ -127,11 +127,7 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
     info!("[scan] looking for files in directory");
     let files_in_dir: Vec<DirEntry> = WalkDir::new(library_dir)
         .into_iter()
-        .filter_map(|result| {
-            result
-                .ok()
-                .and_then(|dir_entry| if dir_entry.file_type().is_file() { Some(dir_entry) } else { None })
-        })
+        .filter_map(|result| result.ok().filter(|dir_entry| dir_entry.file_type().is_file()))
         .collect();
     let total_files_in_dir = files_in_dir.len();
 

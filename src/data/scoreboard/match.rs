@@ -1,5 +1,6 @@
 use crate::data::scoreboard::AnyValue;
-use crate::util::{command_line::AskError, timestamp::NsTimestamp, uuid::UuidString};
+use crate::util::timestamp::NsTimestamp;
+use crate::util::{command_line::AskError, uuid::UuidString};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

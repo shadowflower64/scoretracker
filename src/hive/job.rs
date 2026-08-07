@@ -9,7 +9,7 @@ use crate::data::library::stpl_url::StplUrl;
 use crate::ffmpeg::ffmpeg_cut_video_streamcopy;
 use crate::hive::worker::data::WorkerInfo;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault};
-use crate::util::timestamp::NsTimestamp;
+use crate::util::timestamp::NsLocalTimestamp;
 use crate::util::uuid::UuidString;
 use crate::{config::Config, data::library::database::LibraryDatabase, info, log_fn_name};
 use relative_path::RelativePathBuf;
@@ -76,8 +76,8 @@ pub enum Job {
     },
     CutLibraryVideo {
         source_path: PathBuf,
-        cut_start_point: Option<NsTimestamp>,
-        cut_end_point: Option<NsTimestamp>,
+        cut_start_point: Option<NsLocalTimestamp>,
+        cut_end_point: Option<NsLocalTimestamp>,
         destination_path: PathBuf,
     },
     ProcessVideo {

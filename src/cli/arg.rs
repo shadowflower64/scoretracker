@@ -10,14 +10,14 @@ pub struct ArgError {
 
 impl ArgError {
     pub fn from_parse_err<T: fmt::Display>(e: T) -> Self {
-        return Self {
+        Self {
             error_message: e.to_string(),
-        };
+        }
     }
 }
 
 pub trait CmdlineArgumentParse: Sized {
-    fn try_from_arg(arg: &String) -> Result<Self, ArgError>;
+    fn try_from_arg(arg: &str) -> Result<Self, ArgError>;
 }
 
 pub trait CmdlineArgument: CmdlineArgumentParse {
@@ -61,7 +61,7 @@ where
     T: FromStr,
     <T as FromStr>::Err: fmt::Display,
 {
-    fn try_from_arg(arg: &String) -> Result<Self, ArgError> {
+    fn try_from_arg(arg: &str) -> Result<Self, ArgError> {
         arg.parse().map_err(ArgError::from_parse_err)
     }
 }

@@ -1,7 +1,7 @@
+pub mod data;
 mod ipc;
 pub mod names;
 pub mod status;
-pub mod data;
 
 use crate::config::Config;
 use crate::hive::queue::{TaskNotFound, TaskQueue};
@@ -13,10 +13,10 @@ use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::lockfile;
 use crate::util::timestamp::NsTimestamp;
 use crate::{error, info, log_fn_name, success};
+use crossbeam_channel::Sender;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::{io, process};
-use crossbeam_channel::Sender;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -64,7 +64,7 @@ impl Worker {
     }
 
     pub fn fetch_progress(&self) -> String {
-        return "Fetch progress".to_owned(); // todo
+        "Fetch progress".to_owned() // todo
     }
 
     pub fn new_with_listener(name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
@@ -122,8 +122,8 @@ impl Worker {
     async fn execute_task_body(&self, task: &mut Task) {
         log_fn_name!("worker:execute task");
 
-        let worker_info = &self.worker_data().lock().unwrap().info;
-        match task.job.run(&self.config, Some(worker_info)).await {
+        let worker_info = self.worker_data().lock().unwrap().info.clone();
+        match task.job.run(&self.config, Some(&worker_info)).await {
             Ok(success) => {
                 success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
                 task.state = TaskState::Done;
