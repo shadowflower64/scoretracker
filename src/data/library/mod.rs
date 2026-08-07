@@ -84,14 +84,14 @@ pub enum LibraryScanError {
     CannotWriteDatabase(lockfile::Error),
 }
 
-pub const VERBOSE_SCANNING: bool = false;
-
 /// Determines whether a file should be added to the library scan list or not.
 ///
 /// Returns true if the file should be scanned into the library as proof.
 pub fn should_file_be_scanned(filename: &str) -> bool {
     filename.ends_with(".mp4") || filename.ends_with(".mkv")
 }
+
+pub const VERBOSE_SCANNING: bool = false;
 
 /// Fully scan a library directory for added/moved/removed files.
 ///

@@ -22,9 +22,11 @@ use uuid::Uuid;
 fn create_stpl_url_to_file(_library_dir: &Path, _file_path: &Path) -> StplUrl {
     todo!()
 }
+
 fn create_internal_path_to_file(_library_dir: &Path, _file_path: &Path) -> RelativePathBuf {
     todo!()
 }
+
 fn get_library_dir_of_path(_path: &Path) -> Option<PathBuf> {
     todo!()
 }
