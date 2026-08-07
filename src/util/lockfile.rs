@@ -14,6 +14,7 @@ use std::process;
 use std::result;
 use std::sync::mpsc;
 use thiserror::Error;
+use toml_edit::Item::Table;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -58,6 +59,7 @@ pub fn is_file_locked<T>(result: &Result<T>) -> bool {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LockfileContent {
+    program: String,
     version: String,
     pid: u32,
     lock_timestamp: NsTimestamp,
@@ -91,20 +93,29 @@ impl LockfileContent {
         doc.decor_mut().set_prefix(
             "# File locked by scoretracker.\n# WARNING - Do not edit the locked file. Editing the locked file may result in data loss.\n\n",
         );
+
         doc.key_mut("lock_timestamp")
-            .unwrap()
+            .expect("key 'lock_timestamp' not found")
             .leaf_decor_mut()
-            .set_prefix(format!("# lock_timestamp = {lock_timestamp_string}\n"));
+            .set_prefix(format!("# lock time: {lock_timestamp_string}\n"));
 
         if let Some(worker_info) = self.worker.as_ref() {
             let birth_timestamp_string = worker_info.birth_timestamp.to_date_time_string_local();
-            doc.key_mut("worker.birth_timestamp")
-                .unwrap()
+            doc["worker"] = Table(doc["worker"].clone().into_table().expect("into table"));
+            doc["worker"]
+                .as_table_mut()
+                .expect("'worker' should be a table")
+                .set_position(Some(1));
+            doc["worker"]
+                .as_table_mut()
+                .expect("'worker' should be a table")
+                .key_mut("birth_timestamp")
+                .expect("key 'birth_timestamp' not found")
                 .leaf_decor_mut()
-                .set_prefix(format!("# birth_timestamp = {birth_timestamp_string}\n"));
+                .set_prefix(format!("# birth time: {birth_timestamp_string}\n"));
         }
 
-        todo!()
+        doc.to_string()
     }
 }
 
@@ -140,6 +151,7 @@ impl LockfileHandle {
 
     fn generate_lockfile_contents(worker_info: Option<&WorkerInfo>) -> String {
         let content = LockfileContent {
+            program: "scoretracker".to_string(),
             version: VERSION.to_string(),
             pid: process::id(),
             lock_timestamp: NsTimestamp::now(),

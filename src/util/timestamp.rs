@@ -1,5 +1,6 @@
 //! Module for nanosecond timestamp and duration structures: [`Nanoseconds`] and [`NsDuration`].
 use chrono::{DateTime, Local, SecondsFormat, TimeZone, Utc};
+use serde::de::{self, MapAccess};
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::fmt;
 use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
@@ -31,7 +32,7 @@ struct SerializableStruct {
 }
 
 impl SerializableStruct {
-    pub fn nanos(self: SerializableStruct) -> Nanoseconds {
+    pub fn nanos(self) -> Nanoseconds {
         Nanoseconds::from_secs(self.seconds) + (self.frac as i128)
     }
 }
@@ -257,7 +258,7 @@ impl<'de> Deserialize<'de> for NsTimestamp {
         // if let Ok(a) = deserializer.deserialize_i128(NanosecondsVisitor) {
         //     return Ok(NsTimestamp(a));
         // }
-        SerializableStruct::deserialize(deserializer).map(|x| x.nanos().into())
+        Nanoseconds::deserialize(deserializer).map(Self)
     }
 }
 
@@ -478,7 +479,7 @@ impl<'de> Deserialize<'de> for NsDuration {
         // if let Ok(a) = deserializer.deserialize_i128(NanosecondsVisitor) {
         //     return Ok(NsDuration(a));
         // }
-        SerializableStruct::deserialize(deserializer).map(|x| x.nanos().into())
+        Nanoseconds::deserialize(deserializer).map(Self)
     }
 }
 
@@ -1385,7 +1386,7 @@ impl<'de> Visitor<'de> for NanosecondsVisitor {
     type Value = Nanoseconds;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a number of nanoseconds since 1970-01-01 (can be negative)")
+        formatter.write_str("a number of nanoseconds or a struct containing a whole number of seconds and a fractional part")
     }
 
     fn visit_i8<E: serde::de::Error>(self, v: i8) -> Result<Self::Value, E> {
@@ -1427,10 +1428,17 @@ impl<'de> Visitor<'de> for NanosecondsVisitor {
     fn visit_u128<E: serde::de::Error>(self, v: u128) -> Result<Self::Value, E> {
         Nanoseconds::try_from(v).map_err(|e| E::custom(format!("timestamp out of range: {e}")))
     }
+
+    fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
+    where
+        M: MapAccess<'de>,
+    {
+        SerializableStruct::deserialize(de::value::MapAccessDeserializer::new(map)).map(|x| x.nanos())
+    }
 }
 
 impl<'de> Deserialize<'de> for Nanoseconds {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_i128(NanosecondsVisitor)
+        deserializer.deserialize_any(NanosecondsVisitor)
     }
 }
