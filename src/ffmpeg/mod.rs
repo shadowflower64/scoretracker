@@ -1,12 +1,13 @@
 use std::path::Path;
 
-use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output};
+use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress};
 
-pub async fn ffmpeg_cut_video_streamcopy(
+pub async fn ffmpeg_cut_video_streamcopy<OnProgress: Fn(Progress) -> () + Send + Sync + 'static>(
     source_path: &Path,
     destination_path: &Path,
     start_time_ms: Option<u64>,
     end_time_ms: Option<u64>,
+    on_progress: OnProgress,
 ) {
     let input = Input::new(source_path.to_string_lossy().to_string());
     let input = if let Some(start_time_ms) = start_time_ms {
@@ -27,9 +28,7 @@ pub async fn ffmpeg_cut_video_streamcopy(
                 .audio_codec(Codec::copy())
                 .video_codec(Codec::copy()),
         )
-        .on_progress(|p| {
-            println!("Progress: {:?}", p);
-        });
+        .on_progress(on_progress);
     let command = ffmpeg.command().expect("todocommand");
     todo!("running ffmpeg with cmd: {command}");
     // ffmpeg.run().await.expect("todo2");

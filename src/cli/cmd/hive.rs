@@ -6,12 +6,13 @@ use scoretracker::hive::{queue::TaskQueue, worker::Worker};
 use scoretracker::info_npr;
 use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::{config::Config, error, info, log_fn_name, success};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
     log_fn_name!("cmd:spawn_worker");
 
-    let worker = Worker::new_default()?;
+    let worker = Arc::new(Worker::new_default()?);
     if persistent {
         info!("created persistent worker, now taking on tasks...");
     } else {
@@ -20,7 +21,7 @@ pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
 
     smol::block_on(async {
         loop {
-            match worker.take_on_task().await {
+            match worker.clone().take_on_task().await {
                 Ok(_) => {
                     success!("worker task finished successfully");
                 }

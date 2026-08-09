@@ -31,6 +31,9 @@ pub struct WorkerStatus {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TaskProgress {
+    /// Is task fully done?
+    pub done: bool,
+
     /// Number of the current stage, starting from 1, can go up to and including [`Self::total_stages`].
     pub current_stage_number: u32,
 

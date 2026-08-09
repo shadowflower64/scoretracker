@@ -4,6 +4,7 @@ pub mod names;
 pub mod status;
 
 use crate::config::Config;
+use crate::hive::job;
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
@@ -16,7 +17,7 @@ use crate::{error, info, log_fn_name, success};
 use crossbeam_channel::Sender;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
-use std::{io, process};
+use std::{io, panic, process};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -49,6 +50,14 @@ pub enum WorkerCreateError {
 #[derive(Debug)]
 pub struct Worker {
     config: Config,
+
+    /// All data that is related to this worker.
+    ///
+    /// This structure is shareable across threads.
+    /// It contains:
+    /// * [`WorkerInfo`], an immutable structure containing basic info about the worker;
+    /// * [`WorkerStatus`], which holds the current state of the worker (is it paused, running, etc.);
+    /// * [`TaskProgress`], which contains information about progress on the current task.
     data: Arc<Mutex<WorkerData>>,
     worker_status_tx: Sender<WorkerStatus>,
     task_progress_tx: Sender<TaskProgress>,
@@ -65,6 +74,29 @@ impl Worker {
 
     pub fn fetch_progress(&self) -> String {
         "Fetch progress".to_owned() // todo
+    }
+
+    pub fn update_worker_status(&self, status: WorkerStatus) {
+        self.data.lock().unwrap().status = status.clone();
+        self.worker_status_tx.send(status).expect("todo"); // todo
+    }
+
+    pub fn update_task_progress(&self, task_progress: TaskProgress) {
+        self.data.lock().unwrap().task_progress = Some(task_progress.clone());
+        self.task_progress_tx.send(task_progress).expect("todo"); // todo
+    }
+
+    pub fn update_task_progress_very_simple(&self, message: String) {
+        let task_progress = TaskProgress {
+            done: false,
+            current_stage_number: 0,
+            current_stage: "todo".to_owned(),
+            total_stages: 0,
+            current_stage_progress: 0,
+            current_stage_progress_max: 0,
+            current_stage_progress_msg: message,
+        };
+        self.update_task_progress(task_progress);
     }
 
     pub fn new_with_listener(name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
@@ -119,20 +151,27 @@ impl Worker {
     /// The queue file should be written to before calling this method.
     ///
     /// The result of the task should also be saved to the queue after this method finishes, so that no data is lost and the task is not done twice.
-    async fn execute_task_body(&self, task: &mut Task) {
+    async fn execute_task_body(self: Arc<Self>, task: &mut Task) {
         log_fn_name!("worker:execute task");
 
-        let worker_info = self.worker_data().lock().unwrap().info.clone();
-        match task.job.run(&self.config, Some(&worker_info)).await {
-            Ok(success) => {
-                success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
-                task.state = TaskState::Done;
-                task.result = Some(TaskResult::Success(success));
-            }
-            Err(error) => {
-                error!("task failed: uuid: {} error: {:?}", task.uuid.0, error);
+        let result = panic::catch_unwind(async || task.job.run(self).await);
+        match result {
+            Ok(no_panic) => match no_panic.await {
+                Ok(success) => {
+                    success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
+                    task.state = TaskState::Done;
+                    task.result = Some(TaskResult::Success(success));
+                }
+                Err(error) => {
+                    error!("task failed: uuid: {} error: {:?}", task.uuid.0, error);
+                    task.state = TaskState::Failed;
+                    task.result = Some(TaskResult::Error(error));
+                }
+            },
+            Err(panic) => {
+                error!("task panicked: uuid: {} error: {:?}", task.uuid.0, panic);
                 task.state = TaskState::Failed;
-                task.result = Some(TaskResult::Error(error));
+                task.result = Some(TaskResult::Error(job::Failure::Panic(format!("{panic:?}"))));
             }
         }
         task.finish_timestamp = Some(NsTimestamp::now());
@@ -146,7 +185,7 @@ impl Worker {
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
     pub async fn execute_task<F: Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>>(
-        &self,
+        self: Arc<Self>,
         mut queue: FileLocked<TaskQueue>,
         task_getter: F,
     ) -> Result<FileLocked<TaskQueue>, Error> {
@@ -172,7 +211,7 @@ impl Worker {
             data.status.working = true;
             data.status.current_task = Some(task.uuid);
         }
-        self.execute_task_body(&mut task).await;
+        self.clone().execute_task_body(&mut task).await;
         {
             let mut data = self.worker_data().lock().unwrap();
             data.status.working = false;
@@ -191,7 +230,7 @@ impl Worker {
     /// Please note that executing a task may take a long time.
     ///
     /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
-    pub async fn execute_task_with_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
+    pub async fn execute_task_with_uuid(self: Arc<Self>, task_uuid: Uuid) -> Result<(), Error> {
         let queue = self.open_queue()?;
         self.execute_task(queue, |q| q.get_task_mut(task_uuid).ok_or(Error::TaskNotFound(task_uuid)))
             .await?;
@@ -203,7 +242,7 @@ impl Worker {
     /// Please note that executing a task may take a long time.
     ///
     /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
-    pub async fn take_on_task(&self) -> Result<(), Error> {
+    pub async fn take_on_task(self: Arc<Self>) -> Result<(), Error> {
         let queue = self.open_queue()?;
         self.execute_task(queue, |q| q.top_queued_task_mut().ok_or(Error::NoTopQueuedTask))
             .await?;

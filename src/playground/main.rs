@@ -151,17 +151,17 @@ pub async fn test_queue(_args: &[String]) {
 
     // Do some task if there is something to do
     if let Some(mut task) = currently_doing_task_opt {
-        match task.job.run(&Config::load().unwrap(), None).await {
-            Ok(results) => {
-                //
-                task.state = TaskState::Done
-            }
-            Err(error) => {
-                //
-                task.state = TaskState::Failed
-            }
-        }
-        task.finish_timestamp = Some(NsTimestamp::now());
+        // match task.job.run(&Config::load().unwrap(), None).await {
+        //     Ok(results) => {
+        //         //
+        //         task.state = TaskState::Done
+        //     }
+        //     Err(error) => {
+        //         //
+        //         task.state = TaskState::Failed
+        //     }
+        // }
+        // task.finish_timestamp = Some(NsTimestamp::now());
 
         // Read the queue file again to update the state of the task
         let mut queue = TaskQueue::lock_and_read_or_default("playground/test_queue.jsonl", None).expect("couldn't read queue");

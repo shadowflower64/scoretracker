@@ -32,10 +32,27 @@ use crate::util::{filelocked::FileLockableData, uuid::UuidString};
 use crate::{debug, info, log_fn_name, log_should_print_debug, warn};
 use relative_path::{PathExt, RelativePathBuf};
 use std::collections::{HashMap, HashSet};
-use std::path::{self, Path};
+use std::path::{self, Path, PathBuf};
 use std::time::Instant;
 use thiserror::Error;
 use walkdir::{DirEntry, WalkDir};
+
+/// Returns the library directory ("repository directory") of the specified file.
+///
+/// This function searches for the root directory of the library by repeatedly going up a level until it finds a file named `library_info.json`.
+/// The function returns the path of the directory that the "library_info.json" file is located in.
+///
+/// Returns [`None`] if the file was not found in any parent directory.
+pub fn get_library_dir_of_path(path: &Path) -> Option<PathBuf> {
+    let mut current_path = path.to_path_buf();
+    while let Some(parent_path) = current_path.parent() {
+        if current_path.join("library_info.json").is_file() {
+            return Some(current_path);
+        }
+        current_path = parent_path.to_path_buf();
+    }
+    None
+}
 
 /// Creates a normalized path to a file within the library.
 ///
@@ -64,6 +81,17 @@ pub fn path_within_library_dir<P1: AsRef<Path>, P2: AsRef<Path>>(library_dir: P1
     } else {
         Some(relative_file_path)
     }
+}
+
+pub fn create_stpl_url_to_file<P1: AsRef<Path>, P2: AsRef<Path>>(
+    library_info: LibraryInfo,
+    library_dir: P1,
+    target_file_path: P2,
+) -> Option<StplUrl> {
+    let Some(rel) = path_within_library_dir(library_dir, target_file_path) else {
+        return None;
+    };
+    Some(StplUrl::new(LibraryDomain::Local(library_info.domain), Some(rel.to_string())))
 }
 
 #[derive(Debug, Error)]

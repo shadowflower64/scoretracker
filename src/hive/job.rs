@@ -4,32 +4,21 @@
 //! One worker may take on a job, and then report a success, or a failure.
 use crate::data::library::database::{ClothInfo, LibraryEntry};
 use crate::data::library::index::LibraryIndex;
-use crate::data::library::scan_register_added_file;
+use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::StplUrl;
+use crate::data::library::{create_stpl_url_to_file, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
 use crate::ffmpeg::ffmpeg_cut_video_streamcopy;
-use crate::hive::worker::data::WorkerInfo;
+use crate::hive::worker::Worker;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault};
 use crate::util::timestamp::NsLocalTimestamp;
 use crate::util::uuid::UuidString;
-use crate::{config::Config, data::library::database::LibraryDatabase, info, log_fn_name};
-use relative_path::RelativePathBuf;
+use crate::{data::library::database::LibraryDatabase, info, log_fn_name};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
 use std::{path::PathBuf, thread::sleep, time::Duration};
 use thiserror::Error;
 use uuid::Uuid;
-
-fn create_stpl_url_to_file(_library_dir: &Path, _file_path: &Path) -> StplUrl {
-    todo!()
-}
-
-fn create_internal_path_to_file(_library_dir: &Path, _file_path: &Path) -> RelativePathBuf {
-    todo!()
-}
-
-fn get_library_dir_of_path(_path: &Path) -> Option<PathBuf> {
-    todo!()
-}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -44,6 +33,8 @@ pub enum ProcessingType {
 pub enum Failure {
     #[error("unknown error while running a job")]
     UnknownError,
+    #[error("panic while running a job: {0}")]
+    Panic(String),
     #[error("could not open library: {0}")]
     LibraryError(String),
     #[error("could not find library entry with uuid: {0}")]
@@ -91,14 +82,20 @@ pub enum Job {
 }
 
 impl Job {
-    pub async fn run(&self, config: &Config, worker_info: Option<&WorkerInfo>) -> Result<Success, Failure> {
+    pub async fn run(&self, worker: Arc<Worker>) -> Result<Success, Failure> {
+        let worker_info = worker.worker_data().lock().unwrap().info.clone();
+        let config = worker.config();
         // Helper functions
         let _open_library_db_readwrite = || {
-            LibraryDatabase::lock_and_read_or_default(config.library_database_path(), worker_info)
+            LibraryDatabase::lock_and_read_or_default(config.library_database_path(), Some(&worker_info))
                 .map_err(|e| Failure::LibraryError(e.to_string()))
         };
         let open_library_db_readonly = || {
             LibraryDatabase::read_without_locking_or_default(config.library_database_path())
+                .map_err(|e| Failure::LibraryError(e.to_string()))
+        };
+        let open_library_info_readonly = |library_dir: &Path| {
+            LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME))
                 .map_err(|e| Failure::LibraryError(e.to_string()))
         };
         let _reopen_library_db =
@@ -131,7 +128,7 @@ impl Job {
                 let source_library_index =
                     LibraryIndex::read_without_locking(source_library_dir.join(LibraryIndex::STANDARD_FILENAME)).expect("todo");
 
-                let internal_source_path = create_internal_path_to_file(&source_library_dir, source_path);
+                let internal_source_path = path_within_library_dir(&source_library_dir, source_path).expect("todo");
                 let source_proof_uuid = source_library_index.files.get(&internal_source_path).expect("todo");
 
                 // Get source proof entry from the database
@@ -144,7 +141,8 @@ impl Job {
 
                 // Sanity check - proof entry with the given UUID should contain the given URL.
                 // If it doesn't, that means the library needs to be rescanned or the request was invalid.
-                let file_url = create_stpl_url_to_file(&source_library_dir, source_path);
+                let library_info = open_library_info_readonly(&source_library_dir)?;
+                let file_url = create_stpl_url_to_file(library_info, &source_library_dir, source_path).expect("todo");
                 if !proof_entry.library_urls.contains(&file_url) {
                     return Err(Failure::FileUrlNotFoundInEntry {
                         expected_url: file_url,
@@ -153,11 +151,15 @@ impl Job {
                 }
 
                 // Launch ffmpeg to cut the video losslessly
+                let worker2 = Arc::clone(&worker);
                 ffmpeg_cut_video_streamcopy(
                     source_path,
                     destination_path,
                     cut_start_point.map(|x| x.as_millis() as u64),
                     cut_end_point.map(|x| x.as_millis() as u64),
+                    move |progress| {
+                        worker2.update_task_progress_very_simple(format!("{progress:?}"));
+                    },
                 )
                 .await;
 
@@ -169,7 +171,7 @@ impl Job {
                     &destination_library_dir,
                     &config.library_database_path(),
                     destination_path,
-                    worker_info,
+                    Some(&worker_info),
                 )
                 .map_err(|e| Failure::CannotRegisterFileIntoLibrary {
                     file_path: destination_path.to_owned(),
