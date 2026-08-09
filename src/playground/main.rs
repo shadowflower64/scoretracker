@@ -3,6 +3,7 @@ use scoretracker::config::Config;
 use scoretracker::data::game::game_instance_from_id;
 use scoretracker::data::library::scan_full;
 use scoretracker::hive::job::AnyJob;
+use scoretracker::hive::jobs::display_message_and_sleep::DisplayMessageAndSleepJob;
 use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::{Task, TaskState};
 use scoretracker::hive::worker::data::WorkerInfo;
@@ -138,10 +139,10 @@ pub async fn test_queue(_args: &[String]) {
         // Add a new task
         let new_task = Task::new(
             String::from("Test task from playground"),
-            AnyJob::DisplayMessageAndSleep {
+            AnyJob::DisplayMessageAndSleep(DisplayMessageAndSleepJob {
                 message: String::from("Hello world from the queue!"),
                 time_nanos: 3_000_000_000,
-            },
+            }),
         );
         queue.add_task(new_task);
     }

@@ -902,7 +902,7 @@ impl Nanoseconds {
     /// assert_eq!(two_seconds_earlier, Nanoseconds::from_secs(3));
     ///
     /// let twelfth_second_since_epoch = Nanoseconds::from_secs(12);
-    /// let twelfth_second_before_epoch = twelfth_second_since_epoch.invert_with_origin(Nanoseconds::UNIX_EPOCH);
+    /// let twelfth_second_before_epoch = twelfth_second_since_epoch.invert_with_origin(Nanoseconds::ZERO);
     /// assert_eq!(twelfth_second_before_epoch, Nanoseconds::from_secs(-12));
     /// ```
     pub fn invert_with_origin(self, origin: Self) -> Self {
@@ -982,7 +982,7 @@ impl Sub for Nanoseconds {
     /// use scoretracker::util::timestamp::Nanoseconds;
     /// use std::ops::Sub;
     ///
-    /// assert_eq!(Nanoseconds::from_secs(3).sub(Nanoseconds::UNIX_EPOCH), 3_000_000_000);
+    /// assert_eq!(Nanoseconds::from_secs(3).sub(Nanoseconds::ZERO), 3_000_000_000);
     /// assert_eq!(Nanoseconds::from_secs(10).sub(Nanoseconds::from_secs(3)), 7_000_000_000);
     /// assert_eq!(Nanoseconds::from_secs(-123).sub(Nanoseconds::from_secs(-113)), -10_000_000_000);
     /// ```
@@ -1049,7 +1049,7 @@ impl From<Duration> for Nanoseconds {
     /// use std::time::Duration;
     ///
     /// let duration = Duration::ZERO;
-    /// assert_eq!(Nanoseconds::from(duration), Nanoseconds::UNIX_EPOCH);
+    /// assert_eq!(Nanoseconds::from(duration), Nanoseconds::ZERO);
     ///
     /// let duration = Duration::from_millis(3);
     /// assert_eq!(Nanoseconds::from(duration), Nanoseconds::from_nanos(3_000_000));
@@ -1214,7 +1214,7 @@ impl TryFrom<Nanoseconds> for (bool, Duration) {
     /// assert_eq!(negative, true);
     /// assert_eq!(duration, Duration::from_nanos(6_123_456_789));
     ///
-    /// let timestamp = Nanoseconds::UNIX_EPOCH;
+    /// let timestamp = Nanoseconds::ZERO;
     /// let (negative, duration) = timestamp.try_into().unwrap();
     /// assert_eq!(negative, false);
     /// assert_eq!(duration, Duration::ZERO);
@@ -1291,7 +1291,7 @@ impl TryFrom<Nanoseconds> for SystemTime {
     /// let system_time: SystemTime = timestamp.try_into().unwrap();
     /// assert_eq!(UNIX_EPOCH.duration_since(system_time).unwrap().as_nanos(), 3);
     ///
-    /// let timestamp = Nanoseconds::UNIX_EPOCH;
+    /// let timestamp = Nanoseconds::ZERO;
     /// let system_time: SystemTime = timestamp.try_into().unwrap();
     /// assert_eq!(system_time, UNIX_EPOCH);
     ///

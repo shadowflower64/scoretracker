@@ -2,7 +2,7 @@ use std::path::Path;
 
 use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress};
 
-pub async fn ffmpeg_cut_video_streamcopy<OnProgress: Fn(Progress) -> () + Send + Sync + 'static>(
+pub async fn ffmpeg_cut_video_streamcopy<OnProgress: Fn(Progress) + Send + Sync + 'static>(
     source_path: &Path,
     destination_path: &Path,
     start_time_ms: Option<u64>,

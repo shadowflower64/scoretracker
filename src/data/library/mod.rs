@@ -88,9 +88,7 @@ pub fn create_stpl_url_to_file<P1: AsRef<Path>, P2: AsRef<Path>>(
     library_dir: P1,
     target_file_path: P2,
 ) -> Option<StplUrl> {
-    let Some(rel) = path_within_library_dir(library_dir, target_file_path) else {
-        return None;
-    };
+    let rel = path_within_library_dir(library_dir, target_file_path)?;
     Some(StplUrl::new(LibraryDomain::Local(library_info.domain), Some(rel.to_string())))
 }
 

@@ -6,6 +6,7 @@
 //!
 //! The hive system consists of several submodules, which are listed below.
 pub mod job;
+pub mod jobs;
 pub mod queue;
 pub mod task;
 pub mod worker;

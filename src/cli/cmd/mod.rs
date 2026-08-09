@@ -5,7 +5,7 @@ use crate::error::CmdError;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::hive::job::AnyJob;
-use scoretracker::hive::job::cut_library_video::CutLibraryVideoJob;
+use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::info_npr;
 use scoretracker::util::timestamp::NsLocalTimestamp;
 use std::path::PathBuf;
@@ -154,6 +154,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                         let cut_end_point: Option<f64> = ctx.pull_arg_opt("cut_end_point", "timestamp to end of cut (in seconds)")?;
                         cmd::hive::add_task(AnyJob::CutLibraryVideo(CutLibraryVideoJob {
                             source_path,
+                            source_proof_uuid_precondition_check: None,
                             cut_start_point: cut_start_point.map(NsLocalTimestamp::from_secs_f64),
                             cut_end_point: cut_end_point.map(NsLocalTimestamp::from_secs_f64),
                             destination_path,

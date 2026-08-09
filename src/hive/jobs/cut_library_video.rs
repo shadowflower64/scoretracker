@@ -10,12 +10,14 @@ use crate::hive::job::{Failure, Job, Success};
 use crate::hive::worker::Worker;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault};
 use crate::util::timestamp::NsLocalTimestamp;
+use crate::util::uuid::UuidString;
 use std::path::Path;
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CutLibraryVideoJob {
     pub source_path: PathBuf,
+    pub source_proof_uuid_precondition_check: Option<UuidString>,
     pub cut_start_point: Option<NsLocalTimestamp>,
     pub cut_end_point: Option<NsLocalTimestamp>,
     pub destination_path: PathBuf,
@@ -52,6 +54,13 @@ impl Job for CutLibraryVideoJob {
         let internal_source_path = path_within_library_dir(&source_library_dir, &self.source_path).expect("todo");
         let source_proof_uuid = source_library_index.files.get(&internal_source_path).expect("todo");
 
+        // Check if it matches the precondition (if it doesn't, that means that the input request was incorrect!)
+        if let Some(precondition_uuid) = self.source_proof_uuid_precondition_check
+            && *source_proof_uuid != precondition_uuid
+        {
+            panic!("todo: precondition check failed")
+        }
+
         // Get source proof entry from the database
         let library_db = open_library_db_readonly()?;
         let proof_entry = library_db
@@ -62,8 +71,8 @@ impl Job for CutLibraryVideoJob {
 
         // Sanity check - proof entry with the given UUID should contain the given URL.
         // If it doesn't, that means the library needs to be rescanned or the request was invalid.
-        let library_info = open_library_info_readonly(&source_library_dir)?;
-        let file_url = create_stpl_url_to_file(library_info, &source_library_dir, &self.source_path).expect("todo");
+        let source_library_info = open_library_info_readonly(&source_library_dir)?;
+        let file_url = create_stpl_url_to_file(source_library_info, &source_library_dir, &self.source_path).expect("todo");
         if !proof_entry.library_urls.contains(&file_url) {
             return Err(Failure::FileUrlNotFoundInEntry {
                 expected_url: file_url,
