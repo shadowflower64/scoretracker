@@ -4,7 +4,7 @@
 //! It includes information about whether the job is currently being worked on,
 //! the worker that is currently working on the job, the input parameters for the job,
 //! and when it finishes, the results of the job.
-use crate::hive::job::{self, Job};
+use crate::hive::job::{self, AnyJob};
 use crate::hive::worker::data::WorkerInfo;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
@@ -34,7 +34,7 @@ pub struct Task {
     pub uuid: UuidString,
     pub name: String,
     pub comment: Option<String>,
-    pub job: Job,
+    pub job: AnyJob,
     pub state: TaskState,
     pub request_timestamp: NsTimestamp,
     pub start_timestamp: Option<NsTimestamp>,
@@ -44,7 +44,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(name: String, job: Job) -> Self {
+    pub fn new(name: String, job: AnyJob) -> Self {
         Self {
             uuid: Uuid::now_v7().into(),
             name,

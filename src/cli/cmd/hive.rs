@@ -1,6 +1,6 @@
 use crate::cmd::CmdError;
 use chrono::{DateTime, Local};
-use scoretracker::hive::job::Job;
+use scoretracker::hive::job::AnyJob;
 use scoretracker::hive::task::Task;
 use scoretracker::hive::{queue::TaskQueue, worker::Worker};
 use scoretracker::info_npr;
@@ -41,7 +41,7 @@ pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
     Ok(())
 }
 
-pub fn add_task(job: Job) -> Result<(), CmdError> {
+pub fn add_task(job: AnyJob) -> Result<(), CmdError> {
     log_fn_name!("cmd:add_task");
 
     let config = Config::load().expect("todo");

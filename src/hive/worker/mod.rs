@@ -4,7 +4,7 @@ pub mod names;
 pub mod status;
 
 use crate::config::Config;
-use crate::hive::job;
+use crate::hive::job::{self, Job};
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
@@ -64,8 +64,12 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub fn worker_data(&self) -> &Arc<Mutex<WorkerData>> {
+    pub fn data(&self) -> &Arc<Mutex<WorkerData>> {
         &self.data
+    }
+
+    pub fn info_cloned(&self) -> WorkerInfo {
+        self.data().lock().unwrap().info.clone()
     }
 
     pub fn config(&self) -> &Config {
@@ -120,7 +124,7 @@ impl Worker {
             worker_status_tx,
             task_progress_tx,
         };
-        start_listener_thread(listener, Arc::clone(worker.worker_data()), worker_status_rx, task_progress_rx);
+        start_listener_thread(listener, Arc::clone(worker.data()), worker_status_rx, task_progress_rx);
         Ok(worker)
     }
 
@@ -139,7 +143,7 @@ impl Worker {
     }
 
     pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
-        let worker_data = self.worker_data().lock().unwrap();
+        let worker_data = self.data().lock().unwrap();
         TaskQueue::lock_and_read_or_default(self.config.task_queue_path(), Some(&worker_data.info)).map_err(Error::CannotReadQueue)
     }
 
@@ -195,7 +199,7 @@ impl Worker {
         let task_to_do = task_getter(&mut queue)?;
         task_to_do.state = TaskState::Working;
         task_to_do.start_timestamp = Some(NsTimestamp::now());
-        task_to_do.worker_info = Some(self.worker_data().lock().unwrap().info.clone());
+        task_to_do.worker_info = Some(self.data().lock().unwrap().info.clone());
         // task_to_do.comment = Some(String::from("this job was started by scoretracker"));
 
         let mut task = task_to_do.clone();
@@ -207,13 +211,13 @@ impl Worker {
         // Do some task if there is something to do
         info!("starting task: {:?}", task);
         {
-            let mut data = self.worker_data().lock().unwrap();
+            let mut data = self.data().lock().unwrap();
             data.status.working = true;
             data.status.current_task = Some(task.uuid);
         }
         self.clone().execute_task_body(&mut task).await;
         {
-            let mut data = self.worker_data().lock().unwrap();
+            let mut data = self.data().lock().unwrap();
             data.status.working = false;
             data.status.current_task = None;
         }
