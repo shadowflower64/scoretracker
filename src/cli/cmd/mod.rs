@@ -4,7 +4,6 @@ use crate::cmd::{self};
 use crate::error::CmdError;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
-use scoretracker::hive::job::AnyJob;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::info_npr;
 use scoretracker::util::timestamp::NsLocalTimestamp;
@@ -152,13 +151,13 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                         let destination_path: PathBuf = ctx.pull_arg("destination_path", "destination path to fragment video")?;
                         let cut_start_point: Option<f64> = ctx.pull_arg_opt("cut_start_point", "timestamp to start of cut (in seconds)")?;
                         let cut_end_point: Option<f64> = ctx.pull_arg_opt("cut_end_point", "timestamp to end of cut (in seconds)")?;
-                        cmd::hive::add_task(AnyJob::CutLibraryVideo(CutLibraryVideoJob {
+                        cmd::hive::add_task(CutLibraryVideoJob {
                             source_path,
                             source_proof_uuid_precondition_check: None,
                             cut_start_point: cut_start_point.map(NsLocalTimestamp::from_secs_f64),
                             cut_end_point: cut_end_point.map(NsLocalTimestamp::from_secs_f64),
                             destination_path,
-                        }))
+                        })
                     }
                     _ => ctx.unknown_cmd(),
                 },

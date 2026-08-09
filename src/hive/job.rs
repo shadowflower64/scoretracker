@@ -9,12 +9,20 @@ use crate::hive::jobs::display_message::DisplayMessageJob;
 use crate::hive::jobs::display_message_and_sleep::DisplayMessageAndSleepJob;
 use crate::hive::jobs::process_library_video::ProcessLibraryVideoJob;
 use crate::hive::jobs::sleep::SleepJob;
-use crate::hive::worker::Worker;
+use crate::hive::worker::{self, Worker};
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type", content = "details")]
+pub enum Success {
+    Void,
+    ProcessedVideo { dry: UuidString, wet: UuidString },
+    CutVideo { cloth: ClothInfo, fragment: UuidString },
+}
 
 #[derive(Debug, Clone, Error, Deserialize, Serialize)]
 #[serde(tag = "type", content = "details")]
@@ -23,8 +31,12 @@ pub enum Failure {
     UnknownError,
     #[error("panic while running a job: {0}")]
     Panic(String),
-    #[error("could not open library: {0}")]
-    LibraryError(String),
+    #[error("could not open library database: {0}")]
+    CannotOpenLibraryDatabase(String),
+    #[error("could not read library database: {0}")]
+    CannotReadLibraryDatabase(String),
+    #[error("could not read library info: {0}")]
+    CannotReadLibraryInfo(String),
     #[error("could not find library entry with uuid: {0}")]
     EntryNotFound(UuidString),
     #[error("proof url is not present in the provided library entry: {expected_url}, {entry:?}")]
@@ -35,12 +47,20 @@ pub enum Failure {
     Custom { message: String },
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag = "type", content = "details")]
-pub enum Success {
-    Void,
-    ProcessedVideo { dry: UuidString, wet: UuidString },
-    CutVideo { cloth: ClothInfo, fragment: UuidString },
+impl From<worker::Error> for Failure {
+    fn from(value: worker::Error) -> Self {
+        match value {
+            worker::Error::CannotOpenLibraryDatabase(e) => Self::CannotOpenLibraryDatabase(e.to_string()),
+            worker::Error::CannotReadLibraryDatabase(e) => Self::CannotReadLibraryDatabase(e.to_string()),
+            worker::Error::CannotReadLibraryInfo(e) => Self::CannotReadLibraryInfo(e.to_string()),
+            worker::Error::CannotOpenQueue(_)
+            | worker::Error::CannotReopenQueue(_)
+            | worker::Error::CannotUpdateTask(_)
+            | worker::Error::CannotWriteQueue(_)
+            | worker::Error::NoTopQueuedTask
+            | worker::Error::TaskNotFound(_) => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +76,7 @@ pub enum AnyJob {
 
 pub trait Job {
     fn run(&self, worker: Arc<Worker>) -> impl Future<Output = Result<Success, Failure>>;
+    fn into_any(self) -> AnyJob;
 }
 
 impl Job for AnyJob {
@@ -67,5 +88,8 @@ impl Job for AnyJob {
             Self::CutLibraryVideo(job) => job.run(worker).await,
             Self::ProcessLibraryVideo(job) => job.run(worker).await,
         }
+    }
+    fn into_any(self) -> AnyJob {
+        self
     }
 }

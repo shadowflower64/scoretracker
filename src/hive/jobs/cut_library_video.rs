@@ -1,18 +1,15 @@
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
-use crate::data::library::database::{ClothInfo, LibraryDatabase};
+use crate::data::library::database::ClothInfo;
 use crate::data::library::index::LibraryIndex;
-use crate::data::library::info::LibraryInfo;
 use crate::data::library::{create_stpl_url_to_file, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
 use crate::ffmpeg::ffmpeg_cut_video_streamcopy;
-use crate::hive::job::{Failure, Job, Success};
+use crate::hive::job::{AnyJob, Failure, Job, Success};
 use crate::hive::worker::Worker;
-use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault};
+use crate::util::filelocked::FileLockableData;
 use crate::util::timestamp::NsLocalTimestamp;
 use crate::util::uuid::UuidString;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CutLibraryVideoJob {
@@ -25,26 +22,9 @@ pub struct CutLibraryVideoJob {
 
 impl Job for CutLibraryVideoJob {
     async fn run(&self, worker: Arc<Worker>) -> Result<Success, Failure> {
-        let worker_info = worker.data().lock().unwrap().info.clone();
+        let worker_info = Some(&worker.info_cloned());
         let config = worker.config();
         // Helper functions
-        let _open_library_db_readwrite = || {
-            LibraryDatabase::lock_and_read_or_default(config.library_database_path(), Some(&worker_info))
-                .map_err(|e| Failure::LibraryError(e.to_string()))
-        };
-        let open_library_db_readonly = || {
-            LibraryDatabase::read_without_locking_or_default(config.library_database_path())
-                .map_err(|e| Failure::LibraryError(e.to_string()))
-        };
-        let open_library_info_readonly = |library_dir: &Path| {
-            LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME))
-                .map_err(|e| Failure::LibraryError(e.to_string()))
-        };
-        let _reopen_library_db =
-            |library_db: ClosedFileLocked<LibraryDatabase>| library_db.reopen().map_err(|e| Failure::LibraryError(e.to_string()));
-
-        // TODO: ^^These helper functions are copied from super::AnyJob.
-        // They should be placed somewhere else, presumably in the worker itself. it would make a lot of sense that way, no?
 
         // Fetch the source proof UUID from the local index
         let source_library_dir = get_library_dir_of_path(&self.source_path).expect("todo");
@@ -62,7 +42,7 @@ impl Job for CutLibraryVideoJob {
         }
 
         // Get source proof entry from the database
-        let library_db = open_library_db_readonly()?;
+        let library_db = worker.read_library_db()?;
         let proof_entry = library_db
             .find_entry_by_uuid(*source_proof_uuid)
             .ok_or(Failure::EntryNotFound(*source_proof_uuid))?
@@ -71,7 +51,7 @@ impl Job for CutLibraryVideoJob {
 
         // Sanity check - proof entry with the given UUID should contain the given URL.
         // If it doesn't, that means the library needs to be rescanned or the request was invalid.
-        let source_library_info = open_library_info_readonly(&source_library_dir)?;
+        let source_library_info = worker.read_library_info(&source_library_dir)?;
         let file_url = create_stpl_url_to_file(source_library_info, &source_library_dir, &self.source_path).expect("todo");
         if !proof_entry.library_urls.contains(&file_url) {
             return Err(Failure::FileUrlNotFoundInEntry {
@@ -101,7 +81,7 @@ impl Job for CutLibraryVideoJob {
             &destination_library_dir,
             &config.library_database_path(),
             &self.destination_path,
-            Some(&worker_info),
+            worker_info,
         )
         .map_err(|e| Failure::CannotRegisterFileIntoLibrary {
             file_path: self.destination_path.to_owned(),
@@ -116,5 +96,8 @@ impl Job for CutLibraryVideoJob {
             },
             fragment: Uuid::now_v7().into(),
         })
+    }
+    fn into_any(self) -> AnyJob {
+        AnyJob::CutLibraryVideo(self)
     }
 }

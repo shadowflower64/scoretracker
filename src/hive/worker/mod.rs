@@ -4,18 +4,21 @@ pub mod names;
 pub mod status;
 
 use crate::config::Config;
+use crate::data::library::database::LibraryDatabase;
+use crate::data::library::info::LibraryInfo;
 use crate::hive::job::{self, Job};
 use crate::hive::queue::{TaskNotFound, TaskQueue};
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
 use crate::hive::worker::ipc::start_listener_thread;
 use crate::hive::worker::names::random_name;
-use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
-use crate::util::lockfile;
+use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault, FileLocked};
 use crate::util::timestamp::NsTimestamp;
+use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success};
 use crossbeam_channel::Sender;
 use std::net::TcpListener;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::{io, panic, process};
 use thiserror::Error;
@@ -23,8 +26,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("cannot read from queue: {0}")]
-    CannotReadQueue(lockfile::Error),
+    #[error("cannot read lock from queue: {0}")]
+    CannotOpenQueue(lockfile::Error),
     #[error("cannot reopen queue: {0}")]
     CannotReopenQueue(lockfile::Error),
     #[error("cannot write to queue: {0}")]
@@ -35,6 +38,12 @@ pub enum Error {
     TaskNotFound(Uuid),
     #[error("no tasks to do")]
     NoTopQueuedTask,
+    #[error("cannot read lock library database: {0}")]
+    CannotOpenLibraryDatabase(lockfile::Error),
+    #[error("cannot read library database: {0}")]
+    CannotReadLibraryDatabase(file_ex::Error),
+    #[error("cannot read library info: {0}")]
+    CannotReadLibraryInfo(file_ex::Error),
 }
 
 #[derive(Debug, Error)]
@@ -76,8 +85,29 @@ impl Worker {
         &self.config
     }
 
-    pub fn fetch_progress(&self) -> String {
-        "Fetch progress".to_owned() // todo
+    pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
+        TaskQueue::lock_and_read_or_default(self.config.task_queue_path(), Some(&self.info_cloned())).map_err(Error::CannotOpenQueue)
+    }
+
+    pub fn open_library_db(&self) -> Result<FileLocked<LibraryDatabase>, Error> {
+        LibraryDatabase::lock_and_read_or_default(self.config.library_database_path(), Some(&self.info_cloned()))
+            .map_err(Error::CannotOpenLibraryDatabase)
+    }
+
+    pub fn read_library_db(&self) -> Result<LibraryDatabase, Error> {
+        LibraryDatabase::read_without_locking_or_default(self.config.library_database_path()).map_err(Error::CannotReadLibraryDatabase)
+    }
+
+    pub fn reopen_library_db(&self, library_db: ClosedFileLocked<LibraryDatabase>) -> Result<FileLocked<LibraryDatabase>, Error> {
+        library_db.reopen().map_err(Error::CannotOpenLibraryDatabase)
+    }
+
+    pub fn read_library_info(&self, library_dir: &Path) -> Result<LibraryInfo, Error> {
+        LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(Error::CannotReadLibraryInfo)
+    }
+
+    pub fn fetch_progress(&self) -> Option<TaskProgress> {
+        self.data.lock().unwrap().task_progress.clone()
     }
 
     pub fn update_worker_status(&self, status: WorkerStatus) {
@@ -140,11 +170,6 @@ impl Worker {
     pub fn new_default() -> Result<Self, WorkerCreateError> {
         let config = Config::load()?;
         Self::new(Self::make_name(random_name().to_lowercase(), process::id()), config)
-    }
-
-    pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
-        let worker_data = self.data().lock().unwrap();
-        TaskQueue::lock_and_read_or_default(self.config.task_queue_path(), Some(&worker_data.info)).map_err(Error::CannotReadQueue)
     }
 
     /// Execute a task in the current thread.

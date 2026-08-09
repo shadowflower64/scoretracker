@@ -1,4 +1,4 @@
-use crate::hive::job::{Failure, Job, Success};
+use crate::hive::job::{AnyJob, Failure, Job, Success};
 use crate::hive::worker::Worker;
 use crate::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
@@ -14,5 +14,8 @@ impl Job for DisplayMessageJob {
         log_fn_name!("job:display_message");
         info!("{}", self.message);
         Ok(Success::Void)
+    }
+    fn into_any(self) -> AnyJob {
+        AnyJob::DisplayMessage(self)
     }
 }

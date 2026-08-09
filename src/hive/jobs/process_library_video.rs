@@ -1,4 +1,4 @@
-use crate::hive::job::{Failure, Job, Success};
+use crate::hive::job::{AnyJob, Failure, Job, Success};
 use crate::hive::worker::Worker;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc};
@@ -21,5 +21,8 @@ pub struct ProcessLibraryVideoJob {
 impl Job for ProcessLibraryVideoJob {
     async fn run(&self, _worker: Arc<Worker>) -> Result<Success, Failure> {
         todo!()
+    }
+    fn into_any(self) -> AnyJob {
+        AnyJob::ProcessLibraryVideo(self)
     }
 }

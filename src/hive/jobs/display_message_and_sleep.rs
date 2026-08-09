@@ -1,4 +1,4 @@
-use crate::hive::job::{Failure, Job, Success};
+use crate::hive::job::{AnyJob, Failure, Job, Success};
 use crate::hive::worker::Worker;
 use crate::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
@@ -18,5 +18,8 @@ impl Job for DisplayMessageAndSleepJob {
         info!("{}", self.message);
         sleep(Duration::from_nanos(self.time_nanos));
         Ok(Success::Void)
+    }
+    fn into_any(self) -> AnyJob {
+        AnyJob::DisplayMessageAndSleep(self)
     }
 }
