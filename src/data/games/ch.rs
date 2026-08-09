@@ -199,7 +199,6 @@ impl Game for CloneHero {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        // println!("{record}");
         ctx.check_early_skip(record)?;
         let mut lamp = Lamp::None;
         if record.bool("clear")? {

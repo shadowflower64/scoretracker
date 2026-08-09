@@ -12,6 +12,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::result;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use thiserror::Error;
 use toml_edit::Item::Table;
@@ -146,9 +147,9 @@ pub struct LockfileHandle {
     unlocked_manually: bool,
 }
 
-impl LockfileHandle {
-    const VERBOSE: bool = true;
+pub static DEBUG_PRINT: AtomicBool = AtomicBool::new(true);
 
+impl LockfileHandle {
     fn generate_lockfile_contents(worker_info: Option<&WorkerInfo>) -> String {
         let content = LockfileContent {
             program: "scoretracker".to_string(),
@@ -162,7 +163,7 @@ impl LockfileHandle {
 
     fn create_lockfile_on_disk(lockfile_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<()> {
         log_fn_name!("lockfile:create_lockfile_on_disk");
-        log_should_print_debug!(LockfileHandle::VERBOSE);
+        log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         let parent = lockfile_path.parent().ok_or(Error::NoParentPath(lockfile_path.to_owned()))?;
         let _ = fs::create_dir_all(parent).inspect_err(|e| warn!("could not create parent directories for lockfile: {e}"));
@@ -242,7 +243,7 @@ impl LockfileHandle {
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
     pub fn acquire_wait<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
         log_fn_name!("lockfile:acquire_wait");
-        log_should_print_debug!(LockfileHandle::VERBOSE);
+        log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         // Try to create initial lockfile
         let initial_result = Self::acquire(&path, worker_info);
@@ -316,7 +317,7 @@ impl LockfileHandle {
 
     pub fn unlock(mut self) -> lockfile::Result<()> {
         log_fn_name!("lockfile:unlock");
-        log_should_print_debug!(LockfileHandle::VERBOSE);
+        log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         fs::remove_file(&self.lockfile_path).map_err(Error::CannotRemoveLockfile)?;
         self.unlocked_manually = true;
@@ -329,7 +330,7 @@ impl LockfileHandle {
 impl Drop for LockfileHandle {
     fn drop(&mut self) {
         log_fn_name!("lockfile:drop");
-        log_should_print_debug!(LockfileHandle::VERBOSE);
+        log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         if self.unlocked_manually {
             // File was already deleted, do not try to delete it again.

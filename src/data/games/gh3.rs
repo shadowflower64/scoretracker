@@ -174,7 +174,6 @@ impl Game for GuitarHero3 {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        // println!("{record}");
         let mut lamp = Lamp::None;
         if record.bool("clear")? {
             lamp = Lamp::Clear;

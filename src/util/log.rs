@@ -1,12 +1,16 @@
 //! Module with simple logging macros.
-use crate::util::terminal_colors::{ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET};
+use crate::hive::worker::data::WorkerInfo;
+use crate::util::dirs;
+use crate::util::terminal_colors::{ANSI_COLOR_BOLD_BLACK, ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET};
 use chrono::{DateTime, Local, SecondsFormat};
 use smol::io;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::SystemTime;
+use thiserror::Error;
 
 /// Sets the function name used in log macros to the given value.
 #[macro_export]
@@ -19,35 +23,65 @@ macro_rules! log_fn_name {
 /// Sets whether the debug messages should be printed or not.
 #[macro_export]
 macro_rules! log_should_print_debug {
-    ($arg:expr) => {
-        pub const PRINT_DEBUG_MESSAGES: bool = $arg;
+    ($boolvalue:expr) => {
+        pub const PRINT_DEBUG_MESSAGES: bool = $boolvalue;
+    };
+    (dynamic: $atomicbool:ident) => {
+        pub const PRINT_DEBUG_MESSAGES: &AtomicBool = &$atomicbool;
     };
 }
 
-/// Returns the current date and time as a string. Used by logging macros.
-pub fn create_log_filename(worker: Option<(&str, u32)>) -> String {
-    let datetime: DateTime<Local> = SystemTime::now().into();
-    let datetime = datetime.format("%Y_%m_%d_%H_%M_%S");
-    if let Some((short_name, pid)) = worker {
-        format!("log_{datetime}_{}-{pid}_worker.log", short_name.to_lowercase())
-    } else {
-        format!("log_{datetime}.log")
-    }
+/// Returns a filename for a log file with the current date and time.
+pub fn create_general_log_filename() -> String {
+    let now: DateTime<Local> = SystemTime::now().into();
+    let datetime = now.format("%Y_%m_%d_%H_%M_%S");
+    format!("log_{datetime}.log")
+}
+
+/// Returns a filename for a log file with the worker's birth date, name and pid.
+pub fn create_worker_log_filename(worker_info: &WorkerInfo) -> String {
+    worker_info.log_filename()
 }
 
 static LOG_FILE: LazyLock<Mutex<Option<File>>> = LazyLock::new(|| Mutex::new(None));
 
-pub fn open_log_file(path: &Path) -> Result<(), (io::Error, PathBuf, bool)> {
-    let log_file_parent = path.parent().expect("the log file path should have a parent path");
-    fs::create_dir_all(log_file_parent).map_err(|e| (e, path.to_owned(), false))?;
+#[derive(Debug, Error)]
+pub enum LogError {
+    #[error("log file has no parent directory: {path:?}")]
+    NoParentPath { path: PathBuf },
+    #[error("could not create parent directories for log file: {path:?}; reason: {e}")]
+    CreateDirectoriesError { e: io::Error, path: PathBuf },
+    #[error("could not open log file: {path:?}; reason: {e}")]
+    OpenFileError { e: io::Error, path: PathBuf },
+}
+
+/// Changes the active log file to the specified path.
+pub fn open_log_file(path: &Path) -> Result<(), LogError> {
+    use crate::info;
+    log_fn_name!("open_log_file");
+    info!("switching log file to: {path:?}");
+    let log_file_parent = path.parent().ok_or_else(|| LogError::NoParentPath { path: path.to_path_buf() })?;
+    fs::create_dir_all(log_file_parent).map_err(|e| LogError::CreateDirectoriesError {
+        e,
+        path: path.to_path_buf(),
+    })?;
     let file = OpenOptions::new()
         .write(true)
         .append(true)
         .create(true)
         .open(path)
-        .map_err(|e| (e, path.to_owned(), true))?;
+        .map_err(|e| LogError::OpenFileError {
+            e,
+            path: path.to_path_buf(),
+        })?;
     *LOG_FILE.lock().unwrap() = Some(file);
+    eprintln!("{ANSI_COLOR_BOLD_BLACK}log file switched to: {path:?}{ANSI_COLOR_RESET}");
     Ok(())
+}
+
+/// Changes the active log file to the default path.
+pub fn open_default_log_file() -> Result<(), LogError> {
+    open_log_file(&dirs::log_dir().join(create_general_log_filename()))
 }
 
 /// Prints out a message on `stderr`, with a function name, a thread name, and a timestamp, with the provided log level and color.
@@ -92,13 +126,45 @@ macro_rules! log_print {
     }};
 }
 
+#[macro_export]
+macro_rules! log_print_npr {
+    ($log_level: literal, $log_level_color: ident, $($arg:tt)*) => {{
+        #[allow(unused_imports)]
+        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_BOLD_CYAN, ANSI_COLOR_RESET};
+        use $crate::util::log::on_log;
+        let log_level_color = $log_level_color;
+        let log_level = $log_level;
+        let message = format!($($arg)*);
+        let fmt_plain = || format!("{log_level}: {message}");
+        let fmt_colored = || format!("{log_level_color}{log_level}:{ANSI_COLOR_RESET} {message}");
+        on_log(fmt_plain, fmt_colored)
+    }};
+}
+
+pub trait AsBool {
+    fn as_bool(&self) -> bool;
+}
+
+impl AsBool for bool {
+    fn as_bool(&self) -> bool {
+        *self
+    }
+}
+
+impl AsBool for &AtomicBool {
+    fn as_bool(&self) -> bool {
+        self.load(Ordering::Acquire)
+    }
+}
+
 /// Prints out a magenta debug message on `stderr`, with a prefix containing the function name, a thread name, and a timestamp.
 ///
 /// This log message is printed only if the `PRINT_DEBUG_MESSAGES` flag (set using the [`log_should_print_debug!`] macro) is set to true.
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {{
-        if PRINT_DEBUG_MESSAGES {
+        use $crate::util::log::AsBool;
+        if AsBool::as_bool(&PRINT_DEBUG_MESSAGES) {
             use $crate::log_print;
             log_print!("debug", ANSI_COLOR_BOLD_MAGENTA, $($arg)*);
         }
@@ -138,15 +204,6 @@ macro_rules! success {
     ($($arg:tt)*) => {{
         use $crate::log_print;
         log_print!("success", ANSI_COLOR_BOLD_GREEN, $($arg)*);
-    }};
-}
-
-#[macro_export]
-macro_rules! log_print_npr {
-    ($log_level: literal, $log_level_color: ident, $($arg:tt)*) => {{
-        #[allow(unused_imports)]
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_BOLD_CYAN, ANSI_COLOR_RESET};
-        eprintln!("{}{}:{ANSI_COLOR_RESET} {}", $log_level_color, $log_level, format!($($arg)*));
     }};
 }
 

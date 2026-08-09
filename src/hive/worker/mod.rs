@@ -1,5 +1,5 @@
 pub mod data;
-mod ipc;
+pub mod ipc;
 pub mod names;
 pub mod status;
 
@@ -14,7 +14,7 @@ use crate::hive::worker::ipc::start_listener_thread;
 use crate::hive::worker::names::random_name;
 use crate::util::dirs::log_dir;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault, FileLocked};
-use crate::util::log::{create_log_filename, open_log_file};
+use crate::util::log::{LogError, open_log_file};
 use crate::util::timestamp::NsTimestamp;
 use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success};
@@ -52,6 +52,8 @@ pub enum Error {
 pub enum WorkerCreateError {
     #[error("configuration error: {0}")]
     ConfigError(#[from] lockfile::Error),
+    #[error("cannot open log file: {0}")]
+    LogError(LogError),
     #[error("could not bind tcp listener: {0}")]
     TcpListenerBindError(io::Error),
     #[error("could not get local address of tcp listener: {0}")]
@@ -139,24 +141,25 @@ impl Worker {
         log_fn_name!("worker:new_with_listener");
 
         let pid = process::id();
-        let log_file = create_log_filename(Some((short_name.as_str(), pid)));
-        open_log_file(&log_dir().join(log_file)).expect("could not open log file");
-
         let full_name = Self::make_full_name(&short_name, pid);
         info!("creating worker with name: '{full_name}'");
+
         let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
+        let info = WorkerInfo {
+            full_name,
+            short_name,
+            pid,
+            birth_timestamp: NsTimestamp::now(),
+            address,
+        };
+        open_log_file(&log_dir().join(info.log_filename())).map_err(WorkerCreateError::LogError)?;
+
         let (worker_status_tx, worker_status_rx) = crossbeam_channel::unbounded();
         let (task_progress_tx, task_progress_rx) = crossbeam_channel::unbounded();
         let worker = Worker {
             config,
             data: Arc::new(Mutex::new(WorkerData {
-                info: WorkerInfo {
-                    full_name,
-                    short_name,
-                    pid,
-                    birth_timestamp: NsTimestamp::now(),
-                    address,
-                },
+                info,
                 task_progress: None,
                 status: WorkerStatus::default(),
             })),

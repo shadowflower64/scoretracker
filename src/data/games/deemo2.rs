@@ -132,7 +132,6 @@ impl Game for Deemo2 {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        // println!("{record}");
         let performance_data = Performance {
             common: ctx.create_common_p(record)?,
             difficulty: record.string_enum("difficulty")?,

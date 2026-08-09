@@ -145,7 +145,6 @@ impl Game for Cytus {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        // println!("{record}");
         let score = record.int("score").or_skip()?;
         let performance_data = Performance {
             common: ctx.create_common_p(record)?,

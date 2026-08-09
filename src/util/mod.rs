@@ -3,6 +3,7 @@ use std::{ops::Neg, sync::LazyLock};
 use regex::Regex;
 use relative_path::RelativePathBuf;
 
+pub mod byte_count;
 pub mod command_line;
 pub mod dirs;
 pub mod file_ex;

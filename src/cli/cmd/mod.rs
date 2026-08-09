@@ -44,6 +44,19 @@ impl<'a> CmdlineContext<'a> {
         Ok(cmd)
     }
 
+    pub fn cmd_opt(&mut self) -> Result<Option<&str>, CmdError> {
+        let cmd_opt = self.arguments.get(self.top).map(String::as_str);
+        if let Some(cmd) = cmd_opt {
+            if self.full_command_name.is_empty() {
+                self.full_command_name = cmd.to_string();
+            } else {
+                self.full_command_name = format!("{}:{cmd}", self.full_command_name);
+            }
+            self.top += 1;
+        }
+        Ok(cmd_opt)
+    }
+
     fn last_cmd(&mut self) -> Option<&String> {
         self.arguments.get(self.top - 1)
     }
@@ -165,8 +178,8 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             },
             _ => ctx.unknown_cmd(),
         },
-        "vitals" => match ctx.cmd()? {
-            "all" => cmd::vitals::check_all(),
+        "vitals" => match ctx.cmd_opt()? {
+            Some("all") | None => cmd::vitals::check_all(),
             _ => ctx.unknown_cmd(),
         },
         "performance" => match ctx.cmd()? {

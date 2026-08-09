@@ -1,6 +1,7 @@
 use crate::util::{timestamp::NsTimestamp, uuid::UuidString};
+use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::SystemTime};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerInfo {
@@ -26,6 +27,21 @@ pub struct WorkerInfo {
 
     /// Address for the listener for this worker. Can be used by other processes to communicate with this worker process.
     pub address: SocketAddr,
+}
+
+impl WorkerInfo {
+    /// Returns a filename for this worker's log file, with the worker's birth date, name and pid.
+    pub fn log_filename(&self) -> String {
+        let birth_time: SystemTime = self
+            .birth_timestamp
+            .try_into()
+            .expect("worker birth timestamp should be convertible to a SystemTime");
+        let birth_datetime: DateTime<Local> = birth_time.into();
+        let datetime = birth_datetime.format("%Y_%m_%d_%H_%M_%S");
+        let short_name = self.short_name.to_lowercase();
+        let pid = self.pid;
+        format!("log_{datetime}_{short_name}-{pid}_worker.log")
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

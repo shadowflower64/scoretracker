@@ -374,7 +374,6 @@ where
         let game = game_instance_from_id(game_id.as_str()).ok_or_else(|| SpreadsheetImportError::UnknownGame(game_id.to_owned()))?;
 
         let records = parse_records(&sheet_name, range, read_hyperlinks(&sheet_name));
-        // println!("{records:#?}");
 
         match table_type.as_str() {
             "matches" => {

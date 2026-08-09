@@ -3,6 +3,9 @@
 /// Reset all formatting.
 pub const ANSI_COLOR_RESET: &str = "\x1b[0m";
 
+/// Enable bold font and black text color.
+pub const ANSI_COLOR_BOLD_BLACK: &str = "\x1b[1;30m";
+
 /// Enable bold font and red text color.
 pub const ANSI_COLOR_BOLD_RED: &str = "\x1b[1;31m";
 
@@ -20,6 +23,12 @@ pub const ANSI_COLOR_BOLD_MAGENTA: &str = "\x1b[1;35m";
 
 /// Enable bold font and cyan text color.
 pub const ANSI_COLOR_BOLD_CYAN: &str = "\x1b[1;36m";
+
+/// Enable bold font and white text color.
+pub const ANSI_COLOR_BOLD_WHITE: &str = "\x1b[1;37m";
+
+/// Enable bold font and default text color.
+pub const ANSI_COLOR_BOLD_DEFAULT: &str = "\x1b[1;39m";
 
 /// Move writing cursor to the left by a given amount.
 pub fn ansi_move_cursor_left(columns: u32) -> String {

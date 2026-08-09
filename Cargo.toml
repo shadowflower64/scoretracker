@@ -42,3 +42,4 @@ crossbeam-channel = "0.5.16"
 rand = "0.10.2"
 toml = "1.1.4"
 toml_edit = { version = "0.25.13", features = ["serde"] }
+fs_extra = "1.3.0"
