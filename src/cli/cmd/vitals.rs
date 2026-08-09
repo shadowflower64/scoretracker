@@ -142,7 +142,7 @@ pub enum LibraryEntryCheckError {
     ClipNotFound(UuidString),
 }
 
-fn check_entry(library_entry: &LibraryEntry, library_db: &LibraryDatabase) -> Result<(), LibraryEntryCheckError> {
+fn check_library_entry(library_entry: &LibraryEntry, library_db: &LibraryDatabase) -> Result<(), LibraryEntryCheckError> {
     static SHA256_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{64}$").expect("could not compile regex"));
     if !SHA256_REGEX.is_match(&library_entry.sha256) {
         Err(InvalidSHA256Hash(library_entry.sha256.clone()))?;
@@ -180,7 +180,7 @@ fn check_library_database(library_db_path: PathBuf) -> CheckResult<LibraryDataba
     print_check_name("checking library database entries");
     for (i, entry) in library_db.entries.iter().enumerate() {
         print_check_status(&format!("({}/{entry_count})", i + 1));
-        check_entry(entry, &library_db).map_err(|e| LibraryDatabaseCheckError::Entry { uuid: entry.uuid, e })?;
+        check_library_entry(entry, &library_db).map_err(|e| LibraryDatabaseCheckError::Entry { uuid: entry.uuid, e })?;
     }
     Ok(None)
 }
@@ -224,7 +224,7 @@ fn check_task_queue(task_queue_path: PathBuf) -> CheckResult<TaskQueueCheckError
     print_check_name("checking task queue entries");
     for (i, _entry) in task_queue.tasks.iter().enumerate() {
         print_check_status(&format!("({}/{total})", i + 1));
-        // check_task(entry, &library_db).map_err(|e| LibraryDatabaseCheckError::Entry { uuid: entry.uuid, e })?;
+        // check_task(entry, &library_db).map_err(|e| LibraryDatabaseCheckError::Entry { uuid: entry.uuid, e })?; // TODO: check stuck tasks
     }
 
     Ok(None)
