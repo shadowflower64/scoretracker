@@ -11,7 +11,12 @@ pub struct WorkerInfo {
     /// where:
     /// * `random_name` is a lowercase name chosen using [`super::names::random_name`],
     /// * `pid` is the numeric ID of the worker process.
-    pub name: String,
+    // #[serde(alias = "name")]
+    pub full_name: String,
+
+    /// The "random name" part of full name of the worker.
+    // #[serde(default)]
+    pub short_name: String,
 
     /// Process ID of the worker process.
     pub pid: u32,

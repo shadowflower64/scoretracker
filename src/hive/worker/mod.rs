@@ -12,7 +12,9 @@ use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
 use crate::hive::worker::ipc::start_listener_thread;
 use crate::hive::worker::names::random_name;
+use crate::util::dirs::log_dir;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault, FileLocked};
+use crate::util::log::{create_log_filename, open_log_file};
 use crate::util::timestamp::NsTimestamp;
 use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success};
@@ -133,9 +135,15 @@ impl Worker {
         self.update_task_progress(task_progress);
     }
 
-    pub fn new_with_listener(name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
+    pub fn new_with_listener(short_name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
         log_fn_name!("worker:new_with_listener");
-        info!("creating worker with name: '{name}'");
+
+        let pid = process::id();
+        let log_file = create_log_filename(Some((short_name.as_str(), pid)));
+        open_log_file(&log_dir().join(log_file)).expect("could not open log file");
+
+        let full_name = Self::make_full_name(&short_name, pid);
+        info!("creating worker with name: '{full_name}'");
         let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
         let (worker_status_tx, worker_status_rx) = crossbeam_channel::unbounded();
         let (task_progress_tx, task_progress_rx) = crossbeam_channel::unbounded();
@@ -143,8 +151,9 @@ impl Worker {
             config,
             data: Arc::new(Mutex::new(WorkerData {
                 info: WorkerInfo {
-                    name,
-                    pid: process::id(),
+                    full_name,
+                    short_name,
+                    pid,
                     birth_timestamp: NsTimestamp::now(),
                     address,
                 },
@@ -158,18 +167,18 @@ impl Worker {
         Ok(worker)
     }
 
-    pub fn new(name: String, config: Config) -> Result<Self, WorkerCreateError> {
+    pub fn new(short_name: String, config: Config) -> Result<Self, WorkerCreateError> {
         let listener = TcpListener::bind("127.0.0.1:0").map_err(WorkerCreateError::TcpListenerBindError)?;
-        Self::new_with_listener(name, config, listener)
+        Self::new_with_listener(short_name, config, listener)
     }
 
-    pub fn make_name(random_name: String, pid: u32) -> String {
-        format!("{random_name}-{pid}.scoretracker-worker.local")
+    pub fn make_full_name(short_name: &str, pid: u32) -> String {
+        format!("{}-{pid}.scoretracker-worker.local", short_name.to_lowercase())
     }
 
     pub fn new_default() -> Result<Self, WorkerCreateError> {
         let config = Config::load()?;
-        Self::new(Self::make_name(random_name().to_lowercase(), process::id()), config)
+        Self::new(random_name().to_owned(), config)
     }
 
     /// Execute a task in the current thread.

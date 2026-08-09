@@ -127,7 +127,7 @@ pub async fn test_queue(_args: &[String]) {
         task_todo.worker_info = Some(WorkerInfo {
             address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)),
             birth_timestamp: 0.into(),
-            name: "fake-playground-worker".to_string(),
+            full_name: "fake-playground-worker".to_string(),
             pid: process::id(),
         });
         task_todo.comment = Some(String::from("this job was started by the playground"));

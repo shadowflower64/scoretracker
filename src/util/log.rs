@@ -1,5 +1,11 @@
 //! Module with simple logging macros.
+use crate::util::terminal_colors::{ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET};
 use chrono::{DateTime, Local, SecondsFormat};
+use smol::io;
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
 use std::time::SystemTime;
 
 /// Sets the function name used in log macros to the given value.
@@ -19,24 +25,70 @@ macro_rules! log_should_print_debug {
 }
 
 /// Returns the current date and time as a string. Used by logging macros.
+pub fn create_log_filename(worker: Option<(&str, u32)>) -> String {
+    let datetime: DateTime<Local> = SystemTime::now().into();
+    let datetime = datetime.format("%Y_%m_%d_%H_%M_%S");
+    if let Some((short_name, pid)) = worker {
+        format!("log_{datetime}_{}-{pid}_worker.log", short_name.to_lowercase())
+    } else {
+        format!("log_{datetime}.log")
+    }
+}
+
+static LOG_FILE: LazyLock<Mutex<Option<File>>> = LazyLock::new(|| Mutex::new(None));
+
+pub fn open_log_file(path: &Path) -> Result<(), (io::Error, PathBuf, bool)> {
+    let log_file_parent = path.parent().expect("the log file path should have a parent path");
+    fs::create_dir_all(log_file_parent).map_err(|e| (e, path.to_owned(), false))?;
+    let file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(path)
+        .map_err(|e| (e, path.to_owned(), true))?;
+    *LOG_FILE.lock().unwrap() = Some(file);
+    Ok(())
+}
+
+/// Prints out a message on `stderr`, with a function name, a thread name, and a timestamp, with the provided log level and color.
+/// Also prints out a non-colored message to the log file in [`LOG_FILE`].
+pub fn on_log<F: Fn() -> String, G: Fn() -> String>(fmt_plain: F, fmt_colored: G) {
+    eprintln!("{}", fmt_colored());
+
+    let mut log_file = LOG_FILE.lock().unwrap();
+    if let Some(file) = &mut *log_file {
+        if let Err(e) = writeln!(file, "{}", fmt_plain()) {
+            eprintln!("{ANSI_COLOR_BOLD_RED}could not write to log file: {e}{ANSI_COLOR_RESET}");
+        }
+    }
+}
+
+/// Returns the current date and time as a string. Used by logging macros.
 pub fn datetime_now() -> String {
     let datetime: DateTime<Local> = SystemTime::now().into();
     datetime.to_rfc3339_opts(SecondsFormat::Millis, false)
 }
 
-/// Prints out a message on `stderr`, with a function name, a thread name, and a timestamp, with the provided log level and color.
+/// Prints out a message on `stderr` (by calling [`on_log`]), with a function name, a thread name, and a timestamp, with the provided log level and color.
 #[macro_export]
 macro_rules! log_print {
     ($log_level: literal, $log_level_color: ident, $($arg:tt)*) => {{
         #[allow(unused_imports)]
         use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
         use $crate::util::log::datetime_now;
-        // TODO: add a way to capture this output with workers and store worker logs somehow
-        if let Some(thread_name) = std::thread::current().name() {
-            eprintln!("{} {}{}:{ANSI_COLOR_RESET} [{thread_name}/{LOG_FN_NAME}] {}", datetime_now(), $log_level_color, $log_level, format!($($arg)*));
+        use $crate::util::log::on_log;
+        let context_name = if let Some(thread_name) = std::thread::current().name() {
+            format!("{thread_name}/{LOG_FN_NAME}")
         } else {
-            eprintln!("{} {}{}:{ANSI_COLOR_RESET} [{LOG_FN_NAME}] {}", datetime_now(), $log_level_color, $log_level, format!($($arg)*));
-        }
+            format!("{LOG_FN_NAME}")
+        };
+        let datetime_now = datetime_now();
+        let log_level_color = $log_level_color;
+        let log_level = $log_level;
+        let message = format!($($arg)*);
+        let fmt_plain = || format!("{datetime_now} {log_level}: [{context_name}] {message}");
+        let fmt_colored = || format!("{datetime_now} {log_level_color}{log_level}:{ANSI_COLOR_RESET} [{context_name}] {message}");
+        on_log(fmt_plain, fmt_colored)
     }};
 }
 
