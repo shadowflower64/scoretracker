@@ -1,21 +1,21 @@
 import { select, selectAny } from "./Component.js";
 import { SongTablePage } from "./page/SongTablePage.js";
 import { makeTask } from "./tasks/Tasks.js";
-import { sleep } from "./Util.js";
+import { fetchText, sendRequest, sleep } from "./Util.js";
 import { UUID4 } from "./uuid.js";
 console.log("a", UUID4.generate());
 
 console.log("Hello from typescript!");
 
-
-// const fetched1 = await fetchText("/hey");
-// const fetched2 = await sendData("/echo", "POST", "test echo");
-const fetched1 = "fetched1";
-const fetched2 = "fetched2";
-
 export const screenDiv = select(document, "div", "#screen");
-const testEl = selectAny(document, "#test");
-testEl.textContent = `Hello from typescript! req1: ${fetched1} req2: ${fetched2}`;
+
+
+const testEl1 = selectAny(document, "#test1");
+const testEl2 = selectAny(document, "#test2");
+const testEl3 = selectAny(document, "#test3");
+testEl1.textContent = `typescript: Hello from typescript!`;
+fetchText("/hey").then((value) => testEl2.textContent = `fetch: ${value}`);
+sendRequest("/echo", "POST", "test echo").then((value) => testEl3.textContent = `post request: ${value}`);
 
 const page = new SongTablePage("in_falsus");
 page.open();
@@ -38,4 +38,4 @@ makeTaskBtn.addEventListener("click", async () => {
         }
     });
     console.log(result);
-});
+});;;

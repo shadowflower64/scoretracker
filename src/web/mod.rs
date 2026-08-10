@@ -10,7 +10,6 @@ use crate::util::relative_path_from_segments;
 use crate::{debug, info, log_fn_name, log_should_print_debug};
 
 pub const STATIC_FILE_PATH_SEGMENTS: &[&str] = &["web-frontend", "static"];
-
 pub fn static_files_path() -> PathBuf {
     relative_path_from_segments(STATIC_FILE_PATH_SEGMENTS).to_path(".")
 }
