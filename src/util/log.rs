@@ -66,7 +66,6 @@ pub fn open_log_file(path: &Path) -> Result<(), LogError> {
         path: path.to_path_buf(),
     })?;
     let file = OpenOptions::new()
-        .write(true)
         .append(true)
         .create(true)
         .open(path)
@@ -90,10 +89,10 @@ pub fn on_log<F: Fn() -> String, G: Fn() -> String>(fmt_plain: F, fmt_colored: G
     eprintln!("{}", fmt_colored());
 
     let mut log_file = LOG_FILE.lock().unwrap();
-    if let Some(file) = &mut *log_file {
-        if let Err(e) = writeln!(file, "{}", fmt_plain()) {
-            eprintln!("{ANSI_COLOR_BOLD_RED}could not write to log file: {e}{ANSI_COLOR_RESET}");
-        }
+    if let Some(file) = &mut *log_file
+        && let Err(e) = writeln!(file, "{}", fmt_plain())
+    {
+        eprintln!("{ANSI_COLOR_BOLD_RED}could not write to log file: {e}{ANSI_COLOR_RESET}");
     }
 }
 

@@ -79,6 +79,7 @@ impl<E> From<E> for ErrorWithImportance<E> {
 }
 
 trait CanBecomeAWarning<T, E> {
+    #[allow(unused)]
     fn critical(self) -> CheckPartialResult<T, E>;
     fn warn(self) -> CheckPartialResult<T, E>;
 }
