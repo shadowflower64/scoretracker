@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="static/favicon.png">
+    <link rel="stylesheet" href="static/app.css">
+    <title>scoretracker app</title>
+</head>
+
+<body>
+    app.html
+    <p id="test"></p>
+    <div id="screen">
+
+    </div>
+    <hr>
+    <div id="all-tasks">
+
+    </div>
+    <button id="make-task-test">Make task test</button>
+
+    <dialog id="confirm-delete-performance-entry">
+        Are you sure you want to delete the performance entry?
+        <form method="dialog" onsubmit="console.log('Delete', this, arguments, new FormData(this))">
+            <button type="submit" accesskey="y"><u>Y</u>es, delete</button>
+            <button type="button" onclick="document.getElementById('confirm-delete-performance-entry').close()"
+                accesskey="n"><u>N</u>o, keep the entry intact</button>
+        </form>
+    </dialog>
+    <dialog id="edit-match-dialog-infalsus"></dialog>
+    <dialog id="edit-performance-dialog-infalsus"></dialog>
+
+    <template name="task-row">
+        <div style="display: flex; flex-direction: row; gap: 5px;">
+            <div>
+                Task:
+                <span id="title"></span>
+            </div>
+            <div>
+                State text:
+                <span id="state-text"></span>
+            </div>
+            <div>
+                Status text:
+                <span id="status-text"></span>
+            </div>
+            <div id="progress-container">
+                Progress:
+                <span id="progress-num"></span>/<span id="max-progress-num"></span>
+                <progress id="progress" value="0" max="0"></progress>
+            </div>
+            <div>
+                Last update:
+                <span id="last-update"></span>
+            </div>
+        </div>
+    </template>
+
+    <template name="song-table">
+        <h2>Game: <placeholder name="game-id">GAME_ID</placeholder>
+        </h2>
+        <table>
+            <tbody class="song-table-body">
+                <tr>
+                    <th></th>
+                    <th>Artist</th>
+                    <th>Title</th>
+                </tr>
+                <tr class="placeholder-rows"></tr>
+            </tbody>
+        </table>
+        <button class="add-row-button">+</button>
+        <input class="add-row-count" type="number" value="1" placeholder="1" min="1" max="100"></input>
+        <br>
+        <button class="remove-empty-rows-button">Remove empty rows</button>
+    </template>
+
+    <template name="song-table-row">
+        <tr>
+            <td>
+                <button class="remove-row-button">-</button>
+            </td>
+            <td>
+                <input class="artist-input" name="artist"></input>
+            </td>
+            <td>
+                <input class="title-input" name="title"></input>
+            </td>
+        </tr>
+    </template>
+
+    <template name="edit-song-btn-infalsus"></template>
+
+    <template name="edit-match-btn-infalsus">
+        Edit match form infalsus:
+        <button type="button" id="btn">show modal</button>
+    </template>
+
+
+    <template name="metadata-table-editor-row">
+        <tr class="metadata-table-editor-row">
+            <td>
+                <select id="type">
+                    <option value="string">String</option>
+                    <option value="number">Number</option>
+                    <option value="boolean">Boolean</option>
+                </select>
+            </td>
+            <td><input id="key" type="text" placeholder="(empty key)" required></td>
+            <td><input id="value" type="text" placeholder="(empty value)" step="0.000001"></td>
+            <td>
+                <button type="button" id="delete-btn">Delete</button>
+                <button type="button" id="undelete-btn">Undelete</button>
+            </td>
+        </tr>
+    </template>
+
+    <template name="metadata-table-editor">
+        <table>
+            <caption>Metadata table</caption>
+            <tbody>
+                <tr>
+                    <th>Type</th>
+                    <th>Key</th>
+                    <th>Value</th>
+                    <th>Actions</th>
+                </tr>
+                <tr class="placeholder-rows"></tr>
+            </tbody>
+        </table>
+        <button id="add-row-btn" type="button">Add new entry</button>
+    </template>
+
+
+    <template name="performance-table-editor-row">
+        <tr class="performance-table-editor-row">
+            <td><code id="uuid"><placeholder name="uuid">deadbeef-dead-beef-dead-beefdeadbeef</placeholder></code></td>
+            <td>
+                <!-- TODO - make the buttons work similar to metadata table -->
+                <button type="button"
+                    onclick="document.getElementById('edit-match-dialog-infalsus').showModal()">Edit</button>
+                <button type="button"
+                    onclick="document.getElementById('confirm-delete-performance-entry').showModal()">Delete</button>
+            </td>
+        </tr>
+    </template>
+
+    <template name="performance-table-editor">
+        <table>
+            <caption>Performance table</caption>
+            <tbody>
+                <tr>
+                    <th>UUID</th>
+                    <th>Actions</th>
+                </tr>
+                <tr class="placeholder-rows"></tr>
+            </tbody>
+        </table>
+        <button id="add-row-btn" type="button">Add new entry</button>
+    </template>
+
+
+    <template name="proof-table-editor-row">
+        <tr class="proof-table-editor-row">
+            <td><code id="uuid"><placeholder name="uuid">deadbeef-dead-beef-dead-beefdeadbeef</placeholder></code></td>
+            <td>
+                <!-- TODO - make the buttons work similar to metadata table -->
+                <button type="button"
+                    onclick="document.getElementById('edit-match-dialog-infalsus').showModal()">Edit</button>
+                <button type="button"
+                    onclick="document.getElementById('confirm-delete-performance-entry').showModal()">Delete</button>
+            </td>
+        </tr>
+    </template>
+
+    <template name="proof-table-editor">
+        <table>
+            <caption>Proof table</caption>
+            <tbody>
+                <tr>
+                    <th>UUID</th>
+                    <th>Actions</th>
+                </tr>
+                <tr class="placeholder-rows"></tr>
+            </tbody>
+        </table>
+        <button id="add-row-btn" type="button">Add new entry</button>
+    </template>
+
+
+    <template name="edit-match-dialog-generic-part-top">
+        <label for="uuid">UUID: </label>
+        <input id="uuid" type="text" disabled>
+        <label for="timestamp-date">Timestamp: </label>
+        <div class="form-grouped-inputs">
+            <input id="timestamp-date" type="date">
+            <input id="timestamp-time" type="time" step="any">
+            <input id="timestamp-nanos" type="number" min="0" max="999999">
+        </div>
+        <label for="song-id">Song ID: </label>
+        <input id="song-id" type="text" list="song-ids" style="min-width: 300px;">
+        <datalist id="song-ids">
+            <option value="foghat-slow_ride">Foghat - Slow Ride [foghat-slow_ride]</option>
+            <option value="dragonforce-through_the_fire_and_flames">Dragonforce - Through the Fire and
+                Flames
+                [dragonforce-through_the_fire_and_flames]</option>
+        </datalist>
+    </template>
+
+    <template name="edit-match-dialog-generic-part-bottom">
+        <div class="grid-fill-width">
+            <label>Performances:</label>
+            <placeholder name="performance-table-editor"></placeholder>
+        </div>
+        <div class="grid-fill-width">
+            <label>Proof:</label>
+            <placeholder name="proof-table-editor"></placeholder>
+        </div>
+        <label for="comment">Comment: </label>
+        <textarea id="comment" name="comment" placeholder="(optional user comment)"></textarea>
+        <div class="grid-fill-width">
+            <label>Metadata:</label>
+            <placeholder name="metadata-table-editor"></placeholder>
+        </div>
+        <button id="submit-btn">Submit</button>
+    </template>
+
+    <template name="edit-match-dialog-infalsus">
+        Edit match:
+        <form method="dialog" class="edit-match-form">
+            <placeholder name="generic-part-top"></placeholder>
+            Gamespecific stuff: <i>none</i>
+            <placeholder name="generic-part-bottom"></placeholder>
+        </form>
+    </template>
+
+    <template name="edit-performance-dialog-infalsus">
+        Edit performance:
+        <form method="dialog" class="edit-match-form">
+            <label for="song_id">Song ID: </label>
+            <input id="song_id" type="text" value="foghat-slow_ride" disabled>
+            <input name="song_id" type="text" value="foghat-slow_ride" hidden>
+            <label for="score">Score: </label>
+            <input id="score" name="score" type="number" value="1000000" placeholder="1000000">
+            <label for="combo">Combo: </label>
+            <input id="combo" name="combo" type="number" value="100" placeholder="100">
+            <button id="submit-btn">Submit</button>
+        </form>
+    </template>
+
+    <script type="module" src="/static/js/app.js"></script>
+</body>
+
+</html>

@@ -8,6 +8,7 @@ use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::util::dirs::log_dir;
 use scoretracker::util::reveal_directory;
 use scoretracker::util::timestamp::NsLocalTimestamp;
+use scoretracker::web::web_main;
 use scoretracker::{info_npr, success_npr};
 use std::path::PathBuf;
 
@@ -108,6 +109,14 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             info_npr!("hello world!");
             Ok(())
         }
+        "app" => match ctx.cmd()? {
+            "start" => {
+                // info_npr!("starting web application");
+                web_main().expect("application error");
+                Ok(())
+            }
+            _ => ctx.unknown_cmd(),
+        },
         "automark" => {
             let library_dir: Option<PathBuf> = ctx.pull_arg_opt("library_dir", "path of the library directory")?;
             let library_dir = library_dir

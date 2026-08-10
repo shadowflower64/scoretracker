@@ -39,6 +39,7 @@ pub mod hive;
 pub mod spreadsheet;
 pub mod tests;
 pub mod util;
+pub mod web;
 
 /// Current version of `scoretracker`, read from `CARGO_PKG_VERSION` at compile time.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

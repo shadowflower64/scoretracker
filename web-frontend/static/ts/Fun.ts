@@ -1,0 +1,71 @@
+
+type Tuple1<T> = [T];
+type Tuple2<T> = [...Tuple1<T>, ...Tuple1<T>];
+type Tuple4<T> = [...Tuple2<T>, ...Tuple2<T>];
+type Tuple8<T> = [...Tuple4<T>, ...Tuple4<T>];
+type Tuple16<T> = [...Tuple8<T>, ...Tuple8<T>];
+type Tuple32<T> = [...Tuple16<T>, ...Tuple16<T>];
+type Tuple64<T> = [...Tuple32<T>, ...Tuple32<T>];
+type Tuple128<T> = [...Tuple64<T>, ...Tuple64<T>];
+
+type ArrayOf<T> = T[];
+type AddOneTo<X extends any[]> = [...X, any];
+type SubtractOneFrom<X extends any[]> = X extends [...infer Previous, any] ? Previous : never;
+type Add_1<X extends any[]> = AddOneTo<X>;
+type Add_2<X extends any[]> = Add_1<Add_1<X>>;
+type Add_3<X extends any[]> = Add_1<Add_2<X>>;
+type Add_4<X extends any[]> = Add_1<Add_3<X>>;
+type Add_5<X extends any[]> = Add_1<Add_4<X>>;
+type Add_6<X extends any[]> = Add_1<Add_5<X>>;
+type Add_7<X extends any[]> = Add_1<Add_6<X>>;
+type Add_8<X extends any[]> = Add_1<Add_7<X>>;
+type Add_9<X extends any[]> = Add_1<Add_8<X>>;
+type MultiplyByTwo<X extends any[]> = [...X, ...X];
+type MultiplyByTen<X extends any[]> = [...X, ...X, ...X, ...X, ...X, ...X, ...X, ...X, ...X, ...X];
+type T_0<X extends any[]> = MultiplyByTen<X>;
+type T_1<X extends any[]> = Add_1<MultiplyByTen<X>>;
+type T_2<X extends any[]> = Add_2<MultiplyByTen<X>>;
+type T_3<X extends any[]> = Add_3<MultiplyByTen<X>>;
+type T_4<X extends any[]> = Add_4<MultiplyByTen<X>>;
+type T_5<X extends any[]> = Add_5<MultiplyByTen<X>>;
+type T_6<X extends any[]> = Add_6<MultiplyByTen<X>>;
+type T_7<X extends any[]> = Add_7<MultiplyByTen<X>>;
+type T_8<X extends any[]> = Add_8<MultiplyByTen<X>>;
+type T_9<X extends any[]> = Add_9<MultiplyByTen<X>>;
+type X = T_2<T_3<[]>>;
+
+// type LengthOfTuple<T, Arr extends readonly T[]> = Arr["length"];
+// type IsLongEnough<T, Arr extends readonly T[], Length extends number> = LengthOfTuple<T, Arr> extends Length ? true : false;
+// type Extend<T, Arr extends readonly T[]> = [...Arr, T];
+// type SizedArray<T, Length extends number, Arr extends readonly T[] = []> = IsLongEnough<T, Arr, Length> extends true ? Arr : SizedArray<T, Length, Extend<T, Arr>>;
+type SizedArray2<T, Length extends number, Arr extends readonly T[] = []> = AssertNonNegativeInteger<Length> extends never ? never : (Arr["length"] extends Length ? Arr : SizedArray2<T, Length, [T, ...Arr]>);
+const a: SizedArray2<number, 5> = [1, 23, 45, 1, 1];
+const b: SizedArray2<number, 0> = [];
+// var c: SizedArray2<number, -1>;
+// c = "abc";
+type AssertInteger<N extends number> = number extends N ? N : `${N}` extends `${bigint}` ? N : never;
+type AssertNonNegativeInteger<N extends number> = number extends N ? N : `-${N}` extends `${bigint}` ? N : never;
+type x = AssertNonNegativeInteger<1>;
+type y = AssertNonNegativeInteger<0>;
+type z = AssertNonNegativeInteger<-1>;
+
+
+// const a: Tuple128<undefined> = [];
+// const a: X = [];
+
+type Left<X> = X extends [infer A, infer B] ? A : never;
+type Right<X> = X extends [infer A, infer B] ? B : never;
+type Push<X, XS extends any[]> = [...XS, X];
+type If<A extends boolean, B, C> = A extends true ? B : C;
+type Pop<U> = U extends Push<infer X, infer XS> ? [X, XS] : never;
+// type TEST1 = Push<15, [1, 2, 3]>;
+// type TEST2RESULT = Pop<TEST1>;
+// type TEST2 = Right<TEST2RESULT>;
+// type TEST3RESULT = Pop<TEST2>;
+// type TEST3 = Right<TEST3RESULT>;
+// type TEST4RESULT = Pop<TEST3>;
+// type TEST4 = Right<TEST4RESULT>;
+// type TEST5RESULT = Pop<TEST4>;
+// type TEST5 = Right<TEST5RESULT>;
+// type TEST6RESULT = Pop<TEST5>;
+// type TEST6 = Right<TEST6RESULT>;

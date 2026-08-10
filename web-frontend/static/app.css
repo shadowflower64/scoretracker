@@ -1,0 +1,39 @@
+.edit-match-form {
+    display: grid;
+    grid-template-columns: auto auto;
+}
+
+.form-grouped-inputs {
+    display: flex;
+    flex-direction: row;
+}
+
+.grid-fill-width {
+    grid-column-start: 1;
+    grid-column-end: -1;
+}
+
+.metadata-table-editor-row #undelete-btn {
+    display: none;
+}
+
+.metadata-table-editor-row.deleted {
+    background-color: #ff00003f;
+}
+
+.metadata-table-editor-row.deleted input,
+.metadata-table-editor-row.deleted select {
+    text-decoration: line-through;
+    opacity: 50%;
+    user-select: none;
+    cursor: not-allowed;
+}
+
+.metadata-table-editor-row.deleted #delete-btn {
+    display: none;
+}
+
+.metadata-table-editor-row.deleted #undelete-btn {
+    display: block;
+    opacity: 100%;
+}
