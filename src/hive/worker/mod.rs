@@ -54,7 +54,7 @@ pub enum Error {
 #[derive(Debug, Error)]
 pub enum WorkerCreateError {
     #[error("configuration error: {0}")]
-    ConfigError(#[from] file_ex::Error),
+    ConfigError(#[from] &'static file_ex::Error),
     #[error("cannot open log file: {0}")]
     LogError(LogError),
     #[error("could not bind tcp listener: {0}")]
@@ -196,7 +196,7 @@ impl Worker {
 
     pub fn new_default() -> Result<Self, WorkerCreateError> {
         let config = Config::load()?;
-        Self::new(random_name().to_owned(), config)
+        Self::new(random_name().to_owned(), config.clone())
     }
 
     /// Execute a task in the current thread.

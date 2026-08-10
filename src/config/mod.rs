@@ -10,6 +10,7 @@ use crate::util::filelocked::{FileLockableDataJson, FileLockableDataWithDefaultP
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -19,8 +20,9 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> file_ex::Result<Self> {
-        Self::read_default_without_locking()
+    pub fn load() -> Result<&'static Self, &'static file_ex::Error> {
+        static LOADED_CONFIG: LazyLock<file_ex::Result<Config>> = LazyLock::new(|| Config::read_default_without_locking());
+        LOADED_CONFIG.as_ref()
     }
 
     pub fn library_database_path(&self) -> PathBuf {

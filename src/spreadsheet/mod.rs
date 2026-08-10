@@ -152,7 +152,7 @@ pub enum SpreadsheetImportError {
     #[error("invalid table type: '{0}'")]
     InvalidTableType(String),
     #[error("cannot read config: {0}")]
-    CannotReadConfig(file_ex::Error),
+    CannotReadConfig(&'static file_ex::Error),
     #[error("cannot read player database: {0}")]
     CannotReadPlayerDatabase(file_ex::Error),
     #[error("cannot read library database: {0}")]

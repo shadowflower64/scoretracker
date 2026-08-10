@@ -40,7 +40,7 @@ pub enum CmdError {
     IoError(#[from] io::Error),
     // ---
     #[error("could not read config: {0}")]
-    ConfigReadError(file_ex::Error),
+    ConfigReadError(&'static file_ex::Error),
     #[error("could not open config: {0}")]
     ConfigOpenError(lockfile::Error),
     #[error("could not write config: {0}")]

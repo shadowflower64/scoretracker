@@ -108,6 +108,14 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             info_npr!("hello world!");
             Ok(())
         }
+        "automark" => {
+            let library_dir: Option<PathBuf> = ctx.pull_arg_opt("library_dir", "path of the library directory")?;
+            let library_dir = library_dir
+                .map(Ok)
+                .unwrap_or_else(|| Config::load().map(|x| x.default_library_dir_path.clone()))
+                .map_err(CmdError::ConfigReadError)?;
+            cmd::automark::automark_library_files(library_dir)
+        }
         "config" => match ctx.cmd()? {
             "init" => cmd::config::init(),
             "show" => cmd::config::show(),
