@@ -64,7 +64,7 @@ pub fn relative_path_from_segments(segments: &[&str]) -> RelativePathBuf {
 pub fn youtube_id(url: &str) -> Option<String> {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"^(?:(?:https?:\/\/)?(?:(?:(?:www.)?youtube\.com\/watch\?v=)|(?:youtu\.be\/)))?([a-zA-Z0-9-_]{11})(?:[#&?]|$).*")
-            .expect("could not parse regex")
+            .expect("could not compile regex")
     });
     let captures = REGEX.captures(url)?;
     let capture_match = captures.get(1)?.as_str().to_owned();

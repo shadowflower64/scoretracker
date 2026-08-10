@@ -101,7 +101,6 @@ impl<'a> CmdlineContext<'a> {
 
 #[allow(unused_assignments)]
 pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
-    type E = CmdError;
     let mut ctx = CmdlineContext::new(arguments);
 
     match ctx.cmd()? {
@@ -156,15 +155,15 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             }
             "rescan" => {
                 let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
-                cmd::library::rescan(&library_dir).map_err(E::LibraryScanError)
+                cmd::library::rescan(&library_dir)
             }
             "rescan-default" => {
                 let config = Config::load().map_err(CmdError::ConfigReadError)?;
-                cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryScanError)
+                cmd::library::rescan(&config.default_library_dir_path)
             }
             "remove-domain" => {
                 let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;
-                cmd::library::remove_domain(library_domain).map_err(E::DatabaseError)
+                cmd::library::remove_domain(library_domain)
             }
             _ => ctx.unknown_cmd(),
         },

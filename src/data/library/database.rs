@@ -44,7 +44,7 @@ pub struct FileStat {
     pub last_check: NsTimestamp,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MediaCategory {
     /// Default value - value not selected by user yet.
@@ -70,8 +70,20 @@ pub enum MediaCategory {
     /// A video of the screen captured by OBS Studio, and then cut using LosslessCut.
     ObsRecordingLosslessCut,
 
+    /// A video of the screen captured by OBS Studio using the "Replay Buffer" feature.
+    ObsReplay,
+
+    /// A video of the screen captured by OBS Studio using the "Replay Buffer" feature, and then cut using the `autocut` script.
+    ObsReplayAutocut,
+
+    /// A video of the screen captured by OBS Studio using the "Replay Buffer" feature, and then cut using LosslessCut.
+    ObsReplayLosslessCut,
+
     /// A video of the screen captured by a phone's screen recording software.
     MobileScreenRecording,
+
+    /// A video of the screen captured by a phone's screen recording software, and then cut using LosslessCut.
+    MobileScreenRecordingLosslessCut,
 
     /// A video captured by a photo camera, a phone camera, or a webcam.
     CameraVideo,

@@ -430,13 +430,14 @@ pub fn remove_library_domain_from_db(
     library_domain: LibraryDomain,
     library_db_path: &Path,
     worker_info: Option<&WorkerInfo>,
-) -> Result<(), lockfile::Error> {
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info)?;
+) -> Result<(), LibraryScanError> {
+    type E = LibraryScanError;
+    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
 
     for entry in library_db.entries.iter_mut() {
         // Remove all old URLs that reference this library, without touching all of the other ones.
         entry.library_urls.retain(|url| url.domain != library_domain);
     }
-    library_db.save_and_unlock()?;
+    library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
     Ok(())
 }

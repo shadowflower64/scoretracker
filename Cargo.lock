@@ -331,6 +331,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "constcat"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "136d3e02915a2cea4d74caa8681e2d44b1c3254bdbf17d11d41d587ff858832c"
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1252,6 +1258,7 @@ dependencies = [
  "calamine",
  "chrono",
  "chrono-tz",
+ "constcat",
  "crossbeam-channel",
  "ctrlc",
  "directories",
