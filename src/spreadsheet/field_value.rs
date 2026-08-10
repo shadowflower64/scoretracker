@@ -261,7 +261,11 @@ pub fn parse_cell_contents(cell: &Data, hyperlink: Option<&Hyperlink>, formula_m
         let result = iso8601_duration::Duration::parse(cell);
         if let Ok(duration) = result {
             debug!("{log_prefix}parsing duration, success: {duration}");
-            return Filled(FieldValue::Duration(NsDuration::from(duration.to_std().expect("todo"))));
+            return Filled(FieldValue::Duration(NsDuration::from(
+                duration
+                    .to_std()
+                    .expect("iso duration should be convertible to std::time::Duration"),
+            )));
         } else {
             warn!("{log_prefix}parsing duration, fail: {result:?}");
         }

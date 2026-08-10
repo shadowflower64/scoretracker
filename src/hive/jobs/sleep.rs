@@ -1,4 +1,4 @@
-use crate::hive::job::{AnyJob, Failure, Job, Success};
+use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, thread::sleep, time::Duration};
@@ -9,7 +9,7 @@ pub struct SleepJob {
 }
 
 impl Job for SleepJob {
-    async fn run(&self, _worker: Arc<Worker>) -> Result<Success, Failure> {
+    async fn run(&self, _worker: Arc<Worker>) -> Result<Success, Fail> {
         sleep(Duration::from_nanos(self.time_nanos));
         Ok(Success::Void)
     }

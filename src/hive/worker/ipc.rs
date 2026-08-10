@@ -196,7 +196,7 @@ fn handle_incoming_message<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, M
             info!("received termination request, exiting with code {TERMINATION_REQUEST_EXIT_CODE}");
             process::exit(TERMINATION_REQUEST_EXIT_CODE);
         }
-        a => todo!("not done yet: {a:?}"),
+        msg => unimplemented!("incoming message is not handled yet: {msg:?}"),
     }
     Ok(())
 }

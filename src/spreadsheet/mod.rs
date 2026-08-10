@@ -152,7 +152,7 @@ pub enum SpreadsheetImportError {
     #[error("invalid table type: '{0}'")]
     InvalidTableType(String),
     #[error("cannot read config: {0}")]
-    CannotReadConfig(lockfile::Error), // TODO: this should actually be file_ex::Error, because the config is not open for writing
+    CannotReadConfig(file_ex::Error),
     #[error("cannot read player database: {0}")]
     CannotReadPlayerDatabase(file_ex::Error),
     #[error("cannot read library database: {0}")]
@@ -456,7 +456,9 @@ pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<SpreadsheetImport
     let read_hyperlinks = |name: &str| {
         log_fn_name!("import_org_spreadsheet_xlsx:read_hyperlinks");
         info!("reading hyperlinks for worksheet: '{name}'");
-        let hyperlinks = workbook.hyperlinks_by_sheet_name(name).expect("todo");
+        let hyperlinks = workbook
+            .hyperlinks_by_sheet_name(name)
+            .expect("the provided worksheet name should be a valid name of a worksheet in the spreadsheet");
         info!("reading hyperlinks for worksheet done");
         hyperlinks
     };

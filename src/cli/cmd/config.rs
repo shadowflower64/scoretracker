@@ -64,7 +64,7 @@ pub fn show() -> Result<(), CmdError> {
 }
 
 pub fn set(key: String, value: String) -> Result<(), CmdError> {
-    let mut config = Config::lock_default_and_read(None).map_err(CmdError::ConfigReadError)?;
+    let mut config = Config::lock_default_and_read(None).map_err(CmdError::ConfigOpenError)?;
 
     match key.as_str() {
         "domain_name" => config.inner.domain_name = value,

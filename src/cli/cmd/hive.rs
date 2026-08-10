@@ -45,15 +45,15 @@ pub fn add_task<J: Job>(job: J) -> Result<(), CmdError> {
     log_fn_name!("cmd:add_task");
 
     let job = job.into_any();
-    let config = Config::load().expect("todo");
-    let mut task_queue = TaskQueue::lock_and_read_or_default(config.task_queue_path(), None).expect("todo");
+    let config = Config::load().map_err(CmdError::ConfigReadError)?;
+    let mut task_queue = TaskQueue::lock_and_read_or_default(config.task_queue_path(), None).map_err(CmdError::TaskQueueOpenError)?;
     let time_identifier = DateTime::<Local>::from(SystemTime::now()).format("%Y%m%d%H%M%S%3f");
     let task = Task::new(format!("Manually added task #{time_identifier}"), job);
     info!("adding task: {task:?}");
     task_queue
         .add_task(task)
         .expect("task was newly created, the uuid should never collide");
-    task_queue.save_and_unlock().expect("todo could not save");
+    task_queue.save_and_unlock().map_err(CmdError::TaskQueueWriteError)?;
     info_npr!("successfully added task to queue");
     Ok(())
 }

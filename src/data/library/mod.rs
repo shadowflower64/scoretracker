@@ -30,7 +30,7 @@ use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::{file_ex, lockfile};
 use crate::util::{filelocked::FileLockableData, uuid::UuidString};
 use crate::{debug, info, log_fn_name, log_should_print_debug, warn};
-use relative_path::{PathExt, RelativePathBuf};
+use relative_path::{PathExt, RelativePath, RelativePathBuf};
 use std::collections::{HashMap, HashSet};
 use std::path::{self, Path, PathBuf};
 use std::time::Instant;
@@ -88,24 +88,35 @@ pub fn create_stpl_url_to_file<P1: AsRef<Path>, P2: AsRef<Path>>(
     library_dir: P1,
     target_file_path: P2,
 ) -> Option<StplUrl> {
-    let rel = path_within_library_dir(library_dir, target_file_path)?;
-    Some(StplUrl::new(LibraryDomain::Local(library_info.domain), Some(rel.to_string())))
+    let rel = path_within_library_dir(library_dir.as_ref(), target_file_path)?;
+    Some(create_stpl_url_to_relfile(library_info, rel))
+}
+
+pub fn create_stpl_url_to_relfile<P: AsRef<RelativePath>>(library_info: LibraryInfo, target_file_relpath: P) -> StplUrl {
+    StplUrl::new(
+        LibraryDomain::Local(library_info.domain),
+        Some(target_file_relpath.as_ref().to_string()),
+    )
 }
 
 #[derive(Debug, Error)]
 pub enum LibraryScanError {
     #[error("cannot read library info: {0}")]
     CannotReadInfo(file_ex::Error),
+    #[error("cannot read library index: {0}")]
+    CannotReadIndex(file_ex::Error),
+    #[error("cannot open library index: {0}")]
+    CannotOpenIndex(lockfile::Error),
     #[error("cannot write library index: {0}")]
-    CannotWriteIndex(file_ex::Error),
+    CannotWriteReplaceIndex(file_ex::Error),
     #[error("cannot write library index: {0}")]
-    CannotWriteIndexLockfile(lockfile::Error),
+    CannotWriteIndex(lockfile::Error),
     #[error("cannot read library cache: {0}")]
     CannotReadCache(lockfile::Error),
     #[error("cannot write library cache: {0}")]
     CannotWriteCache(lockfile::Error),
-    #[error("cannot read library database: {0}")]
-    CannotReadDatabase(lockfile::Error),
+    #[error("cannot open library database: {0}")]
+    CannotOpenDatabase(lockfile::Error),
     #[error("cannot write library database: {0}")]
     CannotWriteDatabase(lockfile::Error),
 }
@@ -223,31 +234,29 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
 
     // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
     info!("[scan] getting uuids from database");
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotReadDatabase)?;
+    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
     let len = sha256_hashes.len();
     for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
-        let uuid = if let Some(existing_entry) = library_db.find_entry_by_sha256_hash(sha256_hash) {
-            let uuid = existing_entry.uuid.0;
+        let (uuid, existed) = library_db.fetch_or_insert(relative_path, sha256_hash.clone(), library_domain.clone());
+        if existed {
             debug!(
                 "[scan] [{}/{}] fetching uuid for existing database entry ({uuid}) for: {relative_path:?}",
                 i + 1,
                 len
             );
-            uuid
         } else {
-            let uuid = library_db.add(relative_path, sha256_hash.clone(), library_domain.clone());
             debug!(
                 "[scan] [{}/{}] adding new database entry ({uuid}) for: {relative_path:?}",
                 i + 1,
                 len
             );
-            uuid
-        };
+        }
+
         index.files.insert((*relative_path).clone(), uuid.into());
     }
     index
         .save(&library_dir.join(LibraryIndex::STANDARD_FILENAME))
-        .map_err(E::CannotWriteIndex)?;
+        .map_err(E::CannotWriteReplaceIndex)?;
 
     // Now sync all of the URLs within the index file with the database
     info!("[scan] syncing database");
@@ -268,7 +277,7 @@ pub fn scan_register_added_files(
     _library_db_path: &Path,
     _file_paths: Vec<&Path>,
     _worker_info: Option<&WorkerInfo>,
-) -> Result<(), LibraryScanError> {
+) -> Result<Vec<UuidString>, LibraryScanError> {
     //log_fn_name!("library:scan_register_added_files");
 
     todo!()
@@ -279,8 +288,12 @@ pub fn scan_register_added_file(
     library_db_path: &Path,
     file_path: &Path,
     worker_info: Option<&WorkerInfo>,
-) -> Result<(), LibraryScanError> {
-    scan_register_added_files(library_dir, library_db_path, vec![file_path], worker_info)
+) -> Result<UuidString, LibraryScanError> {
+    Ok(
+        *scan_register_added_files(library_dir, library_db_path, vec![file_path], worker_info)?
+            .first()
+            .unwrap(),
+    )
 }
 
 pub fn scan_register_removed_files(
@@ -295,26 +308,29 @@ pub fn scan_register_removed_files(
     let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = LibraryDomain::Local(library_info.domain);
 
-    let mut library_index = LibraryIndex::lock_and_read(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info)
-        .expect("cannot read library index file"); // TODO: error handling
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).expect("cannot open database file"); // TODO: error handling
+    let mut library_index =
+        LibraryIndex::lock_and_read(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info).map_err(E::CannotOpenIndex)?;
+    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
 
     for file_path in file_paths {
-        let relative_path = path_within_library_dir(library_dir, file_path).expect("file not within library"); // TODO: error handling/should this continue or exit out of the loop entirely????
+        let Some(relpath) = path_within_library_dir(library_dir, file_path) else {
+            warn!("file path is not within library: library dir: {library_dir:?}, file: {file_path:?}; skipping...");
+            continue;
+        };
 
-        if let Some(proof_uuid) = library_index.files.remove(&relative_path) {
+        if let Some(proof_uuid) = library_index.files.remove(&relpath) {
             if let Some(entry) = library_db.find_entry_by_uuid_mut(proof_uuid) {
-                let removed_file_url = StplUrl::new(library_domain.clone(), Some(relative_path.to_string()));
+                let removed_file_url = StplUrl::new(library_domain.clone(), Some(relpath.to_string()));
                 entry.library_urls.retain(|x| *x != removed_file_url);
             } else {
                 warn!("proof with uuid was not found in database: {proof_uuid}");
             }
         } else {
-            warn!("tried to remove a file from index, but the file was not in the index in the first place: {relative_path:?}");
+            warn!("tried to remove a file from index, but the file was not in the index in the first place: {relpath:?}");
         };
     }
 
-    library_index.save_and_unlock().map_err(E::CannotWriteIndexLockfile)?;
+    library_index.save_and_unlock().map_err(E::CannotWriteIndex)?;
     library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
     Ok(())
 }
@@ -335,6 +351,7 @@ pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lock
     library_domain: LibraryDomain,
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
+    type E = LibraryScanError;
     log_fn_name!("library:sync_library_index_with_db");
 
     let mut reverse_index: HashMap<UuidString, Vec<RelativePathBuf>> = HashMap::new();
@@ -349,7 +366,7 @@ pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lock
         }
     }
 
-    let mut library_db = library_db_conn(worker_info).expect("cannot open database file"); // TODO: error handling
+    let mut library_db = library_db_conn(worker_info).map_err(E::CannotOpenDatabase)?;
 
     for entry in library_db.entries.iter_mut() {
         // Remove all old URLs that reference this library, without touching all of the other ones.
@@ -365,7 +382,7 @@ pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lock
             unused_proof_uuids_in_index.remove(&entry.uuid);
         }
     }
-    library_db.save_and_unlock().expect("cannot write database file"); // TODO: error handling
+    library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
 
     // Check if any of the proof UUIDs that are in the index were not present in the database
     for absent_uuid in unused_proof_uuids_in_index {
@@ -393,14 +410,12 @@ pub fn sync_library_index_with_db(
     library_db_path: &Path,
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
-    //let shared_data_repo_path = Config::load().expect("cannot load config").shared_data_repo_path; // TODO: error handling
-
-    let library_info =
-        LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("cannot read library info"); // TODO: error handling
+    type E = LibraryScanError;
+    let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = LibraryDomain::Local(library_info.domain);
 
     let library_index =
-        LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).expect("cannot read library index file"); // TODO: error handling
+        LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(E::CannotReadIndex)?;
 
     sync_library_index_with_db_essence(
         library_dir,

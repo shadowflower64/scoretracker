@@ -1,4 +1,4 @@
-use crate::hive::job::{AnyJob, Failure, Job, Success};
+use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ pub struct DisplayMessageAndSleepJob {
 }
 
 impl Job for DisplayMessageAndSleepJob {
-    async fn run(&self, _worker: Arc<Worker>) -> Result<Success, Failure> {
+    async fn run(&self, _worker: Arc<Worker>) -> Result<Success, Fail> {
         log_fn_name!("job:display_message_and_sleep");
         info!("{}", self.message);
         sleep(Duration::from_nanos(self.time_nanos));

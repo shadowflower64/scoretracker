@@ -2,13 +2,17 @@ use std::path::Path;
 
 use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress};
 
+use crate::{error, info, log_fn_name, success};
+
 pub async fn ffmpeg_cut_video_streamcopy<OnProgress: Fn(Progress) + Send + Sync + 'static>(
     source_path: &Path,
     destination_path: &Path,
     start_time_ms: Option<u64>,
     end_time_ms: Option<u64>,
     on_progress: OnProgress,
-) {
+) -> Result<(), rust_ffmpeg::Error> {
+    log_fn_name!("ffmpeg_cut_video_streamcopy");
+
     let input = Input::new(source_path.to_string_lossy().to_string());
     let input = if let Some(start_time_ms) = start_time_ms {
         input.seek(Duration::from_millis(start_time_ms))
@@ -20,17 +24,32 @@ pub async fn ffmpeg_cut_video_streamcopy<OnProgress: Fn(Progress) + Send + Sync 
     } else {
         input
     };
-    let ffmpeg = FFmpegBuilder::new()
-        .expect("todo")
+    let ffmpeg = FFmpegBuilder::new()?
         .input(input)
         .output(
             Output::new(destination_path.to_string_lossy().to_string())
                 .audio_codec(Codec::copy())
                 .video_codec(Codec::copy()),
         )
+        .no_overwrite()
         .on_progress(on_progress);
-    let command = ffmpeg.command().expect("todocommand");
-    todo!("running ffmpeg with cmd: {command}");
-    // ffmpeg.run().await.expect("todo2");
-    // todo!()
+
+    let args = ffmpeg.build_args();
+    info!("running ffmpeg with arguments: {args:?}");
+
+    match ffmpeg.run().await.unwrap().into_result() {
+        Ok(out) => {
+            success!(
+                "ffmpeg process finished successfully (exit code {}): stdout: {:?}, stderr: {:?}",
+                out.status,
+                out.stdout_str(),
+                out.stderr_str()
+            );
+            Ok(())
+        }
+        Err(e) => {
+            error!("ffmpeg process finished with an error (non-zero exit code): {e:?}");
+            Err(e)?
+        }
+    }
 }

@@ -375,22 +375,47 @@ impl LibraryDatabase {
         self.entries.iter().find(|x| x.sha256 == sha256)
     }
 
+    pub fn find_entry_by_sha256_hash_mut(&mut self, sha256: &str) -> Option<&mut LibraryEntry> {
+        self.entries.iter_mut().find(|x| x.sha256 == sha256)
+    }
+
     pub fn find_entry_by_youtube_id(&self, youtube_id: &str) -> Option<&LibraryEntry> {
         self.entries
             .iter()
             .find(|x| x.youtube_id.as_ref().is_some_and(|id| id == youtube_id))
     }
 
-    pub fn add(&mut self, relative_path: &RelativePath, sha256: String, domain: LibraryDomain) -> Uuid {
-        let library_entry = LibraryEntry {
-            library_urls: vec![StplUrl::new(domain.clone(), Some(relative_path.to_string()))],
-            sha256,
-            ..Default::default()
-        };
-        // TODO DO NOT ADD TWO OF THE SAME SHA256 hashes right???
-        let uuid = library_entry.uuid.0;
-        self.entries.push(library_entry);
-        uuid
+    pub fn insert_or_merge(&mut self, relative_path: &RelativePath, sha256: String, domain: LibraryDomain) -> (Uuid, bool) {
+        let url = StplUrl::new(domain.clone(), Some(relative_path.to_string()));
+        if let Some(existing_entry) = self.find_entry_by_sha256_hash_mut(&sha256) {
+            existing_entry.library_urls.push(url);
+            (existing_entry.uuid.0, true)
+        } else {
+            let new_library_entry = LibraryEntry {
+                library_urls: vec![url],
+                sha256,
+                ..Default::default()
+            };
+            let uuid = new_library_entry.uuid.0;
+            self.entries.push(new_library_entry);
+            (uuid, false)
+        }
+    }
+
+    pub fn fetch_or_insert(&mut self, relative_path: &RelativePath, sha256: String, domain: LibraryDomain) -> (Uuid, bool) {
+        let url = StplUrl::new(domain.clone(), Some(relative_path.to_string()));
+        if let Some(existing_entry) = self.find_entry_by_sha256_hash_mut(&sha256) {
+            (existing_entry.uuid.0, true)
+        } else {
+            let new_library_entry = LibraryEntry {
+                library_urls: vec![url],
+                sha256,
+                ..Default::default()
+            };
+            let uuid = new_library_entry.uuid.0;
+            self.entries.push(new_library_entry);
+            (uuid, false)
+        }
     }
 }
 

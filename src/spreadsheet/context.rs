@@ -51,7 +51,10 @@ impl Context<'_> {
     }
 
     pub fn get_or_insert_proof_by_hyperlink(&mut self, hyperlink: &Hyperlink) -> Result<UuidString, BadRecordError> {
-        let url = hyperlink.target.as_ref().expect("todo");
+        let url = hyperlink
+            .target
+            .as_ref()
+            .expect("hyperlink should have the target property set, purely internal hyperlinks are not supported");
         let Some(youtube_id) = youtube_id(url) else {
             return Err(BadRecordError::InvalidYouTubeUrl { url: url.to_owned() });
         };

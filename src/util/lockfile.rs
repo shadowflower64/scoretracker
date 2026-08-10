@@ -261,7 +261,7 @@ impl LockfileHandle {
         watcher
             .watch(&lockfile_path, RecursiveMode::NonRecursive)
             .map_err(Error::CannotWatchLockfile)?;
-        // TODO: this ^ will sometimes exit with an error if the file doesn't exist anymore as you can't watch paths that don't exist.
+        // FIXME or don't: this ^ will sometimes exit with an error if the file doesn't exist anymore as you can't watch paths that don't exist.
         // the intended behavior for this case is to create the lockfile. this should be very rare though.
 
         // Theoretically, the file could've been deleted while everything was being set up - check again for the file again
@@ -308,7 +308,7 @@ impl LockfileHandle {
             watcher
                 .watch(&lockfile_path, RecursiveMode::NonRecursive)
                 .map_err(Error::CannotWatchLockfile)?;
-            // TODO: this ^ will sometimes exit with an error if the file doesn't exist anymore as you can't watch paths that don't exist.
+            // FIXME or don't: this ^ will sometimes exit with an error if the file doesn't exist anymore as you can't watch paths that don't exist.
             // the intended behavior for this case is to create the lockfile. this should be very rare though.
         }
 

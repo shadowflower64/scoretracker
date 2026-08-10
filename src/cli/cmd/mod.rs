@@ -172,9 +172,13 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "open" => {
                 let log_dir = log_dir();
                 info_npr!("opening log directory: {log_dir:?}");
-                reveal_directory(&log_dir).expect("todo");
-                success_npr!("successfully opened log directory");
-                Ok(())
+                match reveal_directory(&log_dir) {
+                    Ok(_) => {
+                        success_npr!("successfully opened log directory");
+                        Ok(())
+                    }
+                    Err(e) => Err(CmdError::RevealDirectoryError(e)),
+                }
             }
             _ => ctx.unknown_cmd(),
         },

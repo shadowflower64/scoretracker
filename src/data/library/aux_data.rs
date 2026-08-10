@@ -5,11 +5,19 @@
 use crate::util::filelocked::FileLockableDataJson;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub struct ColorRGBA {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TagInfo {
     pub id: String,
     pub name: String,
-    pub color: (), // TODO
+    pub color: ColorRGBA,
 }
 
 /// Auxiliary data for the library.

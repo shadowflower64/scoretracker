@@ -11,6 +11,7 @@ use crate::hive::jobs::process_library_video::ProcessLibraryVideoJob;
 use crate::hive::jobs::sleep::SleepJob;
 use crate::hive::worker::{self, Worker};
 use crate::util::uuid::UuidString;
+use relative_path::RelativePathBuf;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -21,38 +22,71 @@ use thiserror::Error;
 pub enum Success {
     Void,
     ProcessedVideo { dry: UuidString, wet: UuidString },
-    CutVideo { cloth: ClothInfo, fragment: UuidString },
+    CutVideo { cloth: ClothInfo, fragment: Option<UuidString> },
 }
 
 #[derive(Debug, Clone, Error, Deserialize, Serialize)]
 #[serde(tag = "type", content = "details")]
-pub enum Failure {
+pub enum Fail {
     #[error("unknown error while running a job")]
     UnknownError,
     #[error("panic while running a job: {0}")]
     Panic(String),
+    //
+    #[error("ffmpeg process error: {0}")]
+    FFmpegProcessError(String),
+    //
     #[error("could not open library database: {0}")]
     CannotOpenLibraryDatabase(String),
     #[error("could not read library database: {0}")]
     CannotReadLibraryDatabase(String),
     #[error("could not read library info: {0}")]
     CannotReadLibraryInfo(String),
+    #[error("could not read library index: {0}")]
+    CannotReadLibraryIndex(String),
+    //
     #[error("could not find library entry with uuid: {0}")]
     EntryNotFound(UuidString),
     #[error("proof url is not present in the provided library entry: {expected_url}, {entry:?}")]
-    FileUrlNotFoundInEntry { expected_url: StplUrl, entry: Box<LibraryEntry> },
+    FileUrlNotFoundInLibraryEntry { expected_url: StplUrl, entry: Box<LibraryEntry> },
+    #[error("cannot find path to file witin library dir: library: {library_dir:?}; target file: {target_file_path:?}")]
+    CannotFindPathWithinLibraryDir { library_dir: PathBuf, target_file_path: PathBuf },
+    #[error(
+        "file is not present in library index; perhaps the library needs to be rescanned? library: {library_dir:?}; internal path: {target_relpath:?}"
+    )]
+    FileNotInIndex {
+        library_dir: PathBuf,
+        target_relpath: RelativePathBuf,
+    },
     #[error("cannot register file at {file_path:?} into library: {reason}")]
     CannotRegisterFileIntoLibrary { file_path: PathBuf, reason: String },
+    #[error(
+        "precondition check failed: uuid detected from path does not match precondition uuid ({read_proof_uuid} != {precondition_uuid}); path: {file_path:?}"
+    )]
+    PreconditionUuidDoesNotMatch {
+        file_path: PathBuf,
+        read_proof_uuid: UuidString,
+        precondition_uuid: UuidString,
+    },
+    #[error("provided path is not part of any library: {path:?}")]
+    PathNotInLibraryRepo { path: PathBuf },
     #[error("{message}")]
     Custom { message: String },
 }
 
-impl From<worker::Error> for Failure {
+impl From<rust_ffmpeg::Error> for Fail {
+    fn from(value: rust_ffmpeg::Error) -> Self {
+        Self::FFmpegProcessError(value.to_string())
+    }
+}
+
+impl From<worker::Error> for Fail {
     fn from(value: worker::Error) -> Self {
         match value {
             worker::Error::CannotOpenLibraryDatabase(e) => Self::CannotOpenLibraryDatabase(e.to_string()),
             worker::Error::CannotReadLibraryDatabase(e) => Self::CannotReadLibraryDatabase(e.to_string()),
             worker::Error::CannotReadLibraryInfo(e) => Self::CannotReadLibraryInfo(e.to_string()),
+            worker::Error::CannotReadLibraryIndex(e) => Self::CannotReadLibraryIndex(e.to_string()),
             worker::Error::CannotOpenQueue(_)
             | worker::Error::CannotReopenQueue(_)
             | worker::Error::CannotUpdateTask(_)
@@ -75,12 +109,12 @@ pub enum AnyJob {
 }
 
 pub trait Job {
-    fn run(&self, worker: Arc<Worker>) -> impl Future<Output = Result<Success, Failure>>;
+    fn run(&self, worker: Arc<Worker>) -> impl Future<Output = Result<Success, Fail>>;
     fn into_any(self) -> AnyJob;
 }
 
 impl Job for AnyJob {
-    async fn run(&self, worker: Arc<Worker>) -> Result<Success, Failure> {
+    async fn run(&self, worker: Arc<Worker>) -> Result<Success, Fail> {
         match self {
             Self::Sleep(job) => job.run(worker).await,
             Self::DisplayMessage(job) => job.run(worker).await,

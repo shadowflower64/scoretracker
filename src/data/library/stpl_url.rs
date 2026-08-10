@@ -85,14 +85,14 @@ impl TryFrom<String> for LibraryDomain {
     type Error = StplUrlError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.rsplit_once(".local") {
-            Some((prefix, _suffix)) => {
+            Some((prefix, suffix)) => {
+                assert_eq!(suffix, "", "suffix (after .local) should be empty");
                 let domain_name = prefix.to_owned().try_into()?;
                 Ok(Self::Local(domain_name))
             }
             None => {
-                todo!();
-                // let domain_name = value.try_into()?;
-                // Ok(Self::Global(domain_name))
+                let domain_name = value.try_into()?;
+                Ok(Self::Global(domain_name))
             }
         }
     }
@@ -108,7 +108,7 @@ impl FromStr for LibraryDomain {
 impl Display for LibraryDomain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Global(_identifier) => todo!(), //write!(f, "{identifier}"),
+            Self::Global(identifier) => write!(f, "{identifier}"),
             Self::Local(identifier) => write!(f, "{identifier}.local"),
         }
     }

@@ -119,21 +119,21 @@ pub async fn test_queue(_args: &[String]) {
 
     // Read the queue to either add something or take on a task
     let mut queue = TaskQueue::lock_and_read_or_default("playground/test_queue.jsonl", None).expect("couldn't read queue");
-    let task_todo_opt = queue.top_queued_task_mut();
-    if let Some(task_todo) = task_todo_opt {
+    let task_to_do_opt = queue.top_queued_task_mut();
+    if let Some(task_to_do) = task_to_do_opt {
         // Take on a task
-        task_todo.state = TaskState::Working;
-        task_todo.start_timestamp = Some(NsTimestamp::now());
-        task_todo.worker_info = Some(WorkerInfo {
+        task_to_do.state = TaskState::Working;
+        task_to_do.start_timestamp = Some(NsTimestamp::now());
+        task_to_do.worker_info = Some(WorkerInfo {
             address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)),
             birth_timestamp: 0.into(),
             short_name: "playground".to_string(),
             full_name: "fake-playground-worker".to_string(),
             pid: process::id(),
         });
-        task_todo.comment = Some(String::from("this job was started by the playground"));
-        currently_doing_task_opt = Some(task_todo.clone());
-        info!("started working on task {}", task_todo.uuid.0);
+        task_to_do.comment = Some(String::from("this job was started by the playground"));
+        currently_doing_task_opt = Some(task_to_do.clone());
+        info!("started working on task {}", task_to_do.uuid.0);
     } else {
         info!("no tasks to do; adding task for next time");
 

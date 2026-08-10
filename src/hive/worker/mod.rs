@@ -5,6 +5,7 @@ pub mod status;
 
 use crate::config::Config;
 use crate::data::library::database::LibraryDatabase;
+use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
 use crate::hive::job::{self, Job};
 use crate::hive::queue::{TaskNotFound, TaskQueue};
@@ -17,7 +18,7 @@ use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDa
 use crate::util::log::{LogError, open_log_file};
 use crate::util::timestamp::NsTimestamp;
 use crate::util::{file_ex, lockfile};
-use crate::{error, info, log_fn_name, success};
+use crate::{error, info, log_fn_name, success, warn};
 use crossbeam_channel::Sender;
 use std::net::TcpListener;
 use std::path::Path;
@@ -46,12 +47,14 @@ pub enum Error {
     CannotReadLibraryDatabase(file_ex::Error),
     #[error("cannot read library info: {0}")]
     CannotReadLibraryInfo(file_ex::Error),
+    #[error("cannot read library index: {0}")]
+    CannotReadLibraryIndex(file_ex::Error),
 }
 
 #[derive(Debug, Error)]
 pub enum WorkerCreateError {
     #[error("configuration error: {0}")]
-    ConfigError(#[from] lockfile::Error),
+    ConfigError(#[from] file_ex::Error),
     #[error("cannot open log file: {0}")]
     LogError(LogError),
     #[error("could not bind tcp listener: {0}")]
@@ -110,28 +113,40 @@ impl Worker {
         LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(Error::CannotReadLibraryInfo)
     }
 
+    pub fn read_library_index(&self, library_dir: &Path) -> Result<LibraryIndex, Error> {
+        LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(Error::CannotReadLibraryIndex)
+    }
+
     pub fn fetch_progress(&self) -> Option<TaskProgress> {
         self.data.lock().unwrap().task_progress.clone()
     }
 
     pub fn update_worker_status(&self, status: WorkerStatus) {
+        log_fn_name!("update_worker_status");
         self.data.lock().unwrap().status = status.clone();
-        self.worker_status_tx.send(status).expect("todo"); // todo
+        let _ = self
+            .worker_status_tx
+            .send(status)
+            .inspect_err(|e| warn!("worker_status_tx channel disconnected: {e:?}"));
     }
 
     pub fn update_task_progress(&self, task_progress: TaskProgress) {
+        log_fn_name!("update_task_progress");
         self.data.lock().unwrap().task_progress = Some(task_progress.clone());
-        self.task_progress_tx.send(task_progress).expect("todo"); // todo
+        let _ = self
+            .task_progress_tx
+            .send(task_progress)
+            .inspect_err(|e| warn!("task_progress_tx channel disconnected: {e:?}"));
     }
 
     pub fn update_task_progress_very_simple(&self, message: String) {
         let task_progress = TaskProgress {
             done: false,
-            current_stage_number: 0,
-            current_stage: "todo".to_owned(),
-            total_stages: 0,
+            current_stage_number: 1,
+            current_stage: "Unknown stage".to_owned(),
+            total_stages: 1,
             current_stage_progress: 0,
-            current_stage_progress_max: 0,
+            current_stage_progress_max: 1,
             current_stage_progress_msg: message,
         };
         self.update_task_progress(task_progress);
@@ -219,7 +234,7 @@ impl Worker {
                 };
                 error!("task panicked: uuid: {}, reason: {disp_panic}", task.uuid.0);
                 task.state = TaskState::Failed;
-                task.result = Some(TaskResult::Error(job::Failure::Panic(disp_panic)));
+                task.result = Some(TaskResult::Error(job::Fail::Panic(disp_panic)));
                 panic::resume_unwind(panic)
             }
         }

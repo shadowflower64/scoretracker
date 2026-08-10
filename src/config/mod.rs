@@ -4,10 +4,9 @@ use crate::data::library::database::LibraryDatabase;
 use crate::data::library::index::LibraryIndex;
 use crate::data::scoreboard::player::PlayerDatabase;
 use crate::hive::queue::TaskQueue;
-use crate::hive::worker::data::WorkerInfo;
 use crate::util::dirs::config_dir;
+use crate::util::file_ex;
 use crate::util::filelocked::{FileLockableDataJson, FileLockableDataWithDefaultPath};
-use crate::util::lockfile::{self};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::PathBuf;
@@ -20,14 +19,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> lockfile::Result<Self> {
-        Self::load_with_worker(None)
-    }
-
-    pub fn load_with_worker(_worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        // TODO: decide on whether this should actually be locking or not
-        // TODO: cont. - this should actually be split into two functions. FileLocked exists now, maybe that should be used here?
-        Ok(Config::read_default_without_locking()?)
+    pub fn load() -> file_ex::Result<Self> {
+        Self::read_default_without_locking()
     }
 
     pub fn library_database_path(&self) -> PathBuf {
