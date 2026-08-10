@@ -1,4 +1,4 @@
-use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerStatus};
+use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
 use crate::{debug, error, info, log_fn_name, log_should_print_debug, warn};
 use crossbeam_channel::{Receiver, RecvError};
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,7 @@ impl IncomingMessage {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OutgoingMessage {
-    WhoAreYouResponse { name: String, pid: u32 },
+    WhoAreYouResponse { worker_info: WorkerInfo },
     WorkerStatusResponse { worker_status: WorkerStatus },
 }
 
@@ -143,7 +143,7 @@ fn handle_incoming_message<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, M
     tcp_stream: &mut TcpStream,
     message: IncomingMessage,
     conn: &Arc<Mutex<ConnectionInfo>>,
-    _worker_data: &Arc<Mutex<WorkerData>>,
+    worker_data: &Arc<Mutex<WorkerData>>,
     make_worker_status_rx: MakeWorkerStatusRx,
     _make_task_progress_rx: MakeTaskProgressRx,
 ) -> Result<(), Error> {
@@ -153,14 +153,9 @@ fn handle_incoming_message<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, M
     match message {
         IncomingMessage::WhoAreYou => {
             debug!("responding to 'who are you' message");
-            let _ = send_message(
-                tcp_stream,
-                &OutgoingMessage::WhoAreYouResponse {
-                    name: "test name".to_string(), // todo
-                    pid: process::id(),
-                },
-            )
-            .inspect_err(|e| error!("failed to send message: {e}; continuing"));
+            let worker_info = worker_data.lock().unwrap().info.clone();
+            let message = OutgoingMessage::WhoAreYouResponse { worker_info };
+            let _ = send_message(tcp_stream, &message).inspect_err(|e| error!("failed to send message: {e}; continuing"));
         }
         IncomingMessage::Subscribe {
             subscription: Subscription::WorkerStatus,

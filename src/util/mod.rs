@@ -1,4 +1,10 @@
-use std::{ops::Neg, sync::LazyLock};
+use std::{
+    io,
+    ops::Neg,
+    path::Path,
+    process::{Child, Command},
+    sync::LazyLock,
+};
 
 use regex::Regex;
 use relative_path::RelativePathBuf;
@@ -72,4 +78,15 @@ pub fn normalize_unsigned_to_unit_range(uint: u64) -> f64 {
     let x = x.neg(); // in range [-1..0), 0 is the highest value
     let x = x + 1.0; // in range [0..1), 1 is the highest value
     x
+}
+
+#[cfg(target_os = "windows")]
+pub const REVEAL_EXECUTABLE_NAME: &str = "explorer";
+#[cfg(target_os = "macos")]
+pub const REVEAL_EXECUTABLE_NAME: &str = "open";
+#[cfg(target_os = "linux")]
+pub const REVEAL_EXECUTABLE_NAME: &str = "xdg-open";
+
+pub fn reveal_directory(path: &Path) -> Result<Child, io::Error> {
+    Command::new(REVEAL_EXECUTABLE_NAME).arg(path).spawn()
 }

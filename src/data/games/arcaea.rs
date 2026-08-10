@@ -23,13 +23,13 @@ pub struct Match {
     pub game_version: Option<String>,
 }
 
-#[typetag::serde(name = "cytus2")]
+#[typetag::serde(name = "arcaea")]
 impl MatchTrait for Match {
     fn common(&self) -> &CommonMatchInfo {
         &self.common
     }
     fn sorting_key(&self) -> f64 {
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -128,7 +128,7 @@ pub struct Performance {
 
 impl Performance {}
 
-#[typetag::serde(name = "cytus2")]
+#[typetag::serde(name = "arcaea")]
 impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common

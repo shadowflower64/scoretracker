@@ -5,8 +5,10 @@ use crate::error::CmdError;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
-use scoretracker::info_npr;
+use scoretracker::util::dirs::log_dir;
+use scoretracker::util::reveal_directory;
 use scoretracker::util::timestamp::NsLocalTimestamp;
+use scoretracker::{info_npr, success_npr};
 use std::path::PathBuf;
 
 pub mod automark;
@@ -102,23 +104,11 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
     type E = CmdError;
     let mut ctx = CmdlineContext::new(arguments);
 
-    // fcn - full command name
     match ctx.cmd()? {
         "hello" => {
             info_npr!("hello world!");
             Ok(())
         }
-        "spreadsheet" => match ctx.cmd()? {
-            "import-org-ods" => {
-                let path: PathBuf = ctx.pull_arg("path", "path of the ods spreadsheet file")?;
-                cmd::spreadsheet::import_org_ods(&path)
-            }
-            "import-org-xlsx" => {
-                let path: PathBuf = ctx.pull_arg("path", "path of the xlsx spreadsheet file")?;
-                cmd::spreadsheet::import_org_xlsx(&path)
-            }
-            _ => ctx.unknown_cmd(),
-        },
         "config" => match ctx.cmd()? {
             "init" => cmd::config::init(),
             "show" => cmd::config::show(),
@@ -126,26 +116,6 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 let config_key: String = ctx.pull_arg("config_key", "name of the key to change in the configuration")?;
                 let config_value: String = ctx.pull_arg("config_value", "new value for the selected key")?;
                 cmd::config::set(config_key, config_value)
-            }
-            _ => ctx.unknown_cmd(),
-        },
-        "library" => match ctx.cmd()? {
-            "init" => {
-                let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
-                let library_domain_name: LibraryDomainName = ctx.pull_arg("library_domain_name", "library domain name")?;
-                cmd::library::init(&library_dir, library_domain_name)
-            }
-            "rescan" => {
-                let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
-                cmd::library::rescan(&library_dir).map_err(E::LibraryScanError)
-            }
-            "rescan-default" => {
-                let config = Config::load().map_err(CmdError::ConfigReadError)?;
-                cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryScanError)
-            }
-            "remove-domain" => {
-                let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;
-                cmd::library::remove_domain(library_domain).map_err(E::DatabaseError)
             }
             _ => ctx.unknown_cmd(),
         },
@@ -178,8 +148,34 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             },
             _ => ctx.unknown_cmd(),
         },
-        "vitals" => match ctx.cmd_opt()? {
-            Some("all") | None => cmd::vitals::check_all(),
+        "library" => match ctx.cmd()? {
+            "init" => {
+                let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
+                let library_domain_name: LibraryDomainName = ctx.pull_arg("library_domain_name", "library domain name")?;
+                cmd::library::init(&library_dir, library_domain_name)
+            }
+            "rescan" => {
+                let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
+                cmd::library::rescan(&library_dir).map_err(E::LibraryScanError)
+            }
+            "rescan-default" => {
+                let config = Config::load().map_err(CmdError::ConfigReadError)?;
+                cmd::library::rescan(&config.default_library_dir_path).map_err(E::LibraryScanError)
+            }
+            "remove-domain" => {
+                let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;
+                cmd::library::remove_domain(library_domain).map_err(E::DatabaseError)
+            }
+            _ => ctx.unknown_cmd(),
+        },
+        "log" => match ctx.cmd()? {
+            "open" => {
+                let log_dir = log_dir();
+                info_npr!("opening log directory: {log_dir:?}");
+                reveal_directory(&log_dir).expect("todo");
+                success_npr!("successfully opened log directory");
+                Ok(())
+            }
             _ => ctx.unknown_cmd(),
         },
         "performance" => match ctx.cmd()? {
@@ -194,6 +190,21 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 let name: String = ctx.pull_arg("name", "name of the player")?;
                 cmd::player::add(name)
             }
+            _ => ctx.unknown_cmd(),
+        },
+        "spreadsheet" => match ctx.cmd()? {
+            "import-org-ods" => {
+                let path: PathBuf = ctx.pull_arg("path", "path of the ods spreadsheet file")?;
+                cmd::spreadsheet::import_org_ods(&path)
+            }
+            "import-org-xlsx" => {
+                let path: PathBuf = ctx.pull_arg("path", "path of the xlsx spreadsheet file")?;
+                cmd::spreadsheet::import_org_xlsx(&path)
+            }
+            _ => ctx.unknown_cmd(),
+        },
+        "vitals" => match ctx.cmd_opt()? {
+            Some("all") | None => cmd::vitals::check_all(),
             _ => ctx.unknown_cmd(),
         },
         _ => ctx.unknown_cmd(),

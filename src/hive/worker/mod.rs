@@ -195,24 +195,32 @@ impl Worker {
     async fn execute_task_body(self: Arc<Self>, task: &mut Task) {
         log_fn_name!("worker:execute task");
 
-        let result = panic::catch_unwind(async || task.job.run(self).await);
+        let result = panic::catch_unwind(|| smol::block_on(task.job.run(self)));
         match result {
-            Ok(no_panic) => match no_panic.await {
+            Ok(no_panic) => match no_panic {
                 Ok(success) => {
-                    success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
+                    success!("task finished successfully: uuid: {}, results: {:#?}", task.uuid.0, success);
                     task.state = TaskState::Done;
                     task.result = Some(TaskResult::Success(success));
                 }
                 Err(error) => {
-                    error!("task failed: uuid: {} error: {:?}", task.uuid.0, error);
+                    error!("task failed: uuid: {}, reason: {} ({:?})", task.uuid.0, error, error);
                     task.state = TaskState::Failed;
                     task.result = Some(TaskResult::Error(error));
                 }
             },
             Err(panic) => {
-                error!("task panicked: uuid: {} error: {:?}", task.uuid.0, panic);
+                let disp_panic = if let Some(a) = panic.downcast_ref::<String>() {
+                    a.to_owned()
+                } else if let Some(a) = panic.downcast_ref::<&str>() {
+                    a.to_string()
+                } else {
+                    "<unknown>".to_string()
+                };
+                error!("task panicked: uuid: {}, reason: {disp_panic}", task.uuid.0);
                 task.state = TaskState::Failed;
-                task.result = Some(TaskResult::Error(job::Failure::Panic(format!("{panic:?}"))));
+                task.result = Some(TaskResult::Error(job::Failure::Panic(disp_panic)));
+                panic::resume_unwind(panic)
             }
         }
         task.finish_timestamp = Some(NsTimestamp::now());
