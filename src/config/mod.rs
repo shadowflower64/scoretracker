@@ -21,7 +21,7 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Result<&'static Self, &'static file_ex::Error> {
-        static LOADED_CONFIG: LazyLock<file_ex::Result<Config>> = LazyLock::new(|| Config::read_default_without_locking());
+        static LOADED_CONFIG: LazyLock<file_ex::Result<Config>> = LazyLock::new(Config::read_default_without_locking);
         LOADED_CONFIG.as_ref()
     }
 

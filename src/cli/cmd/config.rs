@@ -60,7 +60,7 @@ pub fn init() -> Result<(), CmdError> {
 
 pub fn show() -> Result<(), CmdError> {
     let config = Config::load().map_err(CmdError::ConfigReadError)?;
-    display_config(&config)
+    display_config(config)
 }
 
 pub fn set(key: String, value: String) -> Result<(), CmdError> {

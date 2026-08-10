@@ -75,7 +75,7 @@ pub fn test_scanning(args: &[String]) {
     log_fn_name!("playground:scanning");
 
     let library_dir = Path::new(args.get(1).expect("library dir path not provided"));
-    let shared_data_repo_path = Config::load().expect("invalid config").shared_data_repo_path;
+    let shared_data_repo_path = &Config::load().expect("invalid config").shared_data_repo_path;
     let library_db_path = Path::new("playground/test_library_database.json");
     scan_full(library_dir, library_db_path, None);
 }
