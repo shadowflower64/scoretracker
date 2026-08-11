@@ -65,13 +65,14 @@ pub fn game_instance_from_id(game_id: &str) -> Option<Box<dyn Game>> {
     serde_json::from_str(&json).ok()
 }
 
+/// Automatically implement common functions for Game impl.
+///
+/// Currently only implements [`Game::schema`].
+// TODO: this should probably become an attribute macro eventually.
 #[macro_export]
 macro_rules! game_impl {
     ($game:tt) => {
-        // fn schema_name(&self) -> String {
-        //     let game_name = stringify!($game).to_string();
-        //     game_name
-        // }
+        /// Generate a [`schemars::Schema`] for this game's types.
         fn schema(&self) -> schemars::Schema {
             use schemars::{JsonSchema, schema_for};
             // Dummy struct for generating a schema with multiple types at once
@@ -79,6 +80,7 @@ macro_rules! game_impl {
             struct __ {
                 __performance: $game::Performance,
                 __match: $game::Match,
+                //__song: $game::Song,
             }
             let schema = schema_for!(__);
             schema
@@ -86,11 +88,12 @@ macro_rules! game_impl {
     };
 }
 
+/// Register the provided game struct into the global GAMES registry (distributed slice).
 #[macro_export]
 macro_rules! register_game {
     ($game:tt) => {
         #[linkme::distributed_slice(crate::data::games::GAMES)]
-        fn game() -> Box<dyn Game + Send + Sync> {
+        fn create_game_instance() -> Box<dyn Game + Send + Sync> {
             Box::new($game)
         }
     };
