@@ -8,7 +8,7 @@
 
 use std::sync::LazyLock;
 
-use crate::data::game::Game;
+use crate::data::game::AnyGame;
 use linkme::distributed_slice;
 
 pub mod adofai;
@@ -41,10 +41,9 @@ pub mod vs;
 pub mod yarg;
 
 #[distributed_slice]
-pub static GAMES: [fn() -> Box<dyn Game + Send + Sync>];
+pub static GAMES: [fn() -> AnyGame];
 
-pub fn registered_games() -> &'static Vec<Box<dyn Game + Send + Sync>> {
-    static ALL_GAMES: LazyLock<Vec<Box<dyn Game + Send + Sync>>> =
-        LazyLock::new(|| GAMES.iter().map(|game_factory| game_factory()).collect());
+pub fn registered_games() -> &'static Vec<AnyGame> {
+    static ALL_GAMES: LazyLock<Vec<AnyGame>> = LazyLock::new(|| GAMES.iter().map(|game_factory| game_factory()).collect());
     &ALL_GAMES
 }

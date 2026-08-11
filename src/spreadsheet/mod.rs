@@ -5,7 +5,7 @@ pub mod record;
 
 use crate::config::Config;
 use crate::data::game::song::AnySong;
-use crate::data::game::{Game, game_instance_from_id};
+use crate::data::game::{AnyGame, game_instance_from_id};
 use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::r#match::AnyMatch;
 use crate::data::scoreboard::performance::AnyPerformance;
@@ -184,12 +184,12 @@ fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_re
 fn import_org_spreadsheet_page<
     T: fmt::Debug,
     E: Fn(BadRecordErrorWithContext) -> SpreadsheetImportError,
-    F: Fn(&Box<dyn Game>, &Record, &mut Context) -> ParseRecordResult<T>,
+    F: Fn(&AnyGame, &Record, &mut Context) -> ParseRecordResult<T>,
     G: FnMut(T, &mut Context),
     H: Fn(BadRecordErrorWithContext, &mut Context),
     I: Fn(BadRecordErrorWithContext, &mut Context),
 >(
-    game: Box<dyn Game>,
+    game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
     page_type: &str,
@@ -260,7 +260,7 @@ fn import_org_spreadsheet_page<
 }
 
 fn import_org_spreadsheet_matches(
-    game: Box<dyn Game>,
+    game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
     matches: &mut Vec<AnyMatch>,
@@ -290,7 +290,7 @@ fn import_org_spreadsheet_matches(
 }
 
 fn import_org_spreadsheet_songs(
-    game: Box<dyn Game>,
+    game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
     song_lists: &mut Vec<Vec<AnySong>>,

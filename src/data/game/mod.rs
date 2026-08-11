@@ -1,5 +1,6 @@
 pub mod song;
 
+use crate::data::games::registered_games;
 use crate::data::scoreboard::performance::AnyPerformance;
 use crate::spreadsheet::ContinueOrQuit::Quit;
 use crate::spreadsheet::context::Context;
@@ -7,7 +8,6 @@ use crate::spreadsheet::{BadRecordError, record::Record};
 use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult};
 use crate::util::command_line::AskError;
 use schemars::Schema;
-use serde::Serialize;
 use std::fmt::Debug;
 
 #[typetag::serde(tag = "game")]
@@ -39,6 +39,8 @@ pub trait Game: Debug {
     }
 }
 
+pub type AnyGame = &'static (dyn Game + Send + Sync);
+
 /// Get an instance of the [`Game`] trait based on the provided string ID of the game.
 ///
 /// # Examples
@@ -54,15 +56,15 @@ pub trait Game: Debug {
 /// let game = game_instance_from_id("nonexistent_game");
 /// assert!(game.is_none());
 /// ```
-pub fn game_instance_from_id(game_id: &str) -> Option<Box<dyn Game>> {
-    #[derive(Serialize)]
-    struct GameIdentifier {
-        pub game: String,
-    }
-    // TODO: replace this crap with actual normal fetching from the GAMES registry
-    let game_identifier = GameIdentifier { game: game_id.to_string() };
-    let json = serde_json::to_string(&game_identifier).unwrap();
-    serde_json::from_str(&json).ok()
+pub fn game_instance_from_id(game_id: &str) -> Option<AnyGame> {
+    registered_games().iter().find(|x| x.identifier() == game_id).map(|v| &**v)
+    // #[derive(Serialize)]
+    // struct GameIdentifier {
+    //     pub game: String,
+    // }
+    // let game_identifier = GameIdentifier { game: game_id.to_string() };
+    // let json = serde_json::to_string(&game_identifier).unwrap();
+    // serde_json::from_str(&json).ok()
 }
 
 /// Automatically implement common functions for Game impl.
@@ -96,8 +98,9 @@ macro_rules! game_impl {
 macro_rules! register_game {
     ($game:tt) => {
         #[linkme::distributed_slice($crate::data::games::GAMES)]
-        fn create_game_instance() -> Box<dyn Game + Send + Sync> {
-            Box::new($game)
+        fn create_game_instance() -> &'static (dyn Game + Send + Sync) {
+            static GAME: $game = $game;
+            &GAME
         }
     };
 }
