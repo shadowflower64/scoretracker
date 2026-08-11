@@ -4,6 +4,12 @@ export function unwrap<T>(foo: T | null | undefined): T {
     return foo;
 }
 
+export function expect<T>(foo: T | null | undefined, message: string): T {
+    if (foo === null) throw new TypeError(`element is null: ${message}`);
+    if (foo === undefined) throw new TypeError(`element is undefined: ${message}`);
+    return foo;
+}
+
 export function sleep(ms: number): Promise<void> {
     return new Promise((resolve, _reject) => {
         setTimeout(() => {

@@ -1,5 +1,5 @@
 import { ComponentTemplate, place, select, selectAll } from "../Component.js";
-import { UUID, UUID7 } from "../uuid.js";
+import { UUID, UUID7 } from "../lib/uuid.js";
 
 export const PerformanceTableEditorRow = ComponentTemplate.named("performance-table-editor-row", (f, params: { uuid: UUID; }) => {
     place(f, "uuid", params.uuid.toString());

@@ -2,7 +2,7 @@ import { select, selectAny } from "./Component.js";
 import { SongTablePage } from "./page/SongTablePage.js";
 import { makeTask } from "./tasks/Tasks.js";
 import { fetchText, sendRequest, sleep } from "./Util.js";
-import { UUID4 } from "./uuid.js";
+import { UUID4 } from "./lib/uuid.js";
 console.log("a", UUID4.generate());
 
 console.log("Hello from typescript!");

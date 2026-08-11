@@ -2,7 +2,7 @@ import { ComponentTemplate, place, select } from "../Component.js";
 import type * as InFalsus from "../gen/types/in_falsus.schema.js";
 import { Nanoseconds } from "../scoretracker/DataStructures.js";
 import { sendRequestAsJSON } from "../Util.js";
-import { UUID7 } from "../uuid.js";
+import { UUID7 } from "../lib/uuid.js";
 import { commonMatchInfoFromParts, EditMatchDialogGenericPartBottom, EditMatchDialogGenericPartTop } from "./EditMatchForm.js";
 
 export function showEditMatchDialogInFalsus(match: InFalsus.Match) {
