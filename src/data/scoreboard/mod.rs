@@ -8,7 +8,7 @@ pub mod score_db;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(untagged)]
-pub enum AnyValue {
+pub enum MetadataValue {
     String(String),
     Number(f64),
     Bool(bool),

@@ -183,7 +183,7 @@ impl Game for ADOFAI {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!(self);
+    game_impl!();
 }
 
 register_game!(ADOFAI);

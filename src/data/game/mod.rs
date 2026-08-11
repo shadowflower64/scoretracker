@@ -71,6 +71,9 @@ pub fn game_instance_from_id(game_id: &str) -> Option<Box<dyn Game>> {
 // TODO: this should probably become an attribute macro eventually.
 #[macro_export]
 macro_rules! game_impl {
+    () => {
+        game_impl!(self);
+    };
     ($game:tt) => {
         /// Generate a [`schemars::Schema`] for this game's types.
         fn schema(&self) -> schemars::Schema {

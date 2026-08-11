@@ -1,4 +1,4 @@
-use crate::data::scoreboard::AnyValue;
+use crate::data::scoreboard::MetadataValue;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::{command_line::AskError, uuid::UuidString};
 use indexmap::IndexMap;
@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-pub type MatchMetadata = IndexMap<String, AnyValue>;
+pub type MatchMetadata = IndexMap<String, MetadataValue>;
 pub type SongId = String;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]

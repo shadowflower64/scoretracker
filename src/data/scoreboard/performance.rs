@@ -1,4 +1,4 @@
-use crate::data::scoreboard::AnyValue;
+use crate::data::scoreboard::MetadataValue;
 use crate::util::{command_line::AskError, uuid::UuidString};
 use indexmap::IndexMap;
 use schemars::JsonSchema;
@@ -29,7 +29,7 @@ use std::fmt::Debug;
 //     }
 // }
 
-pub type PerformanceMetadata = IndexMap<String, AnyValue>;
+pub type PerformanceMetadata = IndexMap<String, MetadataValue>;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct CommonPerformanceInfo {

@@ -1,37 +1,27 @@
-type u32 = number;
-type i32 = number;
-type f64 = number;
-type Option<T> = T | null;
 type UuidString = string;
-type Vec<T> = Array<T>;
 
-/// This type is a `bigint` 99% of the time - it is only a `number` if it is very close to 1970-01-01 (within a few hours)
-export type NsTimestamp = bigint | number;
-export type BigintNsTimestamp = bigint;
-export function msToNs(ms: number): BigintNsTimestamp {
-    return BigInt(ms) * 1_000_000n;
+export interface Nanoseconds {
+    seconds: number;
+    frac: number;
 }
-export function nsToMs(ns: BigintNsTimestamp): number {
-    return Number(ns / 1_000_000n);
+export type NsTimestamp = Nanoseconds;
+export function nanos(nanoseconds: Nanoseconds): bigint {
+    return (BigInt(nanoseconds.seconds) * 1_000_000_000n) + BigInt(nanoseconds.frac);
 }
-export function nsTimestampToBigint(nsTimestamp: NsTimestamp): BigintNsTimestamp {
-    return BigInt(nsTimestamp);
+export function millisFloor(nanoseconds: Nanoseconds): number {
+    return Number(nanos(nanoseconds) / 1_000_000n);
 }
-export function nsTimestampComponents(nsTimestamp: BigintNsTimestamp): [Date, number] {
-    const ms = nsToMs(nsTimestamp);
-    // const date = new Date(Math.floor(ms / 1_000) * 1_000);
-    const date = new Date(ms);
-    return [
-        date,
-        Number(nsTimestamp % 1_000_000n)
-        // Number(nsTimestamp % 1_000_000_000n)
-    ];
+export function fromMillis(ms: number): Nanoseconds {
+    return {
+        seconds: Math.floor(ms / 1000),
+        frac: (ms % 1000) * 1_000_000
+    };
 }
 
 export type MetadataValue = string | number | boolean;
 export type GenericMetadata = { [key: string]: MetadataValue; };
-export type MatchMetadata = GenericMetadata;
-export type PerformanceMetadata = GenericMetadata;
+export type MatchMetadata = { [key: string]: MetadataValue; };
+export type PerformanceMetadata = { [key: string]: MetadataValue; };
 
 export type CommonPerformanceInfo = {
     /// UUID of the performance.
@@ -41,10 +31,10 @@ export type CommonPerformanceInfo = {
     player_uuid: UuidString,
 
     /// List of library entry UUIDs that are proof of this performance.
-    proof: Vec<UuidString>,
+    proof: UuidString[],
 
     /// Optional user comment.
-    comment: Option<string>,
+    comment?: string | null,
 
     /// Any additional performance metadata.
     metadata: PerformanceMetadata,
@@ -61,140 +51,14 @@ export type CommonMatchInfo = {
     song_id: string,
 
     /// Performances belonging to this match.
-    performance_ids: Vec<UuidString>,
+    performance_ids: UuidString[],
 
     /// List of library entry UUIDs that are proof of this match.
-    proof: Vec<UuidString>,
+    proof: UuidString[],
 
     /// Optional user comment.
-    comment: Option<string>,
+    comment?: string | null,
 
     /// Any additional match metadata.
     metadata: MatchMetadata,
 };
-
-export namespace InFalsus {
-    export type JudgementCountSplit = {
-        early: u32,
-        late: u32,
-    };
-
-    export type SimpleBreakdown = {
-        critical_exact: u32,
-        exact: u32,
-        near: u32,
-        break: u32,
-    };
-
-    export type FullJudgementCount = {
-        tap: u32,
-        hold: u32,
-        field: u32,
-        flick: u32,
-    };
-
-    export type FullBreakdown = {
-        critical_exact: FullJudgementCount,
-        exact: FullJudgementCount,
-        near: FullJudgementCount,
-        break: FullJudgementCount,
-    };
-
-    export type Loadout = {};
-
-    export type PlayerInfo = {
-        name: String,
-        loadout: Loadout,
-    };
-
-    export type EncounterResultType = "connected";
-
-    export type EncounterResultShort = {
-        main_score: u32,
-        status: EncounterResultType,
-        stars: u32,
-        own_info: PlayerInfo,
-        opponent_info: PlayerInfo,
-    };
-
-    export type OffensiveStats = {
-        offensive_rate: u32,
-        damage_dealt: f64,
-        traits: f64,
-        performance: f64,
-        performance_max: f64,
-        resolve_recovered_opponent: f64,
-    };
-
-
-    export type DefensiveStats = {
-        defensive_rate: u32,
-        damage_received: f64,
-        traits: f64,
-        performance: f64,
-        performance_max: f64,
-        resolve_recovered_own: f64,
-    };
-
-
-    export type PhaseStartStats = {
-        resolve: f64,
-        power: u32,
-        defense: u32,
-    };
-
-    export type DamageDealtStats = {
-        traits: f64,
-        performance: f64,
-        performance_max: f64,
-        critical_exact: f64,
-        exact: f64,
-        near: f64,
-        break: f64,
-    };
-
-    export type ResolveRecoveredStats = {
-        traits: f64,
-    };
-
-    export type PhaseStats = {
-        phase_start_stats: PhaseStartStats,
-        damage_dealt: DamageDealtStats,
-        resolve_recovered: ResolveRecoveredStats,
-    };
-
-    export type Side = "own" | "opponent";
-
-    export type Phase = {
-        own: PhaseStats,
-        opponent: PhaseStats,
-        highlighted: Side,
-    };
-
-    export type EncounterResultFull = {
-        offensive_stats: OffensiveStats,
-        defensive_stats: DefensiveStats,
-        phases: [Phase, Phase, Phase, Phase, Phase],
-    };
-
-    export type DiveStatus = "dive_failed" | "dive_cleared" | "full_link" | "perfect_dive";
-
-    export type Results = {
-        max_link: u32,
-        score: u32,
-        simple_breakdown: SimpleBreakdown,
-        full_breakdown: Option<FullBreakdown>,
-        exact_split: Option<JudgementCountSplit>,
-        near_split: Option<JudgementCountSplit>,
-        dive_status: DiveStatus,
-        miss_hp: i32,
-        encounter_result: EncounterResultShort,
-        encounter_result_full: EncounterResultFull,
-    };
-
-    export type Performance = CommonPerformanceInfo & {
-        results: Results;
-    };
-
-    export type Match = CommonMatchInfo;
-}

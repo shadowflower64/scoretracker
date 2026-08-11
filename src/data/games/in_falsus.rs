@@ -3,16 +3,18 @@
 use crate::data::game::Game;
 use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
 use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::{game_impl, register_game};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Judgement count split between early/late, shown on mouse hover
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct JudgementCountSplit {
     pub early: u32,
     pub late: u32,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct SimpleBreakdown {
     pub critical_exact: u32,
     pub exact: u32,
@@ -21,7 +23,7 @@ pub struct SimpleBreakdown {
     pub break_: u32,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct FullJudgementCount {
     pub tap: u32,
     pub hold: u32,
@@ -29,7 +31,7 @@ pub struct FullJudgementCount {
     pub flick: u32,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct FullBreakdown {
     pub critical_exact: FullJudgementCount,
     pub exact: FullJudgementCount,
@@ -38,22 +40,22 @@ pub struct FullBreakdown {
     pub break_: FullJudgementCount,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Loadout; // TODO
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct PlayerInfo {
     pub name: String,
     pub loadout: Loadout,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EncounterResultType {
     Connected,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct EncounterResultShort {
     pub main_score: u32,
     pub status: EncounterResultType,
@@ -62,7 +64,7 @@ pub struct EncounterResultShort {
     pub opponent_info: PlayerInfo,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct OffensiveStats {
     pub offensive_rate: u32,
     pub damage_dealt: f64,
@@ -72,7 +74,7 @@ pub struct OffensiveStats {
     pub resolve_recovered_opponent: f64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct DefensiveStats {
     pub defensive_rate: u32,
     pub damage_received: f64,
@@ -82,14 +84,14 @@ pub struct DefensiveStats {
     pub resolve_recovered_own: f64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct PhaseStartStats {
     pub resolve: f64,
     pub power: u32,
     pub defense: u32,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct DamageDealtStats {
     pub traits: f64,
     pub performance: f64,
@@ -101,40 +103,40 @@ pub struct DamageDealtStats {
     pub break_: f64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct ResolveRecoveredStats {
     pub traits: f64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct PhaseStats {
     pub phase_start_stats: PhaseStartStats,
     pub damage_dealt: DamageDealtStats,
     pub resolve_recovered: ResolveRecoveredStats,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Own,
     Opponent,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Phase {
     pub own: PhaseStats,
     pub opponent: PhaseStats,
     pub highlighted: Side,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct EncounterResultFull {
     pub offensive_stats: OffensiveStats,
     pub defensive_stats: DefensiveStats,
     pub phases: [Phase; 5],
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DiveStatus {
     DiveFailed,
@@ -143,7 +145,7 @@ pub enum DiveStatus {
     PerfectDive,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Results {
     pub max_link: u32,
     pub score: u32,
@@ -157,7 +159,7 @@ pub struct Results {
     pub encounter_result_full: EncounterResultFull,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,
@@ -174,7 +176,7 @@ impl PerformanceTrait for Performance {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Match {
     #[serde(flatten)]
     pub common: CommonMatchInfo,
@@ -201,4 +203,8 @@ impl Game for InFalsus {
     fn url_shortname(&self) -> &'static str {
         "in_falsus"
     }
+
+    game_impl!();
 }
+
+register_game!(InFalsus);

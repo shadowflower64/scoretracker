@@ -55,6 +55,7 @@ pub fn gen_types() -> Result<(), CmdError> {
         .arg(input_dir)
         .arg("-o")
         .arg(output_dir)
+        .arg("--no-additionalProperties")
         // .arg("--unreachableDefinitions")
         .arg("--bannerComment")
         .arg(

@@ -8,13 +8,12 @@
  */
 
 export type UuidString = string;
-export type AnyValue = string | number | boolean;
+export type MetadataValue = string | number | boolean;
 export type Lamp = "none" | "clear" | "fc" | "perfect_fc" | "pure_perfect_fc" | "strict_pure_perfect_fc";
 
 export interface __ {
   __performance: Performance;
   __match: Match;
-  [k: string]: unknown;
 }
 export interface Performance {
   /**
@@ -37,7 +36,7 @@ export interface Performance {
    * Any additional performance metadata.
    */
   metadata: {
-    [k: string]: AnyValue;
+    [k: string]: MetadataValue;
   };
   lamp: Lamp;
   misses: number;
@@ -49,7 +48,6 @@ export interface Performance {
   late_perfect: number;
   perfect: number;
   checkpoints_used: number;
-  [k: string]: unknown;
 }
 export interface Match {
   /**
@@ -77,9 +75,8 @@ export interface Match {
    * Any additional match metadata.
    */
   metadata: {
-    [k: string]: AnyValue;
+    [k: string]: MetadataValue;
   };
-  [k: string]: unknown;
 }
 /**
  * Timestamp of the match - specifically, the timestamp of the first frame of the end screen. Can be approximate.
@@ -87,5 +84,4 @@ export interface Match {
 export interface NsTimestamp {
   seconds: number;
   frac: number;
-  [k: string]: unknown;
 }

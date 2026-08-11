@@ -8,12 +8,11 @@
  */
 
 export type UuidString = string;
-export type AnyValue = string | number | boolean;
+export type MetadataValue = string | number | boolean;
 
 export interface __ {
   __performance: Performance;
   __match: Match;
-  [k: string]: unknown;
 }
 export interface Performance {
   /**
@@ -36,7 +35,7 @@ export interface Performance {
    * Any additional performance metadata.
    */
   metadata: {
-    [k: string]: AnyValue;
+    [k: string]: MetadataValue;
   };
   /**
    * Mode that this performance was played on.
@@ -70,7 +69,6 @@ export interface Performance {
    * Score in range [0..10_000_000+note_count]. Only present for Normal mode.
    */
   score: number;
-  [k: string]: unknown;
 }
 export interface Match {
   /**
@@ -98,14 +96,13 @@ export interface Match {
    * Any additional match metadata.
    */
   metadata: {
-    [k: string]: AnyValue;
+    [k: string]: MetadataValue;
   };
   /**
    * String of the game version that was played on for this match.
    * None for unknown.
    */
   game_version?: string | null;
-  [k: string]: unknown;
 }
 /**
  * Timestamp of the match - specifically, the timestamp of the first frame of the end screen. Can be approximate.
@@ -113,5 +110,4 @@ export interface Match {
 export interface NsTimestamp {
   seconds: number;
   frac: number;
-  [k: string]: unknown;
 }
