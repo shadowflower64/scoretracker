@@ -19,7 +19,7 @@ export namespace Nanoseconds {
     export function normalize(nanoseconds: Nanoseconds): Nanoseconds {
         const secondsWhole = Math.floor(nanoseconds.seconds);
         const secondsFrac = nanoseconds.seconds - secondsWhole;
-        const totalNs = (BigInt(secondsWhole) * 1_000_000_000n) + BigInt(secondsFrac * 1_000_000_000) + BigInt(nanoseconds.frac);
+        const totalNs = (BigInt(secondsWhole) * 1_000_000_000n) + BigInt(Math.floor(secondsFrac * 1_000_000_000)) + BigInt(Math.floor(nanoseconds.frac));
         return fromNanos(totalNs);
     }
 

@@ -38,4 +38,4 @@ makeTaskBtn.addEventListener("click", async () => {
         }
     });
     console.log(result);
-});;;
+});

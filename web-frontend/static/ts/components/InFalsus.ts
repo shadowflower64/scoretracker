@@ -1,5 +1,5 @@
-import { ComponentTemplate, place, select } from "../Component.js";
 import type * as InFalsus from "../gen/types/in_falsus.schema.js";
+import { ComponentTemplate, place, select } from "../Component.js";
 import { Nanoseconds } from "../scoretracker/DataStructures.js";
 import { sendRequestAsJSON } from "../Util.js";
 import { UUID7 } from "../lib/uuid.js";
@@ -23,23 +23,13 @@ export const EditMatchDialogInFalsus = ComponentTemplate.named("edit-match-dialo
     form.addEventListener("submit", async () => {
         const common = commonMatchInfoFromParts(genericPartTop, genericPartBottom);
         const all: InFalsus.Match = common;
-        console.log("all", all);
-
         await sendRequestAsJSON(`/api/match/${all.uuid}`, "PUT", all);
-
         const dialog = select(document, "dialog", "#edit-match-dialog-infalsus");
         dialog.close();
     });
 });
-export const EditMatchBtnInFalsus = ComponentTemplate.named("edit-match-btn-infalsus", (f, params) => {
+
+export const EditMatchBtnInFalsus = ComponentTemplate.named("edit-match-btn-infalsus", (f, params: { match: InFalsus.Match; }) => {
     const btn = select(f, "button", "#btn");
-    btn.addEventListener("click", () => showEditMatchDialogInFalsus({
-        uuid: UUID7.generate().toString(),
-        timestamp: Nanoseconds.fromMillisParts(Date.now(), 123456789),
-        song_id: "xi-freedom_dive",
-        performance_ids: [],
-        proof: [],
-        comment: "Example user comment",
-        metadata: { abc: "def", ghi: 123, jkl: true }
-    }));
+    btn.addEventListener("click", () => showEditMatchDialogInFalsus(params.match));
 });

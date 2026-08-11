@@ -1,6 +1,8 @@
-import { screenDiv } from "../app.js";
+import { screenDiv } from "../main.js";
 import { EditMatchBtnInFalsus } from "../components/InFalsus.js";
 import { SongTable, SongTableRow } from "../components/SongTable.js";
+import { UUID7 } from "../lib/uuid.js";
+import { Nanoseconds } from "../scoretracker/DataStructures.js";
 import type { ALL_GAMES } from "../scoretracker/Games.js";
 import { AbstractPage } from "./AbstractPage.js";
 
@@ -15,7 +17,18 @@ export class SongTablePage extends AbstractPage {
         screenDiv.append(songTable);
         screenDiv.append(document.createElement("hr"));
 
-        const editMatchBtn = EditMatchBtnInFalsus.create({});
+        const editMatchBtn = EditMatchBtnInFalsus.create({
+            // TODO: this is just an example button
+            match: {
+                uuid: UUID7.generate().toString(),
+                timestamp: Nanoseconds.fromMillisParts(Date.now(), 123456789),
+                song_id: "xi-freedom_dive",
+                performance_ids: [],
+                proof: [],
+                comment: "Example user comment",
+                metadata: { abc: "def", ghi: 123, jkl: true }
+            }
+        });
         screenDiv.append(editMatchBtn);
     }
     constructor(protected gameId: keyof typeof ALL_GAMES) {
