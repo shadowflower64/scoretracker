@@ -93,6 +93,13 @@ impl Job for CutLibraryVideoJob {
                     &destination_library_dir,
                     &config.library_database_path(),
                     &self.destination_path,
+                    |entry| {
+                        entry.cloth = Some(ClothInfo {
+                            uuid: *source_proof_uuid,
+                            start_point: self.cut_start_point,
+                            end_point: self.cut_end_point,
+                        })
+                    },
                     worker_info,
                 )
                 .map_err(|e| Fail::CannotRegisterFileIntoLibrary {

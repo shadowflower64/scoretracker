@@ -21,7 +21,7 @@ use thiserror::Error;
 #[serde(tag = "type", content = "details")]
 pub enum Success {
     Void,
-    ProcessedVideo { dry: UuidString, wet: UuidString },
+    ProcessedVideo { dry: UuidString, wet: Option<UuidString> },
     CutVideo { cloth: ClothInfo, fragment: Option<UuidString> },
 }
 

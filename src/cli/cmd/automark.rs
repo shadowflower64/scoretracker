@@ -11,7 +11,9 @@ use std::path::PathBuf;
 use std::sync::LazyLock;
 
 pub fn identify_media_based_on_relpath(relpath: &RelativePath) -> MediaCategory {
-    let filename = relpath.file_name().expect("todo: filename should be the last part of relpath");
+    let Some(filename) = relpath.file_name() else {
+        return MediaCategory::Unspecified;
+    };
 
     pub const OBS_REPLAY: &str = r"^Replay \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}";
     pub const OBS_REC: &str = r"^\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}";

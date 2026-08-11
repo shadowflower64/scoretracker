@@ -21,7 +21,7 @@ pub mod info;
 pub mod stpl_url;
 
 use crate::data::library::cache::LibraryCache;
-use crate::data::library::database::LibraryDatabase;
+use crate::data::library::database::{LibraryDatabase, LibraryEntry};
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
@@ -272,10 +272,11 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
     Ok(())
 }
 
-pub fn scan_register_added_files(
+pub fn scan_register_added_files<F: Fn(&mut LibraryEntry)>(
     _library_dir: &Path,
     _library_db_path: &Path,
     _file_paths: Vec<&Path>,
+    _entry_mutator: F,
     _worker_info: Option<&WorkerInfo>,
 ) -> Result<Vec<UuidString>, LibraryScanError> {
     //log_fn_name!("library:scan_register_added_files");
@@ -283,14 +284,15 @@ pub fn scan_register_added_files(
     todo!()
 }
 
-pub fn scan_register_added_file(
+pub fn scan_register_added_file<F: Fn(&mut LibraryEntry)>(
     library_dir: &Path,
     library_db_path: &Path,
     file_path: &Path,
+    entry_mutator: F,
     worker_info: Option<&WorkerInfo>,
 ) -> Result<UuidString, LibraryScanError> {
     Ok(
-        *scan_register_added_files(library_dir, library_db_path, vec![file_path], worker_info)?
+        *scan_register_added_files(library_dir, library_db_path, vec![file_path], entry_mutator, worker_info)?
             .first()
             .unwrap(),
     )

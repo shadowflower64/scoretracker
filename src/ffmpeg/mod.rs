@@ -1,8 +1,6 @@
-use std::path::Path;
-
+use crate::{error, hive::jobs::process_library_video::ProcessingType, info, log_fn_name, success};
 use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress};
-
-use crate::{error, info, log_fn_name, success};
+use std::path::Path;
 
 pub async fn ffmpeg_cut_video_streamcopy<OnProgress: Fn(Progress) + Send + Sync + 'static>(
     source_path: &Path,
@@ -31,6 +29,47 @@ pub async fn ffmpeg_cut_video_streamcopy<OnProgress: Fn(Progress) + Send + Sync 
                 .audio_codec(Codec::copy())
                 .video_codec(Codec::copy()),
         )
+        .no_overwrite()
+        .on_progress(on_progress);
+
+    let args = ffmpeg.build_args();
+    info!("running ffmpeg with arguments: {args:?}");
+
+    match ffmpeg.run().await.unwrap().into_result() {
+        Ok(out) => {
+            success!(
+                "ffmpeg process finished successfully (exit code {}): stdout: {:?}, stderr: {:?}",
+                out.status,
+                out.stdout_str(),
+                out.stderr_str()
+            );
+            Ok(())
+        }
+        Err(e) => {
+            error!("ffmpeg process finished with an error (non-zero exit code): {e:?}");
+            Err(e)?
+        }
+    }
+}
+
+pub async fn ffmpeg_process_video<OnProgress: Fn(Progress) + Send + Sync + 'static>(
+    source_path: &Path,
+    destination_path: &Path,
+    processing_type: ProcessingType,
+    on_progress: OnProgress,
+) -> Result<(), rust_ffmpeg::Error> {
+    log_fn_name!("ffmpeg_cut_video_streamcopy");
+
+    let vcodec = processing_type.vcodec();
+    let acodec = processing_type.acodec();
+
+    let input = Input::new(source_path.to_string_lossy().to_string());
+    let output = Output::new(destination_path.to_string_lossy().to_string())
+        .video_codec_opts(vcodec)
+        .audio_codec_opts(acodec);
+    let ffmpeg = FFmpegBuilder::new()?
+        .input(input)
+        .output(output)
         .no_overwrite()
         .on_progress(on_progress);
 
