@@ -140,6 +140,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "gen" => cmd::schema::gen_full(),
             "gen-json" => cmd::schema::gen_json(),
             "gen-types" => cmd::schema::gen_types(),
+            "clean" => cmd::schema::clean(),
             _ => ctx.unknown_cmd(),
         },
         "hive" => match ctx.cmd()? {

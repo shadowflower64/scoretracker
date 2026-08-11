@@ -5,6 +5,12 @@
 //!
 //! The structure for Game is always empty and contains some static functions can be defined per-game.
 //! An instance of a Game structure can be created by using [`crate::data::game::game_instance_from_id`]
+
+use std::sync::LazyLock;
+
+use crate::data::game::Game;
+use linkme::distributed_slice;
+
 pub mod adofai;
 pub mod arcaea;
 pub mod beatstar;
@@ -33,3 +39,12 @@ pub mod rizline;
 pub mod unbeatable;
 pub mod vs;
 pub mod yarg;
+
+#[distributed_slice]
+pub static GAMES: [fn() -> Box<dyn Game + Send + Sync>];
+
+pub fn registered_games() -> &'static Vec<Box<dyn Game + Send + Sync>> {
+    static ALL_GAMES: LazyLock<Vec<Box<dyn Game + Send + Sync>>> =
+        LazyLock::new(|| GAMES.iter().map(|game_factory| game_factory()).collect());
+    &*ALL_GAMES
+}

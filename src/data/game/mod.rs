@@ -6,11 +6,15 @@ use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
 use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult};
 use crate::util::command_line::AskError;
+use schemars::Schema;
 use serde::Serialize;
 use std::fmt::Debug;
 
 #[typetag::serde(tag = "game")]
 pub trait Game: Debug {
+    fn identifier(&self) -> &'static str {
+        self.typetag_name()
+    }
     fn pretty_name(&self) -> &'static str;
     fn url_shortname(&self) -> &'static str;
 
@@ -24,6 +28,14 @@ pub trait Game: Debug {
 
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
         Err(Quit(BadRecordError::NotImplemented))
+    }
+
+    fn schema_name(&self) -> String {
+        self.identifier().to_string()
+    }
+
+    fn schema(&self) -> Schema {
+        unimplemented!()
     }
 }
 
@@ -47,7 +59,39 @@ pub fn game_instance_from_id(game_id: &str) -> Option<Box<dyn Game>> {
     struct GameIdentifier {
         pub game: String,
     }
+    // TODO: replace this crap with actual normal fetching from the GAMES registry
     let game_identifier = GameIdentifier { game: game_id.to_string() };
     let json = serde_json::to_string(&game_identifier).unwrap();
     serde_json::from_str(&json).ok()
+}
+
+#[macro_export]
+macro_rules! game_impl {
+    ($game:tt) => {
+        // fn schema_name(&self) -> String {
+        //     let game_name = stringify!($game).to_string();
+        //     game_name
+        // }
+        fn schema(&self) -> schemars::Schema {
+            use schemars::{JsonSchema, schema_for};
+            // Dummy struct for generating a schema with multiple types at once
+            #[derive(JsonSchema)]
+            struct __ {
+                __performance: $game::Performance,
+                __match: $game::Match,
+            }
+            let schema = schema_for!(__);
+            schema
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! register_game {
+    ($game:tt) => {
+        #[linkme::distributed_slice(crate::data::games::GAMES)]
+        fn game() -> Box<dyn Game + Send + Sync> {
+            Box::new($game)
+        }
+    };
 }

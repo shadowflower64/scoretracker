@@ -8,7 +8,13 @@
  */
 
 export type UuidString = string;
+export type AnyValue = string | number | boolean;
 
+export interface __ {
+  __performance: Performance;
+  __match: Match;
+  [k: string]: unknown;
+}
 export interface Performance {
   /**
    * UUID of the performance.
@@ -26,7 +32,12 @@ export interface Performance {
    * Optional user comment.
    */
   comment?: string | null;
-  metadata: PerformanceMetadata;
+  /**
+   * Any additional performance metadata.
+   */
+  metadata: {
+    [k: string]: AnyValue;
+  };
   /**
    * Mode that this performance was played on.
    */
@@ -61,9 +72,46 @@ export interface Performance {
   score: number;
   [k: string]: unknown;
 }
+export interface Match {
+  /**
+   * UUID of the match.
+   */
+  uuid: string;
+  timestamp: NsTimestamp;
+  /**
+   * Named ID of the song.
+   */
+  song_id: string;
+  /**
+   * Performances belonging to this match.
+   */
+  performance_ids: UuidString[];
+  /**
+   * List of library entry UUIDs that are proof of this match.
+   */
+  proof: UuidString[];
+  /**
+   * Optional user comment.
+   */
+  comment?: string | null;
+  /**
+   * Any additional match metadata.
+   */
+  metadata: {
+    [k: string]: AnyValue;
+  };
+  /**
+   * String of the game version that was played on for this match.
+   * None for unknown.
+   */
+  game_version?: string | null;
+  [k: string]: unknown;
+}
 /**
- * Any additional performance metadata.
+ * Timestamp of the match - specifically, the timestamp of the first frame of the end screen. Can be approximate.
  */
-export interface PerformanceMetadata {
+export interface NsTimestamp {
+  seconds: number;
+  frac: number;
   [k: string]: unknown;
 }

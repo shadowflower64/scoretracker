@@ -1,7 +1,9 @@
 //! Module for nanosecond timestamp and duration structures: [`Nanoseconds`] and [`NsDuration`].
 use chrono::{DateTime, Local, SecondsFormat, TimeZone, Utc};
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, MapAccess};
 use serde::{Deserialize, Serialize, de::Visitor};
+use std::borrow::Cow;
 use std::fmt;
 use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 use std::time::SystemTimeError;
@@ -25,7 +27,7 @@ pub enum Error {
     OutOfRange,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 struct SerializableStruct {
     pub seconds: i64,
     pub frac: u32,
@@ -259,6 +261,15 @@ impl<'de> Deserialize<'de> for NsTimestamp {
         //     return Ok(NsTimestamp(a));
         // }
         Nanoseconds::deserialize(deserializer).map(Self)
+    }
+}
+
+impl JsonSchema for NsTimestamp {
+    fn schema_name() -> Cow<'static, str> {
+        "NsTimestamp".into()
+    }
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        SerializableStruct::json_schema(generator)
     }
 }
 

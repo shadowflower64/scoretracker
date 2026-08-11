@@ -13,11 +13,13 @@ use crate::spreadsheet::SkipOrQuit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
 use crate::util::command_line::AskError;
+use crate::{game_impl, register_game};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
 pub type JudgementCount = u32;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Match {
     #[serde(flatten)]
     pub common: CommonMatchInfo,
@@ -180,4 +182,8 @@ impl Game for ADOFAI {
         // Err(Critical(RecordError::NotImplemented))
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
+
+    game_impl!(self);
 }
+
+register_game!(ADOFAI);

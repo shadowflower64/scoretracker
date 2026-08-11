@@ -1,13 +1,12 @@
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
-
 use crate::error::CmdError;
 use fs_extra::file::write_all;
-use schemars::schema_for;
-use scoretracker::data::games::{adofai, arcaea};
+use scoretracker::data::games::registered_games;
 use scoretracker::util::relative_path_from_segments;
-use scoretracker::{error, info, log_fn_name, success};
+use scoretracker::{error, info, log_fn_name, success, success_npr};
+use std::fs;
+use std::io::ErrorKind;
+use std::path::PathBuf;
+use std::process::Command;
 
 pub const SCHEMAS_DIR: &[&str] = &["gen", "schemas"];
 pub fn schemas_dir_path() -> PathBuf {
@@ -32,17 +31,13 @@ pub fn gen_json() -> Result<(), CmdError> {
     let dir = schemas_dir_path();
     fs::create_dir_all(&dir).expect("could not create dir for schemas");
 
-    let schema = schema_for!(adofai::Performance);
-    let schema_str = serde_json::to_string_pretty(&schema).unwrap();
-    let path = dir.join("adofai.schema.json");
-    write_all(&path, &schema_str).expect("could not write to file");
-    success!("json schema written to {path:?}");
-
-    let schema = schema_for!(arcaea::Performance);
-    let schema_str = serde_json::to_string_pretty(&schema).unwrap();
-    let path = dir.join("arcaea.schema.json");
-    write_all(&path, &schema_str).expect("could not write to file");
-    success!("json schema written to {path:?}");
+    for (name, schema) in registered_games().iter().map(|game| (game.schema_name(), game.schema())) {
+        let schema_str = serde_json::to_string_pretty(&schema)
+            .unwrap_or_else(|e| panic!("could not serialize schema '{name}'; reason: {e}; schema: {schema:?}"));
+        let path = dir.join(format!("{name}.schema.json"));
+        write_all(&path, &schema_str).unwrap_or_else(|e| panic!("could not write schema '{name}' to file: {path:?}; reason: {e}"));
+        success!("json schema written to {path:?}");
+    }
     Ok(())
 }
 
@@ -52,6 +47,7 @@ pub fn gen_types() -> Result<(), CmdError> {
 
     let input_dir = schemas_dir_path().to_string_lossy().to_string();
     let output_dir = types_dir_path().to_string_lossy().to_string();
+    info!("generated files will be written to: {:?}", types_dir_path());
 
     let out = Command::new("npx")
         .arg("json2ts")
@@ -59,6 +55,7 @@ pub fn gen_types() -> Result<(), CmdError> {
         .arg(input_dir)
         .arg("-o")
         .arg(output_dir)
+        // .arg("--unreachableDefinitions")
         .arg("--bannerComment")
         .arg(
             r"/* eslint-disable */
@@ -81,5 +78,24 @@ pub fn gen_types() -> Result<(), CmdError> {
         error!("process json2ts failed: {}", out.status)
     }
 
+    Ok(())
+}
+
+pub fn clean() -> Result<(), CmdError> {
+    let path1 = schemas_dir_path();
+    fs::remove_dir_all(&path1).unwrap_or_else(|e| match e.kind() {
+        ErrorKind::NotFound => {}
+        _ => {
+            panic!("could not remove directory: {path1:?}, reason: {e}");
+        }
+    });
+    let path2 = types_dir_path();
+    fs::remove_dir_all(&path2).unwrap_or_else(|e| match e.kind() {
+        ErrorKind::NotFound => {}
+        _ => {
+            panic!("could not remove directory: {path2:?}, reason: {e}");
+        }
+    });
+    success_npr!("deleted {path1:?} and {path2:?} directories");
     Ok(())
 }

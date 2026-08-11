@@ -11,10 +11,11 @@ use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult};
 use crate::util::command_line::AskError;
+use crate::{game_impl, register_game};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Match {
     #[serde(flatten)]
     pub common: CommonMatchInfo,
@@ -177,4 +178,8 @@ impl Game for Arcaea {
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
+
+    game_impl!(self);
 }
+
+register_game!(Arcaea);
