@@ -46,5 +46,5 @@ pub static GAMES: [fn() -> Box<dyn Game + Send + Sync>];
 pub fn registered_games() -> &'static Vec<Box<dyn Game + Send + Sync>> {
     static ALL_GAMES: LazyLock<Vec<Box<dyn Game + Send + Sync>>> =
         LazyLock::new(|| GAMES.iter().map(|game_factory| game_factory()).collect());
-    &*ALL_GAMES
+    &ALL_GAMES
 }

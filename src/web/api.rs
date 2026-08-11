@@ -1,35 +1,32 @@
-use crate::{
-    data::{
-        games::{gh3, in_falsus},
-        scoreboard::r#match::{AnyMatch, CommonMatchInfo, MatchMetadata},
-    },
-    info, log_fn_name,
-    util::timestamp::NsTimestamp,
-};
+use crate::data::games::{gh3, in_falsus};
+use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchMetadata};
+use crate::info;
+use crate::log_fn_name;
+use crate::util::timestamp::NsTimestamp;
 use actix_web::{HttpRequest, HttpResponse, Responder, get, put, web};
 use serde::Serialize;
 use uuid::Uuid;
 
-fn make_get_list_response_ok<T: Serialize>(items: Vec<T>) -> impl Responder {
-    #[derive(Serialize)]
-    #[serde(tag = "status", rename_all = "snake_case")]
-    enum ResponseGetList<T: Serialize> {
-        Ok { items: Vec<T> },
-        Error,
-    }
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum ResponseGetList<T: Serialize> {
+    Ok { items: Vec<T> },
+    _Error,
+}
 
+fn make_get_list_response_ok<T: Serialize>(items: Vec<T>) -> impl Responder {
     let response = ResponseGetList::Ok { items };
     HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
 }
 
-fn make_put_response_ok<T: Serialize>(item: T) -> impl Responder {
-    #[derive(Serialize)]
-    #[serde(tag = "status", rename_all = "snake_case")]
-    enum ResponsePut<T: Serialize> {
-        Ok { item: T },
-        Error,
-    }
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum ResponsePut<T: Serialize> {
+    Ok { item: T },
+    _Error,
+}
 
+fn make_put_response_ok<T: Serialize>(item: T) -> impl Responder {
     let response = ResponsePut::Ok { item };
     HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
 }

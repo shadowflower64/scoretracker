@@ -95,7 +95,7 @@ macro_rules! game_impl {
 #[macro_export]
 macro_rules! register_game {
     ($game:tt) => {
-        #[linkme::distributed_slice(crate::data::games::GAMES)]
+        #[linkme::distributed_slice($crate::data::games::GAMES)]
         fn create_game_instance() -> Box<dyn Game + Send + Sync> {
             Box::new($game)
         }
