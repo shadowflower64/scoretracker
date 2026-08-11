@@ -1,4 +1,5 @@
 //! Module for [`Percentage`] struct, for handling percentage values without floating point errors.
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Write},
@@ -32,7 +33,8 @@ use std::{
 ///     dbg!(string);
 /// }
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize, JsonSchema)]
+#[serde(transparent)]
 pub struct Percentage(pub f64);
 
 impl Percentage {

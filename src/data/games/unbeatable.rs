@@ -3,7 +3,7 @@ use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct UNBEATABLE {}
+pub struct UNBEATABLE;
 
 #[typetag::serde(name = "unbeatable")]
 impl Game for UNBEATABLE {
@@ -14,3 +14,5 @@ impl Game for UNBEATABLE {
         "unbeatable"
     }
 }
+
+// register_game!(UNBEATABLE); // TODO

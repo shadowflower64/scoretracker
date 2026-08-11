@@ -24,3 +24,5 @@ impl Game for Beatstar {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }
+
+// register_game!(Beatstar); // TODO

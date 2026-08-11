@@ -14,3 +14,5 @@ impl Game for RhythmDoctor {
         "rd"
     }
 }
+
+// register_game!(RhythmDoctor); // TODO

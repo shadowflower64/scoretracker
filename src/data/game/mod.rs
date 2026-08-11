@@ -19,7 +19,7 @@ pub trait Game: Debug {
     fn url_shortname(&self) -> &'static str;
 
     fn ask_for_performance_new(&self) -> Result<AnyPerformance, AskError> {
-        unimplemented!()
+        unimplemented!("not implemented for game '{}'", self.identifier())
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
@@ -35,7 +35,7 @@ pub trait Game: Debug {
     }
 
     fn schema(&self) -> Schema {
-        unimplemented!()
+        unimplemented!("not implemented for game '{}'", self.identifier())
     }
 }
 
@@ -74,16 +74,16 @@ macro_rules! game_impl {
     () => {
         game_impl!(self);
     };
-    ($game:tt) => {
+    ($module:tt) => {
         /// Generate a [`schemars::Schema`] for this game's types.
         fn schema(&self) -> schemars::Schema {
             use schemars::{JsonSchema, schema_for};
             // Dummy struct for generating a schema with multiple types at once
             #[derive(JsonSchema)]
             struct __ {
-                __performance: $game::Performance,
-                __match: $game::Match,
-                //__song: $game::Song,
+                __performance: $module::Performance,
+                __match: $module::Match,
+                //__song: $module::Song,
             }
             let schema = schema_for!(__);
             schema

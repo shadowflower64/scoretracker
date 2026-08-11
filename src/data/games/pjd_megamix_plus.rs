@@ -21,3 +21,5 @@ impl Game for ProjectDIVAMegaMixPlus {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }
+
+// register_game!(ProjectDIVAMegaMixPlus); // TODO

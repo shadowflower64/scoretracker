@@ -22,3 +22,5 @@ impl Game for Phigros {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }
+
+// register_game!(Phigros); // TODO

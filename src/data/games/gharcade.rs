@@ -21,3 +21,5 @@ impl Game for GuitarHeroArcade {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 }
+
+// register_game!(GuitarHeroArcade); // TODO

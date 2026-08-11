@@ -10,10 +10,12 @@ use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
 use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
 use crate::util::command_line::AskError;
+use crate::{game_impl, register_game};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Game mode.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     Career,
@@ -36,7 +38,7 @@ impl Mode {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Match {
     #[serde(flatten)]
     pub common: CommonMatchInfo,
@@ -69,7 +71,7 @@ impl MatchTrait for Match {
 }
 
 /// A playable part in the chart.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Instrument {
     LeadGuitar,
@@ -90,7 +92,7 @@ impl TryFrom<&str> for Instrument {
 }
 
 /// Difficulty that the performance was played on.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {
     Easy,
@@ -113,15 +115,15 @@ impl TryFrom<&str> for Difficulty {
 }
 
 /// Clear type.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Lamp {
     None,
     Clear,
     FC,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,
@@ -205,4 +207,8 @@ impl Game for GuitarHero3 {
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
+
+    game_impl!();
 }
+
+register_game!(GuitarHero3);

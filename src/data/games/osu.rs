@@ -3,7 +3,7 @@ use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Osu {}
+pub struct Osu;
 
 #[typetag::serde(name = "osu")]
 impl Game for Osu {
@@ -14,3 +14,5 @@ impl Game for Osu {
         "osu"
     }
 }
+
+// register_game!(Osu); // TODO

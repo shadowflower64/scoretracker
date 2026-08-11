@@ -6,11 +6,12 @@ use crate::util::command_line::{AskError, ask_string, ask_u64, ask_uuid, ask_yn}
 use crate::util::normalize_unsigned_to_unit_range;
 use crate::util::percentage::Percentage;
 use crate::util::uuid::UuidString;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// A playable part in the chart.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Instrument {
     LeadGuitar,
@@ -30,7 +31,7 @@ pub enum Instrument {
 }
 
 /// Difficulty that the performance was played on.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {
     Beginner,
@@ -42,7 +43,7 @@ pub enum Difficulty {
 }
 
 /// Game mode.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     Quickplay,
@@ -53,7 +54,7 @@ pub enum Mode {
 }
 
 /// A modifier (chart mutator).
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Modifier {
     AllStrums,
@@ -67,7 +68,7 @@ pub enum Modifier {
 }
 
 /// A YARG performance - a performance of one player playing on one instrument on a specific chart.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,
@@ -191,3 +192,5 @@ impl Game for YARG {
         }))
     }
 }
+
+// register_game!(YARG); // TODO

@@ -1,5 +1,5 @@
 import { screenDiv } from "../main.js";
-import { EditMatchBtnInFalsus } from "../components/InFalsus.js";
+import { EditMatchBtnInFalsus } from "../components/games/InFalsus.js";
 import { SongTable, SongTableRow } from "../components/SongTable.js";
 import { UUID7 } from "../lib/uuid.js";
 import { Nanoseconds } from "../scoretracker/DataStructures.js";

@@ -15,3 +15,5 @@ impl Game for DJMAXRESPECTV {
         "djmax_respect_v"
     }
 }
+
+// register_game!(DJMAXRESPECTV); // TODO

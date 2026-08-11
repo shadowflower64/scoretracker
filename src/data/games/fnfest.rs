@@ -10,18 +10,20 @@ use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerfo
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
+use crate::{game_impl, register_game};
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Game mode.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     MainStage,
     BattleStage,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Match {
     #[serde(flatten)]
     pub common: CommonMatchInfo,
@@ -48,7 +50,7 @@ impl MatchTrait for Match {
 }
 
 /// A playable part in the chart.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Instrument {
     Lead,      // 5K gamepad gameplay
@@ -59,8 +61,8 @@ pub enum Instrument {
     ProBass,   // 5-fret guitar gameplay
     ProDrums,  // 4-lane MIDI drums gameplay
     ProVocals, // Mic gameplay
-    #[serde(rename = "pro_drums+cymbals")]
-    ProDrumsWithCymbals, // 4-lane MIDI drums (4 drum pads + 3 cymbals) gameplay
+    #[serde(rename = "pro_drums_plus_cymbals")]
+    ProDrumsPlusCymbals, // 4-lane MIDI drums (4 drum pads + 3 cymbals) gameplay
 }
 
 impl TryFrom<&str> for Instrument {
@@ -75,14 +77,14 @@ impl TryFrom<&str> for Instrument {
             "pro_bass" => Ok(Self::ProBass),
             "pro_drums" => Ok(Self::ProDrums),
             "pro_vocals" => Ok(Self::ProVocals),
-            "pro_drums+cymbals" => Ok(Self::ProDrumsWithCymbals),
+            "pro_drums_plus_cymbals" => Ok(Self::ProDrumsPlusCymbals),
             _ => Err("fnfest::Instrument"),
         }
     }
 }
 
 /// Difficulty that the performance was played on.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {
     Easy,
@@ -105,8 +107,8 @@ impl TryFrom<&str> for Difficulty {
 }
 
 /// Clear type.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Lamp {
     None,
     Clear,
@@ -114,7 +116,7 @@ pub enum Lamp {
     PFC,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,
@@ -245,4 +247,8 @@ impl Game for FortniteFestival {
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
+
+    game_impl!();
 }
+
+register_game!(FortniteFestival);
