@@ -1,12 +1,11 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
 use crate::data::game::Game;
 use crate::data::game::song::{SongAlbumInfo, SongTrait};
-use crate::data::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceMetadata, PerformanceTrait};
 use crate::util::command_line::{AskError, ask_string, ask_u64, ask_uuid, ask_yn};
 use crate::util::normalize_unsigned_to_unit_range;
 use crate::util::percentage::Percentage;
 use crate::util::uuid::UuidString;
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -175,7 +174,7 @@ impl Game for YARG {
                 proof: Vec::new(),
                 // timestamp: NsTimestamp::now(),
                 comment: None,
-                metadata: IndexMap::new(),
+                metadata: PerformanceMetadata::new(),
             },
             song_id: ask_string("song id", None)?,
             instrument: Instrument::LeadGuitar,

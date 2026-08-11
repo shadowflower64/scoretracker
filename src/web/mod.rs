@@ -60,7 +60,7 @@ pub async fn web_main() -> std::io::Result<()> {
     log_fn_name!("web_main");
     const HOST: &str = "127.0.0.1";
     const PORT: u16 = 8080;
-    info!("starting server on http://{HOST}:{PORT}");
+    info!("starting server on: http://{HOST}:{PORT}");
     HttpServer::new(|| {
         App::new()
             .service(index)

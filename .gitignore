@@ -3,3 +3,4 @@
 /node_modules
 /web-frontend/static/js
 /web-frontend/tsconfig.tsbuildinfo
+/gen

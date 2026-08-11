@@ -1,5 +1,7 @@
 //! Module for [`UuidString`], a (de)serializable wrapper for [`Uuid`].
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize, de::Visitor};
+use std::borrow::Cow;
 use std::fmt::{self, Display};
 use std::str::FromStr;
 use uuid::Uuid;
@@ -72,5 +74,18 @@ impl<'de> Visitor<'de> for UuidVisitor {
 impl<'de> Deserialize<'de> for UuidString {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_str(UuidVisitor)
+    }
+}
+
+impl JsonSchema for UuidString {
+    fn schema_name() -> Cow<'static, str> {
+        "UuidString".into()
+    }
+
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        json_schema!({
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        })
     }
 }

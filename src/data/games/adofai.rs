@@ -13,6 +13,7 @@ use crate::spreadsheet::SkipOrQuit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
 use crate::util::command_line::AskError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 pub type JudgementCount = u32;
 
@@ -32,14 +33,18 @@ impl MatchTrait for Match {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Lamp {
     None,
     Clear,
+    #[serde(rename = "fc")]
     FC,
+    #[serde(rename = "perfect_fc")]
     PerfectFC,
+    #[serde(rename = "pure_perfect_fc")]
     PurePerfectFC,
+    #[serde(rename = "strict_pure_perfect_fc")]
     StrictPurePerfectFC,
 }
 
@@ -66,7 +71,7 @@ impl TryFrom<&Record> for Lamp {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,

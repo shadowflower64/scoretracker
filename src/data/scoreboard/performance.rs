@@ -1,12 +1,33 @@
 use crate::data::scoreboard::AnyValue;
 use crate::util::{command_line::AskError, uuid::UuidString};
 use indexmap::IndexMap;
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::fmt::Debug;
 
-pub type PerformanceMetadata = IndexMap<String, AnyValue>;
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(transparent)]
+pub struct PerformanceMetadata(IndexMap<String, AnyValue>);
+
+impl PerformanceMetadata {
+    pub fn new() -> Self {
+        Self(IndexMap::new())
+    }
+}
+
+impl JsonSchema for PerformanceMetadata {
+    fn schema_name() -> Cow<'static, str> {
+        "PerformanceMetadata".into()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        json_schema!({
+            "type": "object"
+        })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct CommonPerformanceInfo {
     /// UUID of the performance.
     pub uuid: UuidString,

@@ -11,6 +11,7 @@ use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult};
 use crate::util::command_line::AskError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -34,7 +35,7 @@ impl MatchTrait for Match {
 }
 
 /// Game mode.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     Normal,
@@ -43,7 +44,7 @@ pub enum Mode {
 }
 
 /// Difficulty that the performance was played on.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {
     Past,
@@ -66,13 +67,14 @@ impl TryFrom<&str> for Difficulty {
 }
 
 /// Clear type.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Lamp {
     None,
     C,
     FC,
     PF,
+    #[serde(rename = "pf_plus")]
     PFPlus,
 }
 
@@ -96,7 +98,7 @@ impl TryFrom<&Record> for Lamp {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
     #[serde(flatten)]
     pub common: CommonPerformanceInfo,

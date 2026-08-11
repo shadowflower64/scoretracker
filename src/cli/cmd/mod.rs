@@ -1,6 +1,6 @@
 use crate::arg::{CmdlineArgument, parse_arg, parse_arg_opt};
+use crate::cmd;
 use crate::cmd::CmdError::NoCommandProvided;
-use crate::cmd::{self};
 use crate::error::CmdError;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
@@ -18,6 +18,7 @@ pub mod hive;
 pub mod library;
 pub mod performance;
 pub mod player;
+pub mod schema;
 pub mod spreadsheet;
 pub mod vitals;
 
@@ -133,6 +134,12 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 let config_value: String = ctx.pull_arg("config_value", "new value for the selected key")?;
                 cmd::config::set(config_key, config_value)
             }
+            _ => ctx.unknown_cmd(),
+        },
+        "schema" => match ctx.cmd()? {
+            "gen" => cmd::schema::gen_full(),
+            "gen-json" => cmd::schema::gen_json(),
+            "gen-types" => cmd::schema::gen_types(),
             _ => ctx.unknown_cmd(),
         },
         "hive" => match ctx.cmd()? {

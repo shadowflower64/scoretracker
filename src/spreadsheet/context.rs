@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::data::library::database::{LibraryDatabase, LibraryEntry};
 use crate::data::scoreboard::r#match::CommonMatchInfo;
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceMetadata, PerformanceTrait};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, BadRecordErrorWithContext, ParseRecordResult, SkipOrQuit};
@@ -110,7 +110,7 @@ impl Context<'_> {
             player_uuid: self.find_player_by_name(record.string("player")?)?.uuid,
             proof: self.create_proof(record)?,
             comment,
-            metadata: IndexMap::new(),
+            metadata: PerformanceMetadata::new(),
         })
     }
 
