@@ -67,6 +67,7 @@ pub async fn web_main() -> std::io::Result<()> {
             .service(static_handler)
             .service(echo)
             .service(hey)
+            .service(api::get_match_list)
             .service(api::put_match)
     })
     .bind((HOST, PORT))?
