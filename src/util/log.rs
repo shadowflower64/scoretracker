@@ -43,7 +43,7 @@ pub fn create_worker_log_filename(worker_info: &WorkerInfo) -> String {
     worker_info.log_filename()
 }
 
-static LOG_FILE: LazyLock<Mutex<Option<File>>> = LazyLock::new(|| Mutex::new(None));
+pub static LOG_FILE: LazyLock<Mutex<Option<File>>> = LazyLock::new(|| Mutex::new(None));
 
 #[derive(Debug, Error)]
 pub enum LogError {

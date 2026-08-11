@@ -7,7 +7,7 @@ use std::{net::SocketAddr, time::SystemTime};
 pub struct WorkerInfo {
     /// Name of the worker.
     ///
-    /// For standard scoretracker workers, this is generated with the [`super::Worker::make_name`] function.
+    /// For standard scoretracker workers, this is generated with the [`super::Worker::make_full_name`] function.
     /// That function generates names in the format: `{random_name}-{pid}.scoretracker-worker.local`,
     /// where:
     /// * `random_name` is a lowercase name chosen using [`super::names::random_name`],
