@@ -1,5 +1,6 @@
 import { ComponentTemplate, place, select } from "../Component.js";
-import { msToNs, type InFalsus } from "../scoretracker/DataStructures.js";
+import type * as InFalsus from "../gen/types/in_falsus.schema.js";
+import { Nanoseconds } from "../scoretracker/DataStructures.js";
 import { sendRequestAsJSON } from "../Util.js";
 import { UUID7 } from "../uuid.js";
 import { commonMatchInfoFromParts, EditMatchDialogGenericPartBottom, EditMatchDialogGenericPartTop } from "./EditMatchForm.js";
@@ -34,7 +35,7 @@ export const EditMatchBtnInFalsus = ComponentTemplate.named("edit-match-btn-infa
     const btn = select(f, "button", "#btn");
     btn.addEventListener("click", () => showEditMatchDialogInFalsus({
         uuid: UUID7.generate().toString(),
-        timestamp: msToNs(Date.now()) + 123456789n,
+        timestamp: Nanoseconds.fromMillisParts(Date.now(), 123456789),
         song_id: "xi-freedom_dive",
         performance_ids: [],
         proof: [],

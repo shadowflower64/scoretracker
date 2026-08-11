@@ -1,5 +1,3 @@
-import type { BigintNsTimestamp, NsTimestamp } from "./scoretracker/DataStructures.js";
-
 export function unwrap<T>(foo: T | null | undefined): T {
     if (foo === null) throw new TypeError("element is null");
     if (foo === undefined) throw new TypeError("element is undefined");

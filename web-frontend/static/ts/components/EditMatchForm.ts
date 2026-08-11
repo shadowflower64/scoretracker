@@ -1,5 +1,5 @@
 import { ComponentTemplate, place, select, type ComponentMadeFrom } from "../Component.js";
-import { msToNs, nsTimestampComponents, nsTimestampToBigint, type CommonMatchInfo, type MatchMetadata, type NsTimestamp } from "../scoretracker/DataStructures.js";
+import { Nanoseconds, type CommonMatchInfo, type MatchMetadata, type NsTimestamp } from "../scoretracker/DataStructures.js";
 import { MetadataTableEditor } from "./MetadataTableEditor.js";
 import { PerformanceTableEditor } from "./PerformanceTableEditor.js";
 import { ProofTableEditor } from "./ProofTableEditor.js";
@@ -21,15 +21,15 @@ export const EditMatchDialogGenericPartTop = ComponentTemplate.named("edit-match
     const songId = select(f, "input", "#song-id");
 
     uuid.value = params.uuid;
-    const [date, nanos] = nsTimestampComponents(nsTimestampToBigint(params.timestamp));
+    const [date, nanosFrac] = Nanoseconds.dateParts(params.timestamp);
     timestampDate.valueAsDate = date;
     timestampTime.valueAsDate = date;
-    timestampNanos.valueAsNumber = nanos;
+    timestampNanos.valueAsNumber = nanosFrac;
     songId.value = params.song_id;
 
     return {
         getFormValues() {
-            const timestamp = msToNs(Date.parse(`${timestampDate.value}T${timestampTime.value}`)) + BigInt(timestampNanos.valueAsNumber);
+            const timestamp = Nanoseconds.fromMillisParts(Date.parse(`${timestampDate.value}T${timestampTime.value}`), timestampNanos.valueAsNumber);
             console.log(timestamp);
             return {
                 uuid: uuid.value,
@@ -39,7 +39,7 @@ export const EditMatchDialogGenericPartTop = ComponentTemplate.named("edit-match
         }
     };
 });
-export const EditMatchDialogGenericPartBottom = ComponentTemplate.named("edit-match-dialog-generic-part-bottom", (f, params: { performance_ids: string[], proof: string[], comment: string | null, metadata: MatchMetadata; }) => {
+export const EditMatchDialogGenericPartBottom = ComponentTemplate.named("edit-match-dialog-generic-part-bottom", (f, params: { performance_ids: string[], proof: string[], comment?: string | null, metadata: MatchMetadata; }) => {
     const comment = select(f, "textarea", "#comment");
     const performanceTableEditor = place(f, "performance-table-editor", PerformanceTableEditor.create({ performanceIds: [] }));
     const proofTableEditor = place(f, "proof-table-editor", ProofTableEditor.create({ performanceIds: [] }));
