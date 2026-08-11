@@ -6,6 +6,7 @@ use crate::hive::worker::Worker;
 use crate::util::uuid::UuidString;
 use rust_ffmpeg::{Codec, CodecOptions};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -31,6 +32,18 @@ impl ProcessingType {
             Self::CompressFoldVideo => QualityState::Folded,
             Self::CompressCrumpleVideo => QualityState::Crumpled,
             Self::CompressShredVideo => QualityState::Shredded,
+        }
+    }
+}
+
+impl FromStr for ProcessingType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "fold" => Ok(Self::CompressFoldVideo),
+            "crumple" => Ok(Self::CompressCrumpleVideo),
+            "shred" => Ok(Self::CompressShredVideo),
+            a => Err(format!("invalid processing type: {a}")),
         }
     }
 }

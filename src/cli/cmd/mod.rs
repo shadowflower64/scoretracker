@@ -5,17 +5,17 @@ use crate::error::CmdError;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
-use scoretracker::util::dirs::log_dir;
-use scoretracker::util::reveal_directory;
+use scoretracker::hive::jobs::process_library_video::{ProcessLibraryVideoJob, ProcessingType};
+use scoretracker::info_npr;
 use scoretracker::util::timestamp::NsLocalTimestamp;
 use scoretracker::web::web_main;
-use scoretracker::{info_npr, success_npr};
 use std::path::PathBuf;
 
 pub mod automark;
 pub mod config;
 pub mod hive;
 pub mod library;
+pub mod log;
 pub mod performance;
 pub mod player;
 pub mod schema;
@@ -166,6 +166,18 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                             destination_path,
                         })
                     }
+                    "process-video" => {
+                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to cloth video")?;
+                        let destination_path: PathBuf = ctx.pull_arg("destination_path", "destination path to fragment video")?;
+                        let processing_type: ProcessingType =
+                            ctx.pull_arg("processing_type", "type/quality preset of video compression to do")?;
+                        cmd::hive::add_task(ProcessLibraryVideoJob {
+                            source_path,
+                            source_proof_uuid_precondition_check: None,
+                            processing_type,
+                            destination_path,
+                        })
+                    }
                     _ => ctx.unknown_cmd(),
                 },
                 _ => ctx.unknown_cmd(),
@@ -179,12 +191,15 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 cmd::library::init(&library_dir, library_domain_name)
             }
             "rescan" => {
-                let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
+                let library_dir: PathBuf = if let Some(arg) = ctx.pull_arg_opt("library_dir", "path of the library directory")? {
+                    arg
+                } else {
+                    Config::load()
+                        .map_err(CmdError::ConfigReadError)?
+                        .default_library_dir_path
+                        .to_owned()
+                };
                 cmd::library::rescan(&library_dir)
-            }
-            "rescan-default" => {
-                let config = Config::load().map_err(CmdError::ConfigReadError)?;
-                cmd::library::rescan(&config.default_library_dir_path)
             }
             "remove-domain" => {
                 let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;
@@ -193,17 +208,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             _ => ctx.unknown_cmd(),
         },
         "log" => match ctx.cmd()? {
-            "open" => {
-                let log_dir = log_dir();
-                info_npr!("opening log directory: {log_dir:?}");
-                match reveal_directory(&log_dir) {
-                    Ok(_) => {
-                        success_npr!("successfully opened log directory");
-                        Ok(())
-                    }
-                    Err(e) => Err(CmdError::RevealDirectoryError(e)),
-                }
-            }
+            "open" => cmd::log::open(),
             _ => ctx.unknown_cmd(),
         },
         "performance" => match ctx.cmd()? {
