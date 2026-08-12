@@ -44,33 +44,33 @@ export interface Performance {
   /**
    * Mode that this performance was played on.
    */
-  mode: "normal" | "world" | "unknown_single";
+  mode: "normal" | "challenge";
   /**
    * Difficulty level of the chart.
    */
-  difficulty: "past" | "present" | "future" | "beyond";
+  difficulty: "ez" | "hd" | "in" | "at";
   /**
    * Clear type.
    */
-  lamp: "none" | "c" | "fc" | "pf" | "pf_plus";
+  lamp: "none" | "clear" | "fc" | "pf";
   /**
-   * Count of shiny pure judgements.
+   * Count of perfect judgements.
    */
-  shiny_pure: number;
+  perfect: number;
   /**
-   * Count of pure judgements.
+   * Count of good judgements.
    */
-  pure: number;
+  good: number;
   /**
-   * Count of far judgements.
+   * Count of bad judgements.
    */
-  far: number;
+  bad: number;
   /**
-   * Count of lost judgements.
+   * Count of miss judgements.
    */
-  lost: number;
+  miss: number;
   /**
-   * Score in range [0..10_000_000+note_count]. Only present for Normal mode.
+   * Score in range [0..1_000_000].
    */
   score: number;
 }

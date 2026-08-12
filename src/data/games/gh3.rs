@@ -123,6 +123,20 @@ pub enum Lamp {
     FC,
 }
 
+impl TryFrom<&Record> for Lamp {
+    type Error = BadRecordError;
+    fn try_from(record: &Record) -> Result<Self, Self::Error> {
+        let mut lamp = Lamp::None;
+        if record.bool("clear")? {
+            lamp = Lamp::Clear;
+        }
+        if record.bool("fc")? {
+            lamp = Lamp::FC;
+        }
+        Ok(lamp)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
     #[serde(flatten)]
@@ -176,13 +190,6 @@ impl Game for GuitarHero3 {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        let mut lamp = Lamp::None;
-        if record.bool("clear")? {
-            lamp = Lamp::Clear;
-        }
-        if record.bool("fc")? {
-            lamp = Lamp::FC;
-        }
         let match_data = Match {
             common: ctx.create_common_m(record)?,
             mode: Mode::UnknownSingle,
@@ -195,7 +202,7 @@ impl Game for GuitarHero3 {
             common: ctx.create_common_p(record, match_data.uuid())?,
             instrument: record.string_enum("instrument")?,
             difficulty: record.string_enum("difficulty")?,
-            lamp,
+            lamp: record.try_into()?,
             score: record.int("score").or_skip()?,
             notes_hit: record.int("hit_notes")?,
             notes_total: record.int("total_notes")?,

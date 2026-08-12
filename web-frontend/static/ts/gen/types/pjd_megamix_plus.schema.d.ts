@@ -42,35 +42,39 @@ export interface Performance {
     [k: string]: MetadataValue;
   };
   /**
-   * Mode that this performance was played on.
-   */
-  mode: "normal" | "world" | "unknown_single";
-  /**
    * Difficulty level of the chart.
    */
-  difficulty: "past" | "present" | "future" | "beyond";
+  difficulty: "easy" | "normal" | "hard" | "extreme" | "extra_extreme";
   /**
    * Clear type.
    */
-  lamp: "none" | "c" | "fc" | "pf" | "pf_plus";
+  lamp: "none" | "clear" | "fc" | "pf";
   /**
-   * Count of shiny pure judgements.
+   * Count of cool judgements.
    */
-  shiny_pure: number;
+  cool: number;
   /**
-   * Count of pure judgements.
+   * Count of safe judgements.
    */
-  pure: number;
+  safe: number;
   /**
-   * Count of far judgements.
+   * Count of bad judgements.
    */
-  far: number;
+  bad: number;
   /**
-   * Count of lost judgements.
+   * Count of miss judgements.
    */
-  lost: number;
+  miss: number;
   /**
-   * Score in range [0..10_000_000+note_count]. Only present for Normal mode.
+   * Count of wrong judgements.
+   */
+  wrong: number;
+  /**
+   * Count of almost judgements.
+   */
+  almost: number;
+  /**
+   * Score in range [0..1_000_000].
    */
   score: number;
 }

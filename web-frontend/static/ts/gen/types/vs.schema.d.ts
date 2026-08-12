@@ -24,6 +24,10 @@ export interface Performance {
    */
   player_uuid: string;
   /**
+   * Match UUID.
+   */
+  match_uuid: string;
+  /**
    * List of library entry UUIDs that are proof of this performance.
    */
   proof: UuidString[];
@@ -108,10 +112,6 @@ export interface Match {
    * Named ID of the song.
    */
   song_id: string;
-  /**
-   * Performances belonging to this match.
-   */
-  performance_ids: UuidString[];
   /**
    * List of library entry UUIDs that are proof of this match.
    */

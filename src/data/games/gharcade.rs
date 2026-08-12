@@ -1,9 +1,170 @@
 //! Data structures for Guitar Hero Arcade.
 
 use crate::data::game::Game;
+use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
+use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, ContinueOrQuit::Continue, ParseSongRecordResult, context::Context};
+use crate::util::command_line::AskError;
+use crate::{game_impl, register_game};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+/// Game mode.
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    Singleplayer,
+    Multiplayer, // TODO: confirm gharcade game modes
+}
+
+impl Mode {
+    pub fn player_count(&self) -> u8 {
+        match self {
+            Self::Singleplayer => 1,
+            Self::Multiplayer => 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+pub struct Match {
+    #[serde(flatten)]
+    pub common: CommonMatchInfo,
+
+    /// Game mode that this match was played on.
+    pub mode: Mode,
+
+    /// Amount of points at the end of the match.
+    pub score: u64,
+
+    /// How many notes were hit successfully.
+    pub notes_hit: u32,
+
+    /// The maximum streak achieved during the match.
+    pub max_streak: u32,
+
+    /// String of the game version that was played on for this match.
+    /// None for unknown.
+    pub game_version: Option<String>,
+}
+
+#[typetag::serde(name = "gharcade")]
+impl MatchTrait for Match {
+    fn common(&self) -> &CommonMatchInfo {
+        &self.common
+    }
+    fn sorting_key(&self) -> f64 {
+        todo!()
+    }
+}
+
+/// A playable part in the chart.
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Instrument {
+    LeadGuitar,
+    RhythmGuitar,
+    BassGuitar,
+}
+
+impl TryFrom<&str> for Instrument {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "guitar" => Ok(Self::LeadGuitar),
+            "rhythm" => Ok(Self::RhythmGuitar),
+            "bass" => Ok(Self::BassGuitar),
+            _ => Err("gharcade::Instrument"),
+        }
+    }
+}
+
+/// Difficulty that the performance was played on.
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Difficulty {
+    Easy,
+    Medium,
+    Hard,
+    Expert,
+}
+
+impl TryFrom<&str> for Difficulty {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "easy" => Ok(Self::Easy),
+            "medium" => Ok(Self::Medium),
+            "hard" => Ok(Self::Hard),
+            "expert" => Ok(Self::Expert),
+            _ => Err("gharcade::Difficulty"),
+        }
+    }
+}
+
+/// Clear type.
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Lamp {
+    None,
+    Clear,
+    FC,
+}
+
+impl TryFrom<&Record> for Lamp {
+    type Error = BadRecordError;
+    fn try_from(record: &Record) -> Result<Self, Self::Error> {
+        let mut lamp = Lamp::None;
+        if record.bool("clear")? {
+            lamp = Lamp::Clear;
+        }
+        if record.bool("fc")? {
+            lamp = Lamp::FC;
+        }
+        Ok(lamp)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+pub struct Performance {
+    #[serde(flatten)]
+    pub common: CommonPerformanceInfo,
+
+    /// Played instrument.
+    pub instrument: Instrument,
+
+    /// Difficulty level of the chart.
+    pub difficulty: Difficulty,
+
+    /// Clear type.
+    pub lamp: Lamp,
+
+    /// Amount of points at the end of the performance.
+    pub score: u64,
+
+    /// How many notes were hit successfully.
+    pub notes_hit: u32,
+
+    /// How many notes were in the chart (TODO: should be const across different scores of the chart)
+    pub notes_total: u32,
+
+    /// The maximum streak achieved during the performance.
+    pub max_streak: u32,
+}
+
+#[typetag::serde(name = "gharcade")]
+impl PerformanceTrait for Performance {
+    fn common(&self) -> &CommonPerformanceInfo {
+        &self.common
+    }
+    fn sorting_key(&self) -> f64 {
+        self.score as f64
+    }
+    fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
+        todo!()
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GuitarHeroArcade;
@@ -20,6 +181,8 @@ impl Game for GuitarHeroArcade {
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
+
+    game_impl!();
 }
 
-// register_game!(GuitarHeroArcade); // TODO
+register_game!(GuitarHeroArcade);

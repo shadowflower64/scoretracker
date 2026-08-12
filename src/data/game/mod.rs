@@ -35,7 +35,7 @@ pub trait Game: Debug {
     }
 
     fn schema(&self) -> Schema {
-        unimplemented!("not implemented for game '{}'", self.identifier())
+        unimplemented!("schema gen not implemented for game '{}'", self.identifier())
     }
 }
 

@@ -42,37 +42,33 @@ export interface Performance {
     [k: string]: MetadataValue;
   };
   /**
-   * Mode that this performance was played on.
+   * Played instrument.
    */
-  mode: "normal" | "world" | "unknown_single";
+  instrument: "lead_guitar" | "rhythm_guitar" | "bass_guitar";
   /**
    * Difficulty level of the chart.
    */
-  difficulty: "past" | "present" | "future" | "beyond";
+  difficulty: "easy" | "medium" | "hard" | "expert";
   /**
    * Clear type.
    */
-  lamp: "none" | "c" | "fc" | "pf" | "pf_plus";
+  lamp: "none" | "clear" | "fc";
   /**
-   * Count of shiny pure judgements.
-   */
-  shiny_pure: number;
-  /**
-   * Count of pure judgements.
-   */
-  pure: number;
-  /**
-   * Count of far judgements.
-   */
-  far: number;
-  /**
-   * Count of lost judgements.
-   */
-  lost: number;
-  /**
-   * Score in range [0..10_000_000+note_count]. Only present for Normal mode.
+   * Amount of points at the end of the performance.
    */
   score: number;
+  /**
+   * How many notes were hit successfully.
+   */
+  notes_hit: number;
+  /**
+   * How many notes were in the chart (TODO: should be const across different scores of the chart)
+   */
+  notes_total: number;
+  /**
+   * The maximum streak achieved during the performance.
+   */
+  max_streak: number;
 }
 export interface Match {
   /**
@@ -98,6 +94,22 @@ export interface Match {
   metadata: {
     [k: string]: MetadataValue;
   };
+  /**
+   * Game mode that this match was played on.
+   */
+  mode: "singleplayer" | "multiplayer";
+  /**
+   * Amount of points at the end of the match.
+   */
+  score: number;
+  /**
+   * How many notes were hit successfully.
+   */
+  notes_hit: number;
+  /**
+   * The maximum streak achieved during the match.
+   */
+  max_streak: number;
   /**
    * String of the game version that was played on for this match.
    * None for unknown.

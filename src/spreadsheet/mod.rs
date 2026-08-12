@@ -17,6 +17,7 @@ use crate::spreadsheet::field_path::FieldPath;
 use crate::spreadsheet::field_value::{CellContents, FieldValue};
 use crate::spreadsheet::record::{Record, parse_records};
 use crate::success;
+use crate::util::dirs::project_temp_dir;
 use crate::util::filelocked::FileLockableData;
 use crate::util::{file_ex, lockfile};
 use crate::{info, log_fn_name, warn};
@@ -25,7 +26,6 @@ use calamine::{Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_wo
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Europe::Warsaw;
 use chrono_tz::Tz;
-use std::env::temp_dir;
 use std::error::Error;
 use std::path::Path;
 use std::{fmt, fs};
@@ -399,7 +399,7 @@ where
         ctx.fixable_song_records.len()
     );
 
-    let fixable_match_path = temp_dir().join("scoretracker/fixable_match_records.txt");
+    let fixable_match_path = project_temp_dir().join("fixable_match_records.txt");
     fs::create_dir_all(fixable_match_path.parent().unwrap()).expect("could not create dirs");
     fs::write(
         &fixable_match_path,
@@ -410,7 +410,7 @@ where
             .join(""),
     )
     .expect("could not write to file");
-    let fixable_song_path = temp_dir().join("scoretracker/fixable_song_records.txt");
+    let fixable_song_path = project_temp_dir().join("fixable_song_records.txt");
 
     fs::write(
         &fixable_song_path,
