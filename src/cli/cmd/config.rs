@@ -8,7 +8,7 @@ use scoretracker::{info_npr, success_npr, warn_npr};
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-fn display_config(config: &Config) -> Result<(), CmdError> {
+fn print_config(config: &Config) -> Result<(), CmdError> {
     let mut stdout = io::stdout();
     serde_json::to_writer_pretty(&stdout, &config).map_err(CmdError::ConfigSerializationError)?;
     stdout.write_all(b"\n")?;
@@ -21,7 +21,7 @@ pub fn init() -> Result<(), CmdError> {
     let has_to_confirm = match path.read_from_json() {
         Ok(Some(config)) => {
             info_npr!("current config is:");
-            display_config(&config)?;
+            print_config(&config)?;
             true
         }
         Err(_) => {
@@ -55,12 +55,12 @@ pub fn init() -> Result<(), CmdError> {
         .map_err(CmdError::ConfigWriteError)?;
 
     success_npr!("config written to file: {:?}", path);
-    display_config(&config)
+    print_config(&config)
 }
 
 pub fn show() -> Result<(), CmdError> {
     let config = Config::load().map_err(CmdError::ConfigReadError)?;
-    display_config(config)
+    print_config(config)
 }
 
 pub fn set(key: String, value: String) -> Result<(), CmdError> {

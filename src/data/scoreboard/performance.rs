@@ -1,9 +1,17 @@
 use crate::data::scoreboard::MetadataValue;
+use crate::data::scoreboard::r#match::MatchDatabase;
+use crate::util::file_ex::{self, FileEx};
+use crate::util::filelocked::FileLockableData;
+use crate::util::relative_path_from_segments;
+use crate::util::timestamp::NsDuration;
 use crate::util::{command_line::AskError, uuid::UuidString};
 use indexmap::IndexMap;
+use relative_path::{RelativePath, RelativePathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::sync::LazyLock;
+use uuid::Uuid;
 
 // use schemars::{Schema, SchemaGenerator, json_schema};
 // use std::borrow::Cow;
@@ -39,6 +47,9 @@ pub struct CommonPerformanceInfo {
     /// Player UUID.
     pub player_uuid: UuidString,
 
+    /// Match UUID.
+    pub match_uuid: UuidString,
+
     /// List of library entry UUIDs that are proof of this performance.
     pub proof: Vec<UuidString>,
 
@@ -52,11 +63,17 @@ pub struct CommonPerformanceInfo {
 #[typetag::serde(tag = "game")]
 pub trait PerformanceTrait: Debug {
     fn common(&self) -> &CommonPerformanceInfo;
-    fn uuid(&self) -> &UuidString {
-        &self.common().uuid
+    fn game_id(&self) -> &'static str {
+        self.typetag_name()
     }
-    fn player_uuid(&self) -> &UuidString {
-        &self.common().player_uuid
+    fn uuid(&self) -> UuidString {
+        self.common().uuid
+    }
+    fn player_uuid(&self) -> UuidString {
+        self.common().player_uuid
+    }
+    fn match_uuid(&self) -> UuidString {
+        self.common().match_uuid
     }
     fn proof(&self) -> &Vec<UuidString> {
         &self.common().proof
@@ -74,3 +91,65 @@ pub trait PerformanceTrait: Debug {
 }
 
 pub type AnyPerformance = Box<dyn PerformanceTrait>;
+
+#[derive(Debug, Default)]
+pub struct PerformanceDatabase {
+    pub performances: Vec<AnyPerformance>,
+}
+
+impl PerformanceDatabase {
+    pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "performances.jsonl"];
+
+    pub fn path_within_shared_repo() -> &'static RelativePath {
+        static CACHE: LazyLock<RelativePathBuf> =
+            LazyLock::new(|| relative_path_from_segments(&PerformanceDatabase::STANDARD_PATH_SEGMENTS));
+        &CACHE
+    }
+
+    pub fn find_close_performances(&self, req_p: &AnyPerformance, match_db: &MatchDatabase) -> Vec<(&AnyPerformance, NsDuration)> {
+        let req_m = match_db.find_match_by_uuid(req_p.match_uuid()).expect("todo");
+        let threshold = NsDuration::from_secs_f64(30.0);
+        let mut search_results: Vec<(&AnyPerformance, NsDuration)> = self
+            .performances
+            .iter()
+            .filter_map(|p| {
+                let m = match_db.find_match_by_uuid(p.match_uuid()).expect("todo");
+                let difference = (m.timestamp() - req_m.timestamp()).abs();
+                (p.game_id() == req_p.game_id() && difference <= threshold).then_some((p, difference))
+            })
+            .collect();
+        search_results.sort_by(|(_, a), (_, b)| a.cmp(b));
+        search_results
+    }
+
+    pub fn find_performance_by_uuid(&self, uuid: UuidString) -> Option<&AnyPerformance> {
+        self.performances.iter().find(|x| x.uuid() == uuid)
+    }
+
+    pub fn find_performance_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut AnyPerformance> {
+        self.performances.iter_mut().find(|x| x.uuid() == uuid)
+    }
+
+    pub fn add(&mut self, performance: AnyPerformance, match_db: &MatchDatabase) -> Result<Uuid, Uuid> {
+        if let Some((close_performance, _how_close)) = self.find_close_performances(&performance, match_db).first() {
+            return Err(close_performance.uuid().0);
+        }
+
+        if let Some(existing_performance) = self.find_performance_by_uuid(performance.uuid()) {
+            return Err(existing_performance.uuid().0);
+        }
+
+        let uuid = performance.uuid();
+        self.performances.push(performance);
+        Ok(uuid.0)
+    }
+}
+
+impl FileLockableData for PerformanceDatabase {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
+        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { performances: y }))
+    }
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
+        file_ex.write_as_jsonlines(&self.performances)
+    }
+}

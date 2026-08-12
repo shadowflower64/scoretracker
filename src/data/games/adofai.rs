@@ -159,8 +159,11 @@ impl Game for ADOFAI {
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         let perfect = record.int("perfect").or_skip()?;
+        let match_data = Match {
+            common: ctx.create_common_m(record)?,
+        };
         let performance_data = Performance {
-            common: ctx.create_common_p(record)?,
+            common: ctx.create_common_p(record, match_data.uuid())?,
             lamp: record.try_into()?,
             misses: record.int("misses")?,
             overload: record.int("overhits")?,
@@ -171,9 +174,6 @@ impl Game for ADOFAI {
             late_perfect: record.int("late_perfect")?,
             perfect,
             checkpoints_used: record.int("checkpoints_used")?,
-        };
-        let match_data = Match {
-            common: ctx.create_common_m(record, &[&performance_data])?,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }

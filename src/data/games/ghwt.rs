@@ -164,8 +164,13 @@ impl Game for GuitarHeroWorldTour {
         if record.bool("fc")? {
             lamp = Lamp::FC;
         }
+        let match_data = Match {
+            common: ctx.create_common_m(record)?,
+            mode: Mode::UnknownSingle,
+            game_version: None,
+        };
         let performance_data = Performance {
-            common: ctx.create_common_p(record)?,
+            common: ctx.create_common_p(record, match_data.uuid())?,
             instrument: record.string_enum("instrument")?,
             difficulty: record.string_enum("difficulty")?,
             lamp,
@@ -173,11 +178,6 @@ impl Game for GuitarHeroWorldTour {
             notes_hit: record.int("hit_notes")?,
             notes_total: record.int("total_notes")?,
             max_streak: record.int("note_streak")?,
-        };
-        let match_data = Match {
-            common: ctx.create_common_m(record, &[&performance_data])?,
-            mode: Mode::UnknownSingle,
-            game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }

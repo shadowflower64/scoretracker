@@ -223,8 +223,14 @@ impl Game for FortniteFestival {
             ))
         }
 
+        let match_data = Match {
+            common: ctx.create_common_m(record)?,
+            mode: Mode::MainStage,
+            leaderboard_placement: create_lb_placement(record)?,
+            game_version: None,
+        };
         let performance_data = Performance {
-            common: ctx.create_common_p(record)?,
+            common: ctx.create_common_p(record, match_data.uuid())?,
             instrument,
             difficulty: record.string_enum("difficulty")?,
             lamp,
@@ -234,12 +240,6 @@ impl Game for FortniteFestival {
             miss: record.int("miss")?,
             strike: record.int_opt("strike")?,
             max_streak: record.int("note_streak")?,
-        };
-        let match_data = Match {
-            common: ctx.create_common_m(record, &[&performance_data])?,
-            mode: Mode::MainStage,
-            leaderboard_placement: create_lb_placement(record)?,
-            game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }

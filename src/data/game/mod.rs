@@ -10,7 +10,7 @@ use crate::util::command_line::AskError;
 use schemars::Schema;
 use std::fmt::Debug;
 
-#[typetag::serde(tag = "game")]
+#[typetag::serde(tag = "game")] // TODO: i don't think typetag is needed for games anymore; register_game!() macro along with the game_instance_from_id() function is better... the only problem rn is that IDs are not enforced as unique.
 pub trait Game: Debug {
     fn identifier(&self) -> &'static str {
         self.typetag_name()

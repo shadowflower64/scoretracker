@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::data::library::database::{LibraryDatabase, LibraryEntry};
 use crate::data::scoreboard::r#match::CommonMatchInfo;
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceMetadata, PerformanceTrait};
+use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceMetadata};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, BadRecordErrorWithContext, ParseRecordResult, SkipOrQuit};
@@ -95,7 +95,7 @@ impl Context<'_> {
         ))
     }
 
-    pub fn create_common_p(&mut self, record: &Record) -> Result<CommonPerformanceInfo, BadRecordError> {
+    pub fn create_common_p(&mut self, record: &Record, match_uuid: UuidString) -> Result<CommonPerformanceInfo, BadRecordError> {
         let comment = match record.field_value("comment") {
             Ok(value) => Some(
                 value
@@ -108,18 +108,18 @@ impl Context<'_> {
         Ok(CommonPerformanceInfo {
             uuid: Uuid::now_v7().into(),
             player_uuid: self.find_player_by_name(record.string("player")?)?.uuid,
+            match_uuid,
             proof: self.create_proof(record)?,
             comment,
             metadata: PerformanceMetadata::new(),
         })
     }
 
-    pub fn create_common_m<P: PerformanceTrait>(&mut self, record: &Record, performances: &[&P]) -> ParseRecordResult<CommonMatchInfo> {
+    pub fn create_common_m(&mut self, record: &Record) -> ParseRecordResult<CommonMatchInfo> {
         Ok(CommonMatchInfo {
             uuid: Uuid::now_v7().into(),
             timestamp: record.timestamp("timestamp", self.tz).or_skip()?,
             song_id: record.string("song_id")?.to_owned(),
-            performance_ids: performances.iter().map(|x| *x.uuid()).collect(),
             proof: Vec::new(),
             comment: None,
             metadata: IndexMap::new(),

@@ -172,6 +172,7 @@ impl Game for YARG {
             common: CommonPerformanceInfo {
                 uuid: Uuid::now_v7().into(),
                 player_uuid: ask_uuid("player uuid", None)?.into(),
+                match_uuid: ask_uuid("match uuid", None)?.into(),
                 proof: Vec::new(),
                 // timestamp: NsTimestamp::now(),
                 comment: None,

@@ -185,8 +185,12 @@ impl Game for Cytus2 {
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         let master = record.int_opt("master")?;
         let perfect = record.int("perfect").or_skip()?;
+        let match_data = Match {
+            common: ctx.create_common_m(record)?,
+            game_version: None,
+        };
         let performance_data = Performance {
-            common: ctx.create_common_p(record)?,
+            common: ctx.create_common_p(record, match_data.uuid())?,
             mode: if master.is_some() { Mode::Master } else { Mode::Normal },
             difficulty: record.string_enum("difficulty")?,
             lamp: record.try_into()?,
@@ -197,10 +201,6 @@ impl Game for Cytus2 {
             bad: record.int("bad")?,
             miss: record.int("miss")?,
             score: record.int_opt("score")?,
-        };
-        let match_data = Match {
-            common: ctx.create_common_m(record, &[&performance_data])?,
-            game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }

@@ -368,6 +368,10 @@ impl NsDuration {
         Self(timestamp.into().0)
     }
 
+    pub fn abs(&self) -> Self {
+        Self(self.0.abs())
+    }
+
     fn as_serializable(self) -> SerializableStruct {
         SerializableStruct {
             seconds: self.as_secs() as i64,
@@ -919,6 +923,10 @@ impl Nanoseconds {
     pub fn invert_with_origin(self, origin: Self) -> Self {
         let duration_since_origin = self.0 - origin.0;
         Self(origin.0 - duration_since_origin)
+    }
+
+    pub fn abs(&self) -> Self {
+        Self(self.0.abs())
     }
 }
 

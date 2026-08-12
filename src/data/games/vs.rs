@@ -235,8 +235,12 @@ impl Game for VividStasis {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+        let match_data = Match {
+            common: ctx.create_common_m(record)?,
+            game_version: None,
+        };
         let performance_data = Performance {
-            common: ctx.create_common_p(record)?,
+            common: ctx.create_common_p(record, match_data.uuid())?,
             difficulty: record.string_enum("difficulty")?,
             lamp: record.try_into()?,
             combo: record.int("combo")?,
@@ -252,10 +256,6 @@ impl Game for VividStasis {
             score: record.int("score")?,
             play_rate: record.float("play_rate")?, // TODO: this can be calculated automatically
             ex: record.int("ex")?,
-        };
-        let match_data = Match {
-            common: ctx.create_common_m(record, &[&performance_data])?,
-            game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }

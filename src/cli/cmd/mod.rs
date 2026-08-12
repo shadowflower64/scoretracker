@@ -16,9 +16,8 @@ pub mod config;
 pub mod hive;
 pub mod library;
 pub mod log;
-pub mod performance;
-pub mod player;
 pub mod schema;
+pub mod scoreboard;
 pub mod spreadsheet;
 pub mod vitals;
 
@@ -211,18 +210,22 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "open" => cmd::log::open(),
             _ => ctx.unknown_cmd(),
         },
-        "performance" => match ctx.cmd()? {
-            "add" => {
-                let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
-                cmd::performance::add(game_id)
-            }
-            _ => ctx.unknown_cmd(),
-        },
-        "player" => match ctx.cmd()? {
-            "add" => {
-                let name: String = ctx.pull_arg("name", "name of the player")?;
-                cmd::player::add(name)
-            }
+        "scoreboard" => match ctx.cmd()? {
+            "init" => cmd::scoreboard::init(),
+            "performance" => match ctx.cmd()? {
+                "add" => {
+                    let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
+                    cmd::scoreboard::add_performance(game_id)
+                }
+                _ => ctx.unknown_cmd(),
+            },
+            "player" => match ctx.cmd()? {
+                "add" => {
+                    let name: String = ctx.pull_arg("name", "name of the player")?;
+                    cmd::scoreboard::add_player(name)
+                }
+                _ => ctx.unknown_cmd(),
+            },
             _ => ctx.unknown_cmd(),
         },
         "spreadsheet" => match ctx.cmd()? {

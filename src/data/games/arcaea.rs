@@ -157,8 +157,12 @@ impl Game for Arcaea {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+        let match_data = Match {
+            common: ctx.create_common_m(record)?,
+            game_version: None,
+        };
         let performance_data = Performance {
-            common: ctx.create_common_p(record)?,
+            common: ctx.create_common_p(record, match_data.uuid())?,
             mode: Mode::UnknownSingle,
             difficulty: record.string_enum("difficulty")?,
             lamp: record.try_into()?,
@@ -167,10 +171,6 @@ impl Game for Arcaea {
             far: record.int("far")?,
             lost: record.int("lost")?,
             score: record.int("score")?,
-        };
-        let match_data = Match {
-            common: ctx.create_common_m(record, &[&performance_data])?,
-            game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }

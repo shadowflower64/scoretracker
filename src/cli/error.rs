@@ -70,6 +70,16 @@ pub enum CmdError {
     PlayerDatabaseOpenError(lockfile::Error),
     #[error("could not write player database: {0}")]
     PlayerDatabaseWriteError(lockfile::Error),
+    //
+    #[error("could not open match database: {0}")]
+    MatchDatabaseOpenError(lockfile::Error),
+    #[error("could not write match database: {0}")]
+    MatchDatabaseWriteError(lockfile::Error),
+    //
+    #[error("could not open performance database: {0}")]
+    PerformanceDatabaseOpenError(lockfile::Error),
+    #[error("could not write performance database: {0}")]
+    PerformanceDatabaseWriteError(lockfile::Error),
     // ---
     #[error("library scan error: {0}")]
     LibraryScanError(#[from] LibraryScanError),
@@ -115,6 +125,10 @@ impl CmdError {
             Self::TaskQueueWriteError(..) => 20,
             Self::PlayerDatabaseOpenError(..) => 21,
             Self::PlayerDatabaseWriteError(..) => 22,
+            Self::MatchDatabaseOpenError(..) => 23,
+            Self::MatchDatabaseWriteError(..) => 24,
+            Self::PerformanceDatabaseOpenError(..) => 25,
+            Self::PerformanceDatabaseWriteError(..) => 26,
             // ---
             Self::LibraryScanError(..) => 31,
             Self::WorkerCreateError(..) => 32,

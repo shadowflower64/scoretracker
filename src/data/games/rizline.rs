@@ -144,8 +144,12 @@ impl Game for Rizline {
             lamp = Lamp::PFC;
         }
         let score = record.int("score").or_skip()?;
+        let match_data = Match {
+            common: ctx.create_common_m(record)?,
+            game_version: None,
+        };
         let performance_data = Performance {
-            common: ctx.create_common_p(record)?,
+            common: ctx.create_common_p(record, match_data.uuid())?,
             difficulty: record.string_enum("difficulty")?,
             lamp,
             stars: record.int("stars")?,
@@ -156,10 +160,6 @@ impl Game for Rizline {
             score,
             max_score: record.int("max_score")?,
             clear_rate: Percentage::from_multiplier(record.f64("clear_rate")?),
-        };
-        let match_data = Match {
-            common: ctx.create_common_m(record, &[&performance_data])?,
-            game_version: None,
         };
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }

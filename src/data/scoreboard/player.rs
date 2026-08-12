@@ -1,4 +1,9 @@
-use crate::util::{file_ex::FileEx, filelocked::FileLockableData, relative_path_from_segments, uuid::UuidString};
+use crate::util::{
+    file_ex::{self, FileEx},
+    filelocked::FileLockableData,
+    relative_path_from_segments,
+    uuid::UuidString,
+};
 use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
@@ -12,7 +17,7 @@ pub struct Player {
 
 #[derive(Debug, Default)]
 pub struct PlayerDatabase {
-    pub entries: Vec<Player>,
+    pub players: Vec<Player>,
 }
 
 impl PlayerDatabase {
@@ -24,15 +29,15 @@ impl PlayerDatabase {
     }
 
     pub fn find_player_by_name(&self, name: &str) -> Option<&Player> {
-        self.entries.iter().find(|x| x.name == name)
+        self.players.iter().find(|x| x.name == name)
     }
 
     pub fn find_player_by_uuid(&self, uuid: UuidString) -> Option<&Player> {
-        self.entries.iter().find(|x| x.uuid == uuid)
+        self.players.iter().find(|x| x.uuid == uuid)
     }
 
     pub fn find_player_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut Player> {
-        self.entries.iter_mut().find(|x| x.uuid == uuid)
+        self.players.iter_mut().find(|x| x.uuid == uuid)
     }
 
     pub fn add(&mut self, name: &str) -> Result<Uuid, Uuid> {
@@ -40,7 +45,7 @@ impl PlayerDatabase {
             Err(old_player.uuid.into())
         } else {
             let uuid = Uuid::now_v7();
-            self.entries.push(Player {
+            self.players.push(Player {
                 uuid: uuid.into(),
                 name: name.to_owned(),
             });
@@ -50,10 +55,10 @@ impl PlayerDatabase {
 }
 
 impl FileLockableData for PlayerDatabase {
-    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> crate::util::file_ex::Result<Option<Self>> {
-        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { entries: y }))
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
+        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { players: y }))
     }
-    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> crate::util::file_ex::Result<()> {
-        file_ex.write_as_jsonlines(&self.entries)
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
+        file_ex.write_as_jsonlines(&self.players)
     }
 }
