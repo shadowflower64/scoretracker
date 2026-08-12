@@ -1,5 +1,7 @@
+use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::MetadataValue;
 use crate::data::scoreboard::r#match::MatchDatabase;
+use crate::data::scoreboard::player::PlayerDatabase;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
@@ -88,6 +90,15 @@ pub trait PerformanceTrait: Debug {
         unimplemented!()
     }
     fn sorting_key(&self) -> f64;
+    fn check_vitals(
+        &self,
+        _player_db: &PlayerDatabase,
+        _match_db: &MatchDatabase,
+        _performance_db: &PerformanceDatabase,
+        _library_db: &LibraryDatabase,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 pub type AnyPerformance = Box<dyn PerformanceTrait>;
@@ -106,16 +117,20 @@ impl PerformanceDatabase {
         &CACHE
     }
 
-    pub fn find_close_performances(&self, req_p: &AnyPerformance, match_db: &MatchDatabase) -> Vec<(&AnyPerformance, NsDuration)> {
+    pub fn find_close_performances_from_diff_match(
+        &self,
+        req_p: &AnyPerformance,
+        threshold: NsDuration,
+        match_db: &MatchDatabase,
+    ) -> Vec<(&AnyPerformance, NsDuration)> {
         let req_m = match_db.find_match_by_uuid(req_p.match_uuid()).expect("todo");
-        let threshold = NsDuration::from_secs_f64(30.0);
         let mut search_results: Vec<(&AnyPerformance, NsDuration)> = self
             .performances
             .iter()
             .filter_map(|p| {
                 let m = match_db.find_match_by_uuid(p.match_uuid()).expect("todo");
                 let difference = (m.timestamp() - req_m.timestamp()).abs();
-                (p.game_id() == req_p.game_id() && difference <= threshold).then_some((p, difference))
+                (m.uuid() != req_m.uuid() && p.game_id() == req_p.game_id() && difference <= threshold).then_some((p, difference))
             })
             .collect();
         search_results.sort_by(|(_, a), (_, b)| a.cmp(b));
@@ -131,7 +146,11 @@ impl PerformanceDatabase {
     }
 
     pub fn add(&mut self, performance: AnyPerformance, match_db: &MatchDatabase) -> Result<Uuid, Uuid> {
-        if let Some((close_performance, _how_close)) = self.find_close_performances(&performance, match_db).first() {
+        let threshold = NsDuration::from_secs_f64(MatchDatabase::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
+        if let Some((close_performance, _how_close)) = self
+            .find_close_performances_from_diff_match(&performance, threshold, match_db)
+            .first()
+        {
             return Err(close_performance.uuid().0);
         }
 

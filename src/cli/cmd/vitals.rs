@@ -1,10 +1,13 @@
 use crate::cmd::CmdError;
-use crate::cmd::vitals::LibraryEntryCheckError::{ClipNotFound, ClothNotFound, DryNotFound, InvalidSHA256Hash};
 use crate::cmd::vitals::LogCheckError::GetSizeError;
 use fs_extra::dir::get_size;
 use regex::Regex;
 use scoretracker::config::Config;
+use scoretracker::data::game::game_instance_from_id;
 use scoretracker::data::library::database::{LibraryDatabase, LibraryEntry};
+use scoretracker::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
+use scoretracker::data::scoreboard::performance::{AnyPerformance, PerformanceDatabase};
+use scoretracker::data::scoreboard::player::{Player, PlayerDatabase};
 use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::TaskState;
 use scoretracker::util::byte_count::ByteCount;
@@ -13,10 +16,12 @@ use scoretracker::util::filelocked::{FileLockableData, FileLockableDataWithDefau
 use scoretracker::util::lockfile;
 use scoretracker::util::terminal_colors::{ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET, ANSI_ERASE_TO_END};
 use scoretracker::util::terminal_colors::{ANSI_COLOR_BOLD_YELLOW, ansi_move_cursor_left};
+use scoretracker::util::timestamp::NsDuration;
 use scoretracker::util::uuid::UuidString;
+use std::collections::HashSet;
 use std::fmt::{self, Debug, Display};
 use std::io::{Write, stdout};
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::LazyLock;
 use std::sync::atomic::Ordering;
 use thiserror::Error;
@@ -132,61 +137,6 @@ fn result_wrapper<E: Display>(result: CheckResult<E>) {
 }
 
 #[derive(Error, Debug)]
-pub enum LibraryEntryCheckError {
-    #[error("invalid sha256 hash: {0}")]
-    InvalidSHA256Hash(String),
-    #[error("cloth entry not found: {0}")]
-    ClothNotFound(UuidString),
-    #[error("dry entry not found: {0}")]
-    DryNotFound(UuidString),
-    #[error("clip entry not found: {0}")]
-    ClipNotFound(UuidString),
-}
-
-fn check_library_entry(library_entry: &LibraryEntry, library_db: &LibraryDatabase) -> Result<(), LibraryEntryCheckError> {
-    static SHA256_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{64}$").expect("could not compile regex"));
-    if !SHA256_REGEX.is_match(&library_entry.sha256) {
-        Err(InvalidSHA256Hash(library_entry.sha256.clone()))?;
-    }
-    if let Some(cloth) = &library_entry.cloth {
-        library_db.find_entry_by_uuid(cloth.uuid).ok_or(ClothNotFound(cloth.uuid))?;
-    }
-    if let Some(dry_uuid) = library_entry.dry {
-        library_db.find_entry_by_uuid(dry_uuid).ok_or(DryNotFound(dry_uuid))?;
-    }
-    if let Some(clips) = &library_entry.clips {
-        for clip_uuid in clips {
-            library_db.find_entry_by_uuid(*clip_uuid).ok_or(ClipNotFound(*clip_uuid))?;
-        }
-    }
-    Ok(())
-}
-
-#[derive(Error, Debug)]
-pub enum LibraryDatabaseCheckError {
-    #[error("lockfile error: {0}")]
-    Lockfile(#[from] lockfile::Error),
-    #[error("entry with uuid {uuid}: {e}")]
-    Entry { uuid: UuidString, e: LibraryEntryCheckError },
-}
-
-fn check_library_database(library_db_path: PathBuf) -> CheckResult<LibraryDatabaseCheckError> {
-    print_check_name("checking library database");
-    print_check_status("waiting for filelock...");
-    use LibraryDatabaseCheckError::Lockfile;
-    let library_db = LibraryDatabase::lock_and_read(library_db_path, None).map_err(Lockfile)?;
-    let entry_count = library_db.entries.len();
-    print_check_ok_msg(&format!("{entry_count} library entries"));
-
-    print_check_name("checking library database entries");
-    for (i, entry) in library_db.entries.iter().enumerate() {
-        print_check_status(&format!("({}/{entry_count})", i + 1));
-        check_library_entry(entry, &library_db).map_err(|e| LibraryDatabaseCheckError::Entry { uuid: entry.uuid, e })?;
-    }
-    Ok(None)
-}
-
-#[derive(Error, Debug)]
 pub enum TaskQueueCheckError {
     #[error("lockfile error: {0}")]
     Lockfile(#[from] lockfile::Error),
@@ -194,7 +144,7 @@ pub enum TaskQueueCheckError {
     Overfill { finished: usize, threshold: usize },
 }
 
-fn check_task_queue(task_queue_path: PathBuf) -> CheckResult<TaskQueueCheckError> {
+fn check_task_queue(task_queue_path: &Path) -> CheckResult<TaskQueueCheckError> {
     print_check_name("checking task queue");
     print_check_status("waiting for filelock...");
     use TaskQueueCheckError::Lockfile;
@@ -239,7 +189,7 @@ pub enum LogCheckError {
     Overfill { total_size: ByteCount, threshold: ByteCount },
 }
 
-fn check_log_dir(log_dir: PathBuf) -> CheckResult<LogCheckError> {
+fn check_log_dir(log_dir: &Path) -> CheckResult<LogCheckError> {
     print_check_name("checking logs");
     print_check_status("reading dir...");
     let total_size: ByteCount = get_size(log_dir).map_err(GetSizeError)?.into();
@@ -249,6 +199,291 @@ fn check_log_dir(log_dir: PathBuf) -> CheckResult<LogCheckError> {
     } else {
         Ok(Some(format!("total size: {total_size}/{threshold}")))
     }
+}
+
+#[derive(Error, Debug)]
+pub enum LibraryEntryCheckError {
+    #[error("reused uuid: {0}")]
+    ReusedUuid(UuidString),
+    #[error("invalid sha256 hash: {0}")]
+    InvalidSHA256Hash(String),
+    #[error("cloth entry not found: {0}")]
+    ClothNotFound(UuidString),
+    #[error("dry entry not found: {0}")]
+    DryNotFound(UuidString),
+    #[error("clip entry not found: {0}")]
+    ClipNotFound(UuidString),
+}
+
+fn check_library_entry(
+    entry: &LibraryEntry,
+    library_db: &LibraryDatabase,
+    uuids: &mut HashSet<UuidString>,
+) -> Result<(), LibraryEntryCheckError> {
+    type E = LibraryEntryCheckError;
+
+    if !uuids.insert(entry.uuid) {
+        return Err(E::ReusedUuid(entry.uuid));
+    }
+
+    static SHA256_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{64}$").expect("could not compile regex"));
+    if !SHA256_REGEX.is_match(&entry.sha256) {
+        Err(E::InvalidSHA256Hash(entry.sha256.clone()))?;
+    }
+
+    if let Some(cloth) = &entry.cloth {
+        library_db.find_entry_by_uuid(cloth.uuid).ok_or(E::ClothNotFound(cloth.uuid))?;
+    }
+
+    if let Some(dry_uuid) = entry.dry {
+        library_db.find_entry_by_uuid(dry_uuid).ok_or(E::DryNotFound(dry_uuid))?;
+    }
+
+    if let Some(clips) = &entry.clips {
+        for clip_uuid in clips {
+            library_db.find_entry_by_uuid(*clip_uuid).ok_or(E::ClipNotFound(*clip_uuid))?;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum PerformanceCheckError {
+    #[error("reused uuid: {0}")]
+    ReusedUuid(UuidString),
+    #[error("found performances close to each other: {0:?}")]
+    ClosePerformances(Vec<(UuidString, NsDuration)>),
+    #[error("player not found: {0}")]
+    PlayerNotFound(UuidString),
+    #[error("match not found: {0}")]
+    MatchNotFound(UuidString),
+    #[error("library entry not found: {0}")]
+    EntryNotFound(UuidString),
+    #[error("unknown game id: '{0}'")]
+    UnknownGame(String),
+    #[error("match game id ('{0}') does not match performance game id ('{1}')")]
+    MatchGameDoesNotMatch(String, String),
+    #[error("{0}")]
+    Custom(String),
+}
+
+fn check_performance(
+    performance: &AnyPerformance,
+    player_db: &PlayerDatabase,
+    match_db: &MatchDatabase,
+    performance_db: &PerformanceDatabase,
+    library_db: &LibraryDatabase,
+    uuids: &mut HashSet<UuidString>,
+) -> Result<(), PerformanceCheckError> {
+    type E = PerformanceCheckError;
+
+    if !uuids.insert(performance.uuid()) {
+        return Err(E::ReusedUuid(performance.uuid()));
+    }
+
+    let other_close = performance_db.find_close_performances_from_diff_match(performance, NsDuration::from_secs_f64(30.0), match_db);
+    if !other_close.is_empty() {
+        return Err(E::ClosePerformances(
+            other_close.iter().map(|(m, how_close)| (m.uuid(), *how_close)).collect(),
+        ));
+    }
+
+    let player_uuid = performance.player_uuid();
+    let _player = player_db.find_player_by_uuid(player_uuid).ok_or(E::PlayerNotFound(player_uuid))?;
+
+    let match_uuid = performance.match_uuid();
+    let match_data = match_db.find_match_by_uuid(match_uuid).ok_or(E::MatchNotFound(match_uuid))?;
+
+    for proof_uuid in performance.proof() {
+        let _entry = library_db.find_entry_by_uuid(*proof_uuid).ok_or(E::EntryNotFound(*proof_uuid))?;
+    }
+
+    let game_id = performance.game_id();
+    let _game = game_instance_from_id(game_id).ok_or(E::UnknownGame(game_id.to_owned()))?;
+
+    let match_game_id = match_data.game_id();
+    if match_game_id != game_id {
+        return Err(E::MatchGameDoesNotMatch(match_game_id.to_owned(), game_id.to_owned()));
+    };
+
+    performance
+        .check_vitals(player_db, match_db, performance_db, library_db)
+        .map_err(E::Custom)?;
+    Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum MatchCheckError {
+    #[error("reused uuid: {0}")]
+    ReusedUuid(UuidString),
+    #[error("found matches close to each other: {0:?}")]
+    CloseMatches(Vec<(UuidString, NsDuration)>),
+    #[error("library entry not found: {0}")]
+    EntryNotFound(UuidString),
+    #[error("unknown game id: '{0}'")]
+    UnknownGame(String),
+    #[error("{0}")]
+    Custom(String),
+}
+
+fn check_match(
+    match_data: &AnyMatch,
+    player_db: &PlayerDatabase,
+    match_db: &MatchDatabase,
+    performance_db: &PerformanceDatabase,
+    library_db: &LibraryDatabase,
+    uuids: &mut HashSet<UuidString>,
+) -> Result<(), MatchCheckError> {
+    type E = MatchCheckError;
+
+    if !uuids.insert(match_data.uuid()) {
+        return Err(E::ReusedUuid(match_data.uuid()));
+    }
+
+    let other_close = match_db.find_other_close_matches(match_data, NsDuration::from_secs_f64(30.0));
+    if !other_close.is_empty() {
+        return Err(E::CloseMatches(
+            other_close.iter().map(|(m, how_close)| (m.uuid(), *how_close)).collect(),
+        ));
+    }
+
+    // TODO: check song id here
+
+    for proof_uuid in match_data.proof() {
+        let _entry = library_db.find_entry_by_uuid(*proof_uuid).ok_or(E::EntryNotFound(*proof_uuid))?;
+    }
+
+    let game_id = match_data.game_id();
+    let _game = game_instance_from_id(game_id).ok_or(E::UnknownGame(game_id.to_owned()))?;
+
+    match_data
+        .check_vitals(player_db, match_db, performance_db, library_db)
+        .map_err(E::Custom)?;
+    Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum PlayerCheckError {
+    #[error("reused uuid: {0}")]
+    ReusedUuid(UuidString),
+}
+
+fn check_player(player: &Player, uuids: &mut HashSet<UuidString>) -> Result<(), PlayerCheckError> {
+    type E = PlayerCheckError;
+
+    if !uuids.insert(player.uuid) {
+        return Err(E::ReusedUuid(player.uuid));
+    }
+
+    Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum ScoreboardCheckError {
+    #[error("lockfile error: {0}")]
+    Lockfile(#[from] lockfile::Error),
+    #[error("entry with uuid {uuid}: {e}")]
+    LibraryEntry { uuid: UuidString, e: LibraryEntryCheckError },
+    #[error("performance with uuid {uuid}: {e}")]
+    Performance { uuid: UuidString, e: PerformanceCheckError },
+    #[error("match with uuid {uuid}: {e}")]
+    Match { uuid: UuidString, e: MatchCheckError },
+    #[error("player with uuid {uuid}: {e}")]
+    Player { uuid: UuidString, e: PlayerCheckError },
+}
+
+fn check_scoreboard_databases(
+    player_db_path: &Path,
+    match_db_path: &Path,
+    performance_db_path: &Path,
+    library_db_path: &Path,
+) -> CheckResult<ScoreboardCheckError> {
+    type E = ScoreboardCheckError;
+
+    print_check_name("loading player database");
+    print_check_status("waiting for player database filelock...");
+    let player_db = PlayerDatabase::lock_and_read(player_db_path, None).map_err(E::Lockfile)?;
+    let player_count = player_db.players.len();
+    print_check_ok_msg(&format!("{player_count} players"));
+
+    print_check_name("loading match database");
+    print_check_status("waiting for match database filelock...");
+    let match_db = MatchDatabase::lock_and_read(match_db_path, None).map_err(E::Lockfile)?;
+    let match_count = match_db.matches.len();
+    print_check_ok_msg(&format!("{match_count} matches"));
+
+    print_check_name("loading performance database");
+    print_check_status("waiting for performance database filelock...");
+    let performance_db = PerformanceDatabase::lock_and_read(performance_db_path, None).map_err(E::Lockfile)?;
+    let performance_count = performance_db.performances.len();
+    print_check_ok_msg(&format!("{performance_count} performances"));
+
+    print_check_name("loading library database");
+    print_check_status("waiting for library database filelock...");
+    let library_db = LibraryDatabase::lock_and_read(library_db_path, None).map_err(E::Lockfile)?; // TODO: this is loaded earlier already, could be reused
+    let entry_count = library_db.entries.len();
+    print_check_ok_msg(&format!("{entry_count} entries"));
+
+    let mut all_mainkey_uuids = HashSet::new();
+
+    print_check_name("checking library database entries");
+    for (i, entry) in library_db.entries.iter().enumerate() {
+        print_check_status(&format!("({}/{entry_count})", i + 1));
+        check_library_entry(entry, &library_db, &mut all_mainkey_uuids).map_err(|e| E::LibraryEntry { uuid: entry.uuid, e })?;
+    }
+    print_check_ok();
+
+    print_check_name("checking performance database entries");
+    for (i, performance) in performance_db.performances.iter().enumerate() {
+        print_check_status(&format!("({}/{performance_count})", i + 1));
+        check_performance(
+            performance,
+            &player_db,
+            &match_db,
+            &performance_db,
+            &library_db,
+            &mut all_mainkey_uuids,
+        )
+        .map_err(|e| E::Performance {
+            uuid: performance.uuid(),
+            e,
+        })?;
+    }
+    print_check_ok();
+
+    print_check_name("checking match database entries");
+    for (i, match_data) in match_db.matches.iter().enumerate() {
+        print_check_status(&format!("({}/{match_count})", i + 1));
+        check_match(
+            match_data,
+            &player_db,
+            &match_db,
+            &performance_db,
+            &library_db,
+            &mut all_mainkey_uuids,
+        )
+        .map_err(|e| E::Match {
+            uuid: match_data.uuid(),
+            e,
+        })?;
+    }
+    print_check_ok();
+
+    print_check_name("checking player database entries");
+    for (i, player) in player_db.players.iter().enumerate() {
+        print_check_status(&format!("({}/{player_count})", i + 1));
+        check_player(player, &mut all_mainkey_uuids).map_err(|e| E::Player { uuid: player.uuid, e })?;
+    }
+
+    // TODO: add:
+    // * matches table,
+    // * performances table;
+    // * cross check performance-match foreign keys,
+    // * player uuids,
+    // * proof uuids,
+    // * and song ids
+    Ok(None)
 }
 
 pub fn check_all() -> Result<(), CmdError> {
@@ -270,19 +505,25 @@ pub fn check_all() -> Result<(), CmdError> {
         }
     };
 
-    let library_db_path = config.library_database_path();
-    println!("library database located at: {library_db_path:?}");
-    result_wrapper(check_library_database(library_db_path));
-
     let task_queue_path = config.task_queue_path();
     println!("task queue located at: {task_queue_path:?}");
-    result_wrapper(check_task_queue(task_queue_path));
+    result_wrapper(check_task_queue(&task_queue_path));
 
     let log_path = log_dir();
     println!("log directory located at: {log_path:?}");
-    result_wrapper(check_log_dir(log_path));
+    result_wrapper(check_log_dir(&log_path));
 
-    // TODO: add matches table, performances table; cross check performance-match foreign keys, player uuids, proof uuids, and song ids
+    let player_db_path = config.player_database_path();
+    println!("player database located at: {player_db_path:?}");
+    let match_db_path = config.match_database_path();
+    println!("match database located at: {match_db_path:?}");
+    let performance_db_path = config.performance_database_path();
+    println!("performance database located at: {performance_db_path:?}");
+    let library_db_path = config.library_database_path();
+    println!("library database located at: {library_db_path:?}");
+    result_wrapper(check_scoreboard_databases(
+        &player_db_path, &match_db_path, &performance_db_path, &library_db_path,
+    ));
 
     Ok(())
 }

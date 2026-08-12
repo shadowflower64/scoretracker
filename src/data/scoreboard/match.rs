@@ -1,4 +1,7 @@
+use crate::data::library::database::LibraryDatabase;
 use crate::data::scoreboard::MetadataValue;
+use crate::data::scoreboard::performance::PerformanceDatabase;
+use crate::data::scoreboard::player::PlayerDatabase;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
@@ -64,6 +67,15 @@ pub trait MatchTrait: Debug {
         unimplemented!()
     }
     fn sorting_key(&self) -> f64;
+    fn check_vitals(
+        &self,
+        _player_db: &PlayerDatabase,
+        _match_db: &MatchDatabase,
+        _performance_db: &PerformanceDatabase,
+        _library_db: &LibraryDatabase,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 pub type AnyMatch = Box<dyn MatchTrait>;
@@ -75,20 +87,20 @@ pub struct MatchDatabase {
 
 impl MatchDatabase {
     pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "matches.jsonl"];
+    pub const ADD_TOO_CLOSE_THRESHOLD_SECONDS: f64 = 60.0;
 
     pub fn path_within_shared_repo() -> &'static RelativePath {
         static CACHE: LazyLock<RelativePathBuf> = LazyLock::new(|| relative_path_from_segments(&MatchDatabase::STANDARD_PATH_SEGMENTS));
         &CACHE
     }
 
-    pub fn find_close_matches(&self, req_m: &AnyMatch) -> Vec<(&AnyMatch, NsDuration)> {
-        let threshold = NsDuration::from_secs_f64(30.0);
+    pub fn find_other_close_matches(&self, req_m: &AnyMatch, threshold: NsDuration) -> Vec<(&AnyMatch, NsDuration)> {
         let mut search_results = self
             .matches
             .iter()
             .filter_map(|m| {
                 let difference = (m.timestamp() - req_m.timestamp()).abs();
-                (m.game_id() == req_m.game_id() && difference <= threshold).then_some((m, difference))
+                (m.uuid() != req_m.uuid() && m.game_id() == req_m.game_id() && difference <= threshold).then_some((m, difference))
             })
             .collect::<Vec<_>>();
         search_results.sort_by(|(_, a), (_, b)| a.cmp(b));
@@ -104,7 +116,8 @@ impl MatchDatabase {
     }
 
     pub fn add(&mut self, match_data: AnyMatch) -> Result<Uuid, Uuid> {
-        if let Some((close_match, _how_close)) = self.find_close_matches(&match_data).first() {
+        let threshold = NsDuration::from_secs_f64(Self::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
+        if let Some((close_match, _how_close)) = self.find_other_close_matches(&match_data, threshold).first() {
             return Err(close_match.uuid().0);
         }
 
