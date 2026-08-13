@@ -9,7 +9,7 @@ use uuid::Uuid;
 #[error("could not read string from stdin: {0}")]
 pub struct AskError(#[from] io::Error);
 
-pub fn ask<T: Display, F: Fn(&str) -> Result<Option<T>, ()>>(prompt: &str, fallback: Option<T>, validator: F) -> Result<T, AskError> {
+pub fn ask<T: Display>(prompt: &str, fallback: Option<T>, validator: impl Fn(&str) -> Result<Option<T>, ()>) -> Result<T, AskError> {
     loop {
         if let Some(default_value) = fallback.as_ref() {
             prompt_user!("{prompt} [{default_value}]: ");

@@ -139,13 +139,13 @@ pub fn send_message(tcp_stream: &mut TcpStream, message: &OutgoingMessage) -> Re
     Ok(())
 }
 
-fn handle_incoming_message<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, MakeTaskProgressRx: Fn() -> Receiver<TaskProgress>>(
+fn handle_incoming_message(
     tcp_stream: &mut TcpStream,
     message: IncomingMessage,
     conn: &Arc<Mutex<ConnectionInfo>>,
     worker_data: &Arc<Mutex<WorkerData>>,
-    make_worker_status_rx: MakeWorkerStatusRx,
-    _make_task_progress_rx: MakeTaskProgressRx,
+    make_worker_status_rx: impl Fn() -> Receiver<WorkerStatus>,
+    _make_task_progress_rx: impl Fn() -> Receiver<TaskProgress>,
 ) -> Result<(), Error> {
     log_fn_name!("handle_incoming_message");
     log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
@@ -201,12 +201,12 @@ fn handle_incoming_message<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, M
     Ok(())
 }
 
-fn recv_connection_loop<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, MakeTaskProgressRx: Fn() -> Receiver<TaskProgress>>(
+fn recv_connection_loop(
     tcp_stream: &mut TcpStream,
     connection_info: &Arc<Mutex<ConnectionInfo>>,
     worker_data: &Arc<Mutex<WorkerData>>,
-    make_worker_status_rx: MakeWorkerStatusRx,
-    make_task_progress_rx: MakeTaskProgressRx,
+    make_worker_status_rx: impl Fn() -> Receiver<WorkerStatus>,
+    make_task_progress_rx: impl Fn() -> Receiver<TaskProgress>,
 ) -> Result<(), Error> {
     log_fn_name!("recv_connection_loop");
 
@@ -228,10 +228,10 @@ fn recv_connection_loop<MakeWorkerStatusRx: Fn() -> Receiver<WorkerStatus>, Make
     Ok(())
 }
 
-fn start_subscription_thread<F: Send + 'static + Fn(&mut TcpStream, &Arc<Mutex<ConnectionInfo>>) -> Result<(), Error>>(
+fn start_subscription_thread(
     tcp_stream: &mut TcpStream,
     connection_info: &Arc<Mutex<ConnectionInfo>>,
-    loop_fn: F,
+    loop_fn: impl Send + 'static + Fn(&mut TcpStream, &Arc<Mutex<ConnectionInfo>>) -> Result<(), Error>,
 ) -> Result<JoinHandle<()>, Error> {
     // log_fn_name!("start_connsend_thread");
 

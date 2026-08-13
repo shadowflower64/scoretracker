@@ -85,7 +85,7 @@ pub fn open_default_log_file() -> Result<(), LogError> {
 
 /// Prints out a message on `stderr`, with a function name, a thread name, and a timestamp, with the provided log level and color.
 /// Also prints out a non-colored message to the log file in [`LOG_FILE`].
-pub fn on_log<F: Fn() -> String, G: Fn() -> String>(fmt_plain: F, fmt_colored: G) {
+pub fn on_log(fmt_plain: impl Fn() -> String, fmt_colored: impl Fn() -> String) {
     eprintln!("{}", fmt_colored());
 
     let mut log_file = LOG_FILE.lock().unwrap();

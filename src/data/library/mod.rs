@@ -272,11 +272,11 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
     Ok(())
 }
 
-pub fn scan_register_added_files<F: Fn(&mut LibraryEntry)>(
+pub fn scan_register_added_files(
     _library_dir: &Path,
     _library_db_path: &Path,
     _file_paths: Vec<&Path>,
-    _entry_mutator: F,
+    _entry_mutator: impl Fn(&mut LibraryEntry),
     _worker_info: Option<&WorkerInfo>,
 ) -> Result<Vec<UuidString>, LibraryScanError> {
     //log_fn_name!("library:scan_register_added_files");
@@ -284,11 +284,11 @@ pub fn scan_register_added_files<F: Fn(&mut LibraryEntry)>(
     todo!()
 }
 
-pub fn scan_register_added_file<F: Fn(&mut LibraryEntry)>(
+pub fn scan_register_added_file(
     library_dir: &Path,
     library_db_path: &Path,
     file_path: &Path,
-    entry_mutator: F,
+    entry_mutator: impl Fn(&mut LibraryEntry),
     worker_info: Option<&WorkerInfo>,
 ) -> Result<UuidString, LibraryScanError> {
     Ok(
@@ -346,10 +346,10 @@ pub fn scan_register_removed_file(
     scan_register_removed_files(library_dir, library_db_path, vec![file_path], worker_info)
 }
 
-pub fn sync_library_index_with_db_essence<F: FnOnce(Option<&WorkerInfo>) -> lockfile::Result<FileLocked<LibraryDatabase>>>(
+pub fn sync_library_index_with_db_essence(
     library_dir: &Path,
     library_index: LibraryIndex,
-    library_db_conn: F,
+    library_db_conn: impl FnOnce(Option<&WorkerInfo>) -> lockfile::Result<FileLocked<LibraryDatabase>>,
     library_domain: LibraryDomain,
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {

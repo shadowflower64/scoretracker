@@ -181,23 +181,16 @@ fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_re
 }
 
 #[allow(clippy::too_many_arguments)]
-fn import_org_spreadsheet_page<
-    T: fmt::Debug,
-    E: Fn(BadRecordErrorWithContext) -> SpreadsheetImportError,
-    F: Fn(&dyn Game, &Record, &mut Context) -> ParseRecordResult<T>,
-    G: FnMut(T, &mut Context),
-    H: Fn(BadRecordErrorWithContext, &mut Context),
-    I: Fn(BadRecordErrorWithContext, &mut Context),
->(
+fn import_org_spreadsheet_page<T: fmt::Debug>(
     game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
     page_type: &str,
-    make_err: E,
-    parser_fn: F,
-    mut on_success: G,
-    on_throwaway: H,
-    on_fixable: I,
+    make_err: impl Fn(BadRecordErrorWithContext) -> SpreadsheetImportError,
+    parser_fn: impl Fn(&dyn Game, &Record, &mut Context) -> ParseRecordResult<T>,
+    mut on_success: impl FnMut(T, &mut Context),
+    on_throwaway: impl Fn(BadRecordErrorWithContext, &mut Context),
+    on_fixable: impl Fn(BadRecordErrorWithContext, &mut Context),
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_page");
@@ -322,13 +315,10 @@ fn import_org_spreadsheet_songs(
     Ok(())
 }
 
-pub fn import_org_spreadsheet_generic<F>(
+pub fn import_org_spreadsheet_generic(
     mut worksheets: Vec<(String, Range<Data>)>,
-    mut read_hyperlinks: F,
-) -> Result<SpreadsheetImportResults, SpreadsheetImportError>
-where
-    F: FnMut(&str) -> Vec<Hyperlink>,
-{
+    mut read_hyperlinks: impl FnMut(&str) -> Vec<Hyperlink>,
+) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_generic");
 
     let total_worksheets = worksheets.len();

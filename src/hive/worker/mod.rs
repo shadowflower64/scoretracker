@@ -248,10 +248,10 @@ impl Worker {
     /// This function will mark the task as being worked on and write to the [`TaskQueue`] file using [`lockfile`];
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
-    pub async fn execute_task<F: Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>>(
+    pub async fn execute_task(
         self: Arc<Self>,
         mut queue: FileLocked<TaskQueue>,
-        task_getter: F,
+        task_getter: impl Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>,
     ) -> Result<FileLocked<TaskQueue>, Error> {
         log_fn_name!("worker:exec_task_safe");
 
