@@ -4,7 +4,7 @@
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
 //! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
-use crate::util::file_ex::FileEx;
+use crate::util::file_ex::{self, FileEx};
 use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
 use crate::util::timestamp::{NsDuration, NsLocalTimestamp, NsTimestamp};
@@ -13,6 +13,7 @@ use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
+use thiserror::Error;
 use uuid::Uuid;
 
 /// Basic metadata about the file from the `stat` command.
@@ -241,7 +242,9 @@ pub struct LibraryEntry {
     pub uuid: UuidString,
 
     /// SHA256 hash of the file.
-    pub sha256: String,
+    ///
+    /// [`None`] for YouTube proofs (for now at least).
+    pub sha256: Option<String>,
 
     /// Known library locations of the file. Updated on rescan.
     pub library_urls: Vec<StplUrl>,
@@ -340,7 +343,7 @@ impl Default for LibraryEntry {
 
             // Default values for other fields
             youtube_id: None,
-            sha256: String::new(),
+            sha256: None,
             library_urls: Vec::new(),
             entry_kind: LibraryEntryKind::default(),
             file_stat: HashMap::new(),
@@ -367,6 +370,12 @@ pub struct LibraryDatabase {
     pub entries: Vec<LibraryEntry>,
 }
 
+#[derive(Debug, Error)]
+pub enum InsertError {
+    #[error("proof is already in the database: {0}")]
+    ExistsAlready(Uuid),
+}
+
 impl LibraryDatabase {
     pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "library_database.jsonl"];
 
@@ -384,11 +393,11 @@ impl LibraryDatabase {
     }
 
     pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
-        self.entries.iter().find(|x| x.sha256 == sha256)
+        self.entries.iter().find(|x| x.sha256.as_deref() == Some(sha256))
     }
 
     pub fn find_entry_by_sha256_hash_mut(&mut self, sha256: &str) -> Option<&mut LibraryEntry> {
-        self.entries.iter_mut().find(|x| x.sha256 == sha256)
+        self.entries.iter_mut().find(|x| x.sha256.as_deref() == Some(sha256))
     }
 
     pub fn find_entry_by_youtube_id(&self, youtube_id: &str) -> Option<&LibraryEntry> {
@@ -405,7 +414,7 @@ impl LibraryDatabase {
         } else {
             let new_library_entry = LibraryEntry {
                 library_urls: vec![url],
-                sha256,
+                sha256: Some(sha256),
                 ..Default::default()
             };
             let uuid = new_library_entry.uuid.0;
@@ -421,7 +430,7 @@ impl LibraryDatabase {
         } else {
             let new_library_entry = LibraryEntry {
                 library_urls: vec![url],
-                sha256,
+                sha256: Some(sha256),
                 ..Default::default()
             };
             let uuid = new_library_entry.uuid.0;
@@ -429,13 +438,23 @@ impl LibraryDatabase {
             (uuid, false)
         }
     }
+
+    pub fn insert(&mut self, entry: LibraryEntry) -> Result<Uuid, InsertError> {
+        if let Some(existing_performance) = self.find_entry_by_uuid(entry.uuid) {
+            return Err(InsertError::ExistsAlready(existing_performance.uuid.0));
+        }
+
+        let uuid = entry.uuid;
+        self.entries.push(entry);
+        Ok(uuid.0)
+    }
 }
 
 impl FileLockableData for LibraryDatabase {
-    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> crate::util::file_ex::Result<Option<Self>> {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
         file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { entries: y }))
     }
-    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> crate::util::file_ex::Result<()> {
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
         file_ex.write_as_jsonlines(&self.entries)
     }
 }

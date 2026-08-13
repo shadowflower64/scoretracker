@@ -13,6 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::LazyLock;
+use thiserror::Error;
 use uuid::Uuid;
 
 pub type MatchMetadata = IndexMap<String, MetadataValue>;
@@ -85,6 +86,14 @@ pub struct MatchDatabase {
     pub matches: Vec<AnyMatch>,
 }
 
+#[derive(Debug, Error)]
+pub enum InsertError {
+    #[error("match is too close to an existing match: {0} (time difference: {1})")]
+    TooClose(Uuid, NsDuration),
+    #[error("match is already in the database: {0}")]
+    ExistsAlready(Uuid),
+}
+
 impl MatchDatabase {
     pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "matches.jsonl"];
     pub const ADD_TOO_CLOSE_THRESHOLD_SECONDS: f64 = 60.0;
@@ -115,14 +124,14 @@ impl MatchDatabase {
         self.matches.iter_mut().find(|x| x.uuid() == uuid)
     }
 
-    pub fn add(&mut self, match_data: AnyMatch) -> Result<Uuid, Uuid> {
+    pub fn insert(&mut self, match_data: AnyMatch) -> Result<Uuid, InsertError> {
         let threshold = NsDuration::from_secs_f64(Self::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
-        if let Some((close_match, _how_close)) = self.find_other_close_matches(match_data.as_ref(), threshold).first() {
-            return Err(close_match.uuid().0);
+        if let Some((close_match, how_close)) = self.find_other_close_matches(match_data.as_ref(), threshold).first() {
+            return Err(InsertError::TooClose(close_match.uuid().0, *how_close));
         }
 
         if let Some(existing_match) = self.find_match_by_uuid(match_data.uuid()) {
-            return Err(existing_match.uuid().0);
+            return Err(InsertError::ExistsAlready(existing_match.uuid().0));
         }
 
         let uuid = match_data.uuid();

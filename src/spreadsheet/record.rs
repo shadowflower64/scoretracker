@@ -19,30 +19,30 @@ impl Record {
     /// Returns `Ok(true)` if the field exists and is empty.
     /// Returns `Ok(false)` if the field exists and is not empty.
     /// Returns `Err(_)` if the field does not exist.
-    pub fn is_empty<K: Into<FieldPath>>(&self, key: K) -> Result<bool, BadRecordError> {
+    pub fn is_empty(&self, key: impl Into<FieldPath>) -> Result<bool, BadRecordError> {
         self.field_contents(key).map(CellContents::is_empty)
     }
 
     /// Returns `Ok(true)` if the field exists and is filled.
     /// Returns `Ok(false)` if the field exists and is not filled.
     /// Returns `Err(_)` if the field does not exist.
-    pub fn is_filled<K: Into<FieldPath>>(&self, key: K) -> Result<bool, BadRecordError> {
+    pub fn is_filled(&self, key: impl Into<FieldPath>) -> Result<bool, BadRecordError> {
         self.field_contents(key).map(CellContents::is_filled)
     }
 
     /// Returns `Some(_)` if the field exists.
-    pub fn field<K: Into<FieldPath>>(&self, key: K) -> Option<&CellContents> {
+    pub fn field(&self, key: impl Into<FieldPath>) -> Option<&CellContents> {
         self.0.get(&key.into())
     }
 
     /// Returns `Ok(_)` if the field exists.
-    pub fn field_contents<K: Into<FieldPath>>(&self, key: K) -> Result<&CellContents, BadRecordError> {
+    pub fn field_contents(&self, key: impl Into<FieldPath>) -> Result<&CellContents, BadRecordError> {
         let path = key.into();
         self.0.get(&path).ok_or_else(|| BadRecordError::FieldNotPresent(path))
     }
 
     /// Returns `Ok(_)` if the field exists and the cell is not empty.
-    pub fn field_value<K: Into<FieldPath>>(&self, key: K) -> Result<&FieldValue, BadRecordError> {
+    pub fn field_value(&self, key: impl Into<FieldPath>) -> Result<&FieldValue, BadRecordError> {
         let path = key.into();
         let Some(cell) = self.0.get(&path) else {
             return Err(BadRecordError::FieldNotPresent(path));
@@ -57,7 +57,7 @@ impl Record {
     ///
     /// Returns `Ok(String)` if a string is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<&str, BadRecordError> {
+    pub fn string(&self, key: impl Into<FieldPath>) -> Result<&str, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -69,7 +69,7 @@ impl Record {
     ///
     /// Returns `Ok(Some(String))` if a string is present in the cell, or `Ok(None)` if the cell is empty.
     /// Returns an `Err(_)` if the field does not exist, or if the cell contains another data type.
-    pub fn string_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&str>, BadRecordError> {
+    pub fn string_opt(&self, key: impl Into<FieldPath>) -> Result<Option<&str>, BadRecordError> {
         let path = key.into();
         let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
@@ -84,7 +84,7 @@ impl Record {
     ///
     /// Returns `Ok(Some(String))` if a string is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
     /// Returns an `Err(_)` if the field does not exist.
-    pub fn string_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&str>, BadRecordError> {
+    pub fn string_var(&self, key: impl Into<FieldPath>) -> Result<Option<&str>, BadRecordError> {
         let path = key.into();
         Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_str()))
     }
@@ -93,7 +93,7 @@ impl Record {
     ///
     /// Returns `Ok(i64)` if an int is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn i64<K: Into<FieldPath>>(&self, key: K) -> Result<i64, BadRecordError> {
+    pub fn i64(&self, key: impl Into<FieldPath>) -> Result<i64, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -105,7 +105,7 @@ impl Record {
     ///
     /// Returns `Ok(Some(i64))` if an int is present in the cell, or `Ok(None)` if the cell is empty.
     /// Returns an `Err(_)` if the field does not exist, or if the cell contains another data type.
-    pub fn i64_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<i64>, BadRecordError> {
+    pub fn i64_opt(&self, key: impl Into<FieldPath>) -> Result<Option<i64>, BadRecordError> {
         let path = key.into();
         let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
@@ -120,7 +120,7 @@ impl Record {
     ///
     /// Returns `Ok(Some(i64))` if an int is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
     /// Returns an `Err(_)` if the field does not exist.
-    pub fn i64_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<i64>, BadRecordError> {
+    pub fn i64_var(&self, key: impl Into<FieldPath>) -> Result<Option<i64>, BadRecordError> {
         let path = key.into();
         Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_i64()))
     }
@@ -129,7 +129,7 @@ impl Record {
     ///
     /// Returns `Ok(T)` if an int is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn int<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<T, BadRecordError> {
+    pub fn int<T: TryFrom<i64>>(&self, key: impl Into<FieldPath>) -> Result<T, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -141,7 +141,7 @@ impl Record {
     ///
     /// Returns `Ok(Some(T))` if an int is present in the cell, or `Ok(None)` if the cell is empty.
     /// Returns an `Err(_)` if the field does not exist, or if the cell contains another data type.
-    pub fn int_opt<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<Option<T>, BadRecordError> {
+    pub fn int_opt<T: TryFrom<i64>>(&self, key: impl Into<FieldPath>) -> Result<Option<T>, BadRecordError> {
         let path = key.into();
         let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
@@ -156,7 +156,7 @@ impl Record {
     ///
     /// Returns `Ok(Some(T))` if an int is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
     /// Returns an `Err(_)` if the field does not exist.
-    pub fn int_var<T: TryFrom<i64>, K: Into<FieldPath>>(&self, key: K) -> Result<Option<T>, BadRecordError> {
+    pub fn int_var<T: TryFrom<i64>>(&self, key: impl Into<FieldPath>) -> Result<Option<T>, BadRecordError> {
         let path = key.into();
         Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_int()))
     }
@@ -165,7 +165,7 @@ impl Record {
     ///
     /// Returns `Ok(f64)` if a float is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn f64<K: Into<FieldPath>>(&self, key: K) -> Result<f64, BadRecordError> {
+    pub fn f64(&self, key: impl Into<FieldPath>) -> Result<f64, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -177,7 +177,7 @@ impl Record {
     ///
     /// Returns `Ok(T)` if a float is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn float<T: TryFrom<f64>, K: Into<FieldPath>>(&self, key: K) -> Result<T, BadRecordError> {
+    pub fn float<T: TryFrom<f64>>(&self, key: impl Into<FieldPath>) -> Result<T, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -189,7 +189,7 @@ impl Record {
     ///
     /// Returns `Ok(bool)` if a boolean value is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn bool<K: Into<FieldPath>>(&self, key: K) -> Result<bool, BadRecordError> {
+    pub fn bool(&self, key: impl Into<FieldPath>) -> Result<bool, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -201,7 +201,7 @@ impl Record {
     ///
     /// Returns `Ok(bool)` if a boolean value is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn bool_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<bool>, BadRecordError> {
+    pub fn bool_opt(&self, key: impl Into<FieldPath>) -> Result<Option<bool>, BadRecordError> {
         let path = key.into();
         let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
@@ -216,7 +216,7 @@ impl Record {
     ///
     /// Returns `Ok(NsTimestamp)` if a timestamp is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn timestamp<K: Into<FieldPath>>(&self, key: K, tz: Tz) -> Result<NsTimestamp, BadRecordError> {
+    pub fn timestamp(&self, key: impl Into<FieldPath>, tz: Tz) -> Result<NsTimestamp, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value.try_as_timestamp(path, tz)
@@ -226,7 +226,7 @@ impl Record {
     ///
     /// Returns `Ok(NaiveDate)` if a date is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn date_only<K: Into<FieldPath>>(&self, key: K) -> Result<NaiveDate, BadRecordError> {
+    pub fn date_only(&self, key: impl Into<FieldPath>) -> Result<NaiveDate, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -238,7 +238,7 @@ impl Record {
     ///
     /// Returns `Ok(Hyperlink)` if a hyperlink is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn hyperlink<K: Into<FieldPath>>(&self, key: K) -> Result<&Hyperlink, BadRecordError> {
+    pub fn hyperlink(&self, key: impl Into<FieldPath>) -> Result<&Hyperlink, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
@@ -250,7 +250,7 @@ impl Record {
     ///
     /// Returns Ok(Hyperlink) if a hyperlink is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn hyperlink_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&Hyperlink>, BadRecordError> {
+    pub fn hyperlink_opt(&self, key: impl Into<FieldPath>) -> Result<Option<&Hyperlink>, BadRecordError> {
         let path = key.into();
         let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
@@ -265,12 +265,12 @@ impl Record {
     ///
     /// Returns `Ok(Some(Hyperlink))` if a hyperlink is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
     /// Returns an `Err(_)` if the field does not exist.
-    pub fn hyperlink_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&Hyperlink>, BadRecordError> {
+    pub fn hyperlink_var(&self, key: impl Into<FieldPath>) -> Result<Option<&Hyperlink>, BadRecordError> {
         let path = key.into();
         Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_hyperlink()))
     }
 
-    pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str, Error = &'static str>>(&self, key: K) -> Result<T, BadRecordError> {
+    pub fn string_enum<T: for<'a> TryFrom<&'a str, Error = &'static str>>(&self, key: impl Into<FieldPath>) -> Result<T, BadRecordError> {
         let path = key.into();
         let string = self.string(path.clone())?;
         T::try_from(string).map_err(|enum_name| BadRecordError::NotAValidEnumVariant(path, enum_name.to_string(), string.to_owned()))

@@ -19,7 +19,7 @@ use scoretracker::util::terminal_colors::{ANSI_COLOR_BOLD_YELLOW, ansi_move_curs
 use scoretracker::util::timestamp::NsDuration;
 use scoretracker::util::uuid::UuidString;
 use std::collections::HashSet;
-use std::fmt::{self, Debug, Display};
+use std::fmt::{Debug, Display};
 use std::io::{Write, stdout};
 use std::path::Path;
 use std::sync::LazyLock;
@@ -47,7 +47,7 @@ fn print_check_ok_msg(msg: &str) {
     println!("{ANSI_ERASE_TO_END}{ANSI_COLOR_BOLD_GREEN}ok: {ANSI_COLOR_RESET}{msg}");
 }
 
-fn print_check_warn<E: fmt::Display>(warning: &E) {
+fn print_check_warn(warning: impl Display) {
     println!("{ANSI_ERASE_TO_END}{ANSI_COLOR_BOLD_YELLOW}warning: {ANSI_COLOR_RESET}{warning}");
 }
 
@@ -55,7 +55,7 @@ fn _print_check_warn_msg(msg: &str) {
     println!("{ANSI_ERASE_TO_END}{ANSI_COLOR_BOLD_YELLOW}warning: {ANSI_COLOR_RESET}{msg}");
 }
 
-fn print_check_err<E: fmt::Display>(error: &E) {
+fn print_check_err(error: impl Display) {
     println!("{ANSI_ERASE_TO_END}{ANSI_COLOR_BOLD_RED}error: {ANSI_COLOR_RESET}{error}");
 }
 
@@ -207,6 +207,14 @@ pub enum LibraryEntryCheckError {
     ReusedUuid(UuidString),
     #[error("invalid sha256 hash: {0}")]
     InvalidSHA256Hash(String),
+    #[error("duplicate sha256 hash: {0}")]
+    DuplicateSHA256Hash(String),
+    #[error("invalid youtube id: {0}")]
+    InvalidYouTubeId(String),
+    #[error("duplicate youtube id: {0}")]
+    DuplicateYouTubeId(String),
+    #[error("no sha256 hash or youtube id present")]
+    NoHashOrYouTubeId,
     #[error("cloth entry not found: {0}")]
     ClothNotFound(UuidString),
     #[error("dry entry not found: {0}")]
@@ -219,6 +227,8 @@ fn check_library_entry(
     entry: &LibraryEntry,
     library_db: &LibraryDatabase,
     uuids: &mut HashSet<UuidString>,
+    sha256_hashes: &mut HashSet<String>,
+    youtube_ids: &mut HashSet<String>,
 ) -> Result<(), LibraryEntryCheckError> {
     type E = LibraryEntryCheckError;
 
@@ -227,8 +237,23 @@ fn check_library_entry(
     }
 
     static SHA256_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{64}$").expect("could not compile regex"));
-    if !SHA256_REGEX.is_match(&entry.sha256) {
-        Err(E::InvalidSHA256Hash(entry.sha256.clone()))?;
+    static YOUTUBE_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9A-Za-z-_]{11}$").expect("could not compile regex"));
+    if let Some(sha256) = &entry.sha256 {
+        if !SHA256_REGEX.is_match(sha256) {
+            Err(E::InvalidSHA256Hash(sha256.clone()))?;
+        }
+        if !sha256_hashes.insert(sha256.clone()) {
+            return Err(E::DuplicateSHA256Hash(sha256.clone()));
+        }
+    } else if let Some(youtube_id) = &entry.youtube_id {
+        if !YOUTUBE_ID_REGEX.is_match(youtube_id) {
+            Err(E::InvalidYouTubeId(youtube_id.clone()))?;
+        }
+        if !youtube_ids.insert(youtube_id.clone()) {
+            return Err(E::DuplicateYouTubeId(youtube_id.clone()));
+        }
+    } else {
+        Err(E::NoHashOrYouTubeId)?;
     }
 
     if let Some(cloth) = &entry.cloth {
@@ -282,7 +307,9 @@ fn check_performance(
         return Err(E::ReusedUuid(performance.uuid()));
     }
 
-    let other_close = performance_db.find_close_performances_from_diff_match(performance, NsDuration::from_secs_f64(30.0), match_db);
+    let other_close = performance_db
+        .find_close_performances_from_diff_match(performance, NsDuration::from_secs_f64(30.0), match_db)
+        .map_err(|x| E::MatchNotFound(x.into()))?;
     if !other_close.is_empty() {
         return Err(E::ClosePerformances(
             other_close.iter().map(|(m, how_close)| (m.uuid(), *how_close)).collect(),
@@ -426,11 +453,20 @@ fn check_scoreboard_databases(
     print_check_ok_msg(&format!("{entry_count} entries"));
 
     let mut all_mainkey_uuids = HashSet::new();
+    let mut all_sha256_hashes = HashSet::new();
+    let mut all_youtube_ids = HashSet::new();
 
     print_check_name("checking library database entries");
     for (i, entry) in library_db.entries.iter().enumerate() {
         print_check_status(&format!("({}/{entry_count})", i + 1));
-        check_library_entry(entry, &library_db, &mut all_mainkey_uuids).map_err(|e| E::LibraryEntry { uuid: entry.uuid, e })?;
+        check_library_entry(
+            entry,
+            &library_db,
+            &mut all_mainkey_uuids,
+            &mut all_sha256_hashes,
+            &mut all_youtube_ids,
+        )
+        .map_err(|e| E::LibraryEntry { uuid: entry.uuid, e })?;
     }
     print_check_ok();
 
@@ -500,7 +536,7 @@ pub fn check_all() -> Result<(), CmdError> {
             config
         }
         Err(e) => {
-            print_check_err(&e);
+            print_check_err(e);
             return Err(CmdError::ConfigReadError(e));
         }
     };

@@ -36,7 +36,7 @@ pub struct Match {
     pub game_version: Option<String>,
 }
 
-#[typetag::serde(name = "gh3")]
+#[typetag::serde(name = "ghwt")]
 impl MatchTrait for Match {
     fn common(&self) -> &CommonMatchInfo {
         &self.common

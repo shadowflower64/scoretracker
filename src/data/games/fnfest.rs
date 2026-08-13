@@ -164,7 +164,7 @@ impl Performance {
     }
 }
 
-#[typetag::serde(name = "rb4")]
+#[typetag::serde(name = "fnfest")]
 impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common

@@ -7,8 +7,8 @@ use crate::config::Config;
 use crate::data::game::song::AnySong;
 use crate::data::game::{AnyGame, Game, game_instance_from_id};
 use crate::data::library::database::LibraryDatabase;
-use crate::data::scoreboard::r#match::AnyMatch;
-use crate::data::scoreboard::performance::AnyPerformance;
+use crate::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
+use crate::data::scoreboard::performance::{AnyPerformance, PerformanceDatabase};
 use crate::data::scoreboard::player::PlayerDatabase;
 use crate::spreadsheet::ContinueOrQuit::{Continue, Quit};
 use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
@@ -62,12 +62,6 @@ impl From<BadRecordError> for ContinueOrQuit<BadRecordError> {
 pub type ParseMatchRecordResult = ParseRecordResult<(AnyMatch, Vec<AnyPerformance>)>;
 pub type ParseSongRecordResult = ParseRecordResult<AnySong>;
 
-pub struct SpreadsheetImportResults {
-    pub song_lists: Vec<SongList>,
-    pub matches: Vec<AnyMatch>,
-    pub performances: Vec<AnyPerformance>,
-}
-
 #[derive(Debug, Error)]
 pub enum BadRecordError {
     #[error("not implemented")]
@@ -114,6 +108,8 @@ pub enum BadRecordError {
     ProofDoesNotExist { youtube_id: String },
     #[error("invalid youtube url: {url}")]
     InvalidYouTubeUrl { url: String }, // video ID not found
+    #[error("ok throwaway")]
+    OkThrowaway,
     #[error("{0}")]
     CustomMessage(String),
     #[error("{0}")]
@@ -201,12 +197,20 @@ fn import_org_spreadsheet_page<T: fmt::Debug>(
 
         match parser_fn(game, record, ctx) {
             Ok(parser_output) => {
-                if VERBOSE_CORRECT {
-                    success!("{game_id}:{row} | {page_type} parsed successfully: {parser_output:?}");
+                if throwaway == Some(true) {
+                    // throwaway correct
+                    let e = throw_up(game_id, i, BadRecordError::OkThrowaway, record, PRINT_RECORD_FOR_THROWAWAYS);
+                    warn!("{game_id}:{row} | {page_type} parsed successfully, but it was marked as throwaway; ignoring");
+                    on_throwaway(e, ctx);
                 } else {
-                    success!("{game_id}:{row} | {page_type} parsed successfully ");
+                    // normal correct
+                    if VERBOSE_CORRECT {
+                        success!("{game_id}:{row} | {page_type} parsed successfully: {parser_output:?}");
+                    } else {
+                        success!("{game_id}:{row} | {page_type} parsed successfully ");
+                    }
+                    on_success(parser_output, ctx);
                 }
-                on_success(parser_output, ctx);
             }
             Err(Continue(e)) => {
                 if throwaway == Some(true) {
@@ -318,7 +322,7 @@ fn import_org_spreadsheet_songs(
 pub fn import_org_spreadsheet_generic(
     mut worksheets: Vec<(String, Range<Data>)>,
     mut read_hyperlinks: impl FnMut(&str) -> Vec<Hyperlink>,
-) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
+) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_generic");
 
     let total_worksheets = worksheets.len();
@@ -335,11 +339,11 @@ pub fn import_org_spreadsheet_generic(
     let config = Config::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
     let player_database =
         PlayerDatabase::read_without_locking(config.player_database_path()).map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
-    let library_database =
+    let mut library_db =
         LibraryDatabase::lock_and_read(config.library_database_path(), None).map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
     let mut ctx = Context {
         player_database: &player_database,
-        library_database: &library_database,
+        library_database: &library_db,
         proofs_to_insert: Vec::new(),
         tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
         ok_match_record_count: 0,
@@ -389,6 +393,7 @@ pub fn import_org_spreadsheet_generic(
         ctx.fixable_song_records.len()
     );
 
+    // Write fixable records to a temp file
     let fixable_match_path = project_temp_dir().join("fixable_match_records.txt");
     fs::create_dir_all(fixable_match_path.parent().unwrap()).expect("could not create dirs");
     fs::write(
@@ -401,7 +406,6 @@ pub fn import_org_spreadsheet_generic(
     )
     .expect("could not write to file");
     let fixable_song_path = project_temp_dir().join("fixable_song_records.txt");
-
     fs::write(
         &fixable_song_path,
         ctx.fixable_song_records
@@ -413,14 +417,34 @@ pub fn import_org_spreadsheet_generic(
     .expect("could not write to file");
     info!("fixables written to {fixable_match_path:?} and {fixable_song_path:?}");
 
-    Ok(SpreadsheetImportResults {
-        song_lists,
-        matches,
-        performances,
-    })
+    // Add correct records to database
+    let mut match_db = MatchDatabase::lock_and_read(config.match_database_path(), None).expect("todo");
+    let mut performance_db = PerformanceDatabase::lock_and_read(config.performance_database_path(), None).expect("todo");
+    for match_data in matches {
+        info!("inserting match: {match_data:?}");
+        let _ = match_db
+            .insert(match_data)
+            .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
+    }
+    for performance in performances {
+        info!("inserting performance: {performance:?}");
+        let _ = performance_db
+            .insert(performance, &match_db)
+            .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
+    }
+    for proof in ctx.proofs_to_insert {
+        info!("inserting proof: {proof:?}");
+        let _ = library_db.insert(proof).inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
+    }
+
+    performance_db.save_and_close().expect("todo");
+    match_db.save_and_close().expect("todo");
+    library_db.save_and_close().expect("todo");
+
+    Ok(())
 }
 
-pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
+pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_ods");
     info!("loading workbook from path: {ods_path:?}");
     let mut workbook: Ods<_> = open_workbook(ods_path)?;
@@ -433,7 +457,7 @@ pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<SpreadsheetImportRe
     import_org_spreadsheet_generic(worksheets, |_| Vec::new())
 }
 
-pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<SpreadsheetImportResults, SpreadsheetImportError> {
+pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<(), SpreadsheetImportError> {
     log_fn_name!("import_org_spreadsheet_xlsx");
     info!("loading workbook from path: {xlsx_path:?}");
     let mut workbook: Xlsx<_> = open_workbook(xlsx_path)?;

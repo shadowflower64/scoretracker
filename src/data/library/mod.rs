@@ -71,7 +71,7 @@ pub fn get_library_dir_of_path(path: &Path) -> Option<PathBuf> {
 /// assert_eq!(path_within_library_dir("/mnt/example/videos/library", "/mnt/example/videos/library/directory/../../../../example_file_5.mp4"), None);
 /// //assert_eq!(path_within_library_dir(r"C:\Videos\Proof Library", r"C:\Videos\Proof Library\Test Game 1\..\Test Game 2\example_file_6.mp4"), Some(RelativePathBuf::from(r"Test Game 2\example_file_6.mp4")));
 /// ```
-pub fn path_within_library_dir<P1: AsRef<Path>, P2: AsRef<Path>>(library_dir: P1, target_file_path: P2) -> Option<RelativePathBuf> {
+pub fn path_within_library_dir(library_dir: impl AsRef<Path>, target_file_path: impl AsRef<Path>) -> Option<RelativePathBuf> {
     let library_dir_path = path::absolute(library_dir.as_ref()).ok()?;
     let file_path = path::absolute(target_file_path.as_ref()).ok()?;
     let relative_file_path = file_path.relative_to(library_dir_path).ok()?.normalize();
@@ -83,16 +83,16 @@ pub fn path_within_library_dir<P1: AsRef<Path>, P2: AsRef<Path>>(library_dir: P1
     }
 }
 
-pub fn create_stpl_url_to_file<P1: AsRef<Path>, P2: AsRef<Path>>(
+pub fn create_stpl_url_to_file(
     library_info: LibraryInfo,
-    library_dir: P1,
-    target_file_path: P2,
+    library_dir: impl AsRef<Path>,
+    target_file_path: impl AsRef<Path>,
 ) -> Option<StplUrl> {
     let rel = path_within_library_dir(library_dir.as_ref(), target_file_path)?;
     Some(create_stpl_url_to_relfile(library_info, rel))
 }
 
-pub fn create_stpl_url_to_relfile<P: AsRef<RelativePath>>(library_info: LibraryInfo, target_file_relpath: P) -> StplUrl {
+pub fn create_stpl_url_to_relfile(library_info: LibraryInfo, target_file_relpath: impl AsRef<RelativePath>) -> StplUrl {
     StplUrl::new(
         LibraryDomain::Local(library_info.domain),
         Some(target_file_relpath.as_ref().to_string()),

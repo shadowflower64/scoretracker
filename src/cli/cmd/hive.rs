@@ -41,7 +41,7 @@ pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
     Ok(())
 }
 
-pub fn add_task<J: Job>(job: J) -> Result<(), CmdError> {
+pub fn add_task(job: impl Job) -> Result<(), CmdError> {
     log_fn_name!("cmd:add_task");
 
     let job = job.into_any();

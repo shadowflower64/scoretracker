@@ -108,7 +108,7 @@ pub struct Performance {
     pub accuracy: Percentage,
 }
 
-#[typetag::serde(name = "cytus")]
+#[typetag::serde(name = "deemo2")]
 impl PerformanceTrait for Performance {
     fn common(&self) -> &CommonPerformanceInfo {
         &self.common

@@ -121,7 +121,7 @@ impl NsTimestamp {
         Self(Nanoseconds::from_nanos(nanos))
     }
 
-    pub fn from_since_epoch<D: Into<NsDuration>>(duration: D) -> Self {
+    pub fn from_since_epoch(duration: impl Into<NsDuration>) -> Self {
         Self(duration.into().0)
     }
 
@@ -364,7 +364,7 @@ impl NsDuration {
         Self(Nanoseconds::from_nanos(nanos))
     }
 
-    pub fn from_timestamp<T: Into<NsTimestamp>>(timestamp: T) -> Self {
+    pub fn from_timestamp(timestamp: impl Into<NsTimestamp>) -> Self {
         Self(timestamp.into().0)
     }
 
@@ -495,6 +495,14 @@ impl<'de> Deserialize<'de> for NsDuration {
         //     return Ok(NsDuration(a));
         // }
         Nanoseconds::deserialize(deserializer).map(Self)
+    }
+}
+
+impl fmt::Display for NsDuration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sec = self.0.as_secs();
+        let frac = self.0.frac();
+        write!(f, "{sec}.{frac:09} s")
     }
 }
 

@@ -176,7 +176,7 @@ impl LockfileHandle {
         Ok(())
     }
 
-    pub fn lockfile_path_for<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
+    pub fn lockfile_path_for(path: impl AsRef<Path>) -> Result<PathBuf> {
         let path = path.as_ref();
         let parent = path.parent().ok_or(Error::NoParentPath(path.to_owned()))?;
         let filename_osstr = path.file_name().ok_or(Error::NoFilename(path.to_owned()))?;
@@ -210,7 +210,7 @@ impl LockfileHandle {
     /// If the path for the lockfile cannot be generated, this function may return [`Error::NoParentPath`], [`Error::NoFilename`], or [`Error::FilenameIsNotUTF8`].
     /// If the lockfile could not be created, this function will return [`Error::CannotCreateLockfile`].
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
-    pub fn acquire<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
+    pub fn acquire(path: impl AsRef<Path>, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
         // Create lockfile
         let lockfile_path = Self::lockfile_path_for(&path)?;
         Self::create_lockfile_on_disk(&lockfile_path, worker_info)?;
@@ -241,7 +241,7 @@ impl LockfileHandle {
     /// # Errors
     /// If the path for the lockfile cannot be generated, this function may return [`Error::NoParentPath`], [`Error::NoFilename`], or [`Error::FilenameIsNotUTF8`].
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
-    pub fn acquire_wait<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
+    pub fn acquire_wait(path: impl AsRef<Path>, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
         log_fn_name!("lockfile:acquire_wait");
         log_should_print_debug!(dynamic: DEBUG_PRINT);
 

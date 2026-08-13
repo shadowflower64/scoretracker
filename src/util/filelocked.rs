@@ -19,10 +19,10 @@ pub trait FileLockableData: Sized {
     fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>>;
     fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()>;
 
-    fn read_without_locking<P: AsRef<Path>>(path: P) -> file_ex::Result<Self> {
+    fn read_without_locking(path: impl AsRef<Path>) -> file_ex::Result<Self> {
         Self::_inner_read(path.as_ref())?.ok_or_else(|| file_ex::Error::file_not_found(path.as_ref().to_path_buf()))
     }
-    fn lock_and_read<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
+    fn lock_and_read(path: impl AsRef<Path>, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
         let lockfile = LockfileHandle::acquire_wait(&path, worker_info)?;
         let inner = Self::_inner_read(&lockfile)?.ok_or_else(|| file_ex::Error::file_not_found(path.as_ref().to_path_buf()))?;
         Ok(FileLocked {
@@ -48,7 +48,7 @@ where
 }
 
 pub trait FileLockableDataDefault: FileLockableData + Default {
-    fn read_without_locking_or_default<P: AsRef<Path>>(path: P) -> file_ex::Result<Self> {
+    fn read_without_locking_or_default(path: impl AsRef<Path>) -> file_ex::Result<Self> {
         Ok(Self::_inner_read(path.as_ref())?.unwrap_or_default())
     }
 
@@ -61,7 +61,7 @@ pub trait FileLockableDataDefault: FileLockableData + Default {
     /// * the file structure could not be parsed.
     ///
     /// This is to prevent overwriting existing data if it has become corrupted or protected by permissions.
-    fn lock_and_read_or_default<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
+    fn lock_and_read_or_default(path: impl AsRef<Path>, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
         let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let inner = Self::_inner_read(&lockfile)?.unwrap_or_default();
         Ok(FileLocked {

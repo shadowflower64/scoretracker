@@ -3,6 +3,7 @@
 //! A "library info file" is a file that contains basic information about the library.
 //! For example, this file contains the domain name for this library dir.
 use crate::data::library::stpl_url::LibraryDomainName;
+use crate::util::file_ex::FileEx;
 use crate::util::{file_ex, filelocked::FileLockableData};
 use serde::{Deserialize, Serialize};
 
@@ -19,11 +20,11 @@ impl LibraryInfo {
 }
 
 impl FileLockableData for LibraryInfo {
-    fn _inner_read<F: file_ex::FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
+    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
         file_ex.read_from_json()
     }
 
-    fn _inner_write<F: file_ex::FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
+    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
         file_ex.write_as_json_pretty(self)
     }
 }

@@ -10,7 +10,7 @@ pub struct ArgError {
 }
 
 impl ArgError {
-    pub fn from_parse_err<T: fmt::Display>(e: T) -> Self {
+    pub fn from_parse_err(e: impl fmt::Display) -> Self {
         Self {
             error_message: e.to_string(),
         }

@@ -65,11 +65,11 @@ impl Percentage {
         self.0
     }
 
-    pub fn from_multiplier<Num: Into<f64>>(value: Num) -> Self {
+    pub fn from_multiplier(value: impl Into<f64>) -> Self {
         Self(value.into() * 100.0)
     }
 
-    pub fn from_percentage<Num: Into<f64>>(value: Num) -> Self {
+    pub fn from_percentage(value: impl Into<f64>) -> Self {
         Self(value.into())
     }
 }
