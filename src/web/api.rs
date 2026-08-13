@@ -1,11 +1,23 @@
-use crate::data::games::{gh3, in_falsus};
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchMetadata};
+use crate::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
 use crate::info;
 use crate::log_fn_name;
-use crate::util::timestamp::NsTimestamp;
+use crate::util::filelocked::FileLockableData;
+use crate::util::uuid::UuidString;
+use crate::web::AppData;
 use actix_web::{HttpRequest, HttpResponse, Responder, get, put, web};
 use serde::Serialize;
-use uuid::Uuid;
+
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum ResponseGet<T: Serialize> {
+    Ok { item: T },
+    _Error,
+}
+
+fn make_get_response_ok<T: Serialize>(item: &T) -> HttpResponse {
+    let response = ResponseGet::Ok { item };
+    HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
+}
 
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -14,7 +26,7 @@ enum ResponseGetList<T: Serialize> {
     _Error,
 }
 
-fn make_get_list_response_ok<T: Serialize>(items: Vec<T>) -> impl Responder {
+fn make_get_list_response_ok<T: Serialize>(items: Vec<T>) -> HttpResponse {
     let response = ResponseGetList::Ok { items };
     HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
 }
@@ -26,62 +38,49 @@ enum ResponsePut<T: Serialize> {
     _Error,
 }
 
-fn make_put_response_ok<T: Serialize>(item: T) -> impl Responder {
+fn make_put_response_ok<T: Serialize>(item: &T) -> HttpResponse {
     let response = ResponsePut::Ok { item };
     HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
 }
 
 #[get("/api/match")]
-pub async fn get_match_list(_req: HttpRequest) -> impl Responder {
+pub async fn get_match_list(req: HttpRequest) -> impl Responder {
     log_fn_name!("get_match_list");
     info!("received get request for match list");
-    make_get_list_response_ok(vec![
-        //
-        Box::new(gh3::Match {
-            common: CommonMatchInfo {
-                uuid: Uuid::now_v7().into(),
-                timestamp: NsTimestamp::now(),
-                song_id: "example".to_string(),
-                proof: Vec::new(),
-                comment: None,
-                metadata: MatchMetadata::new(),
-            },
-            mode: gh3::Mode::Quickplay,
-            score: 123456,
-            notes_hit: 2345,
-            max_streak: 1234,
-            game_version: Some("gh3 Nonexistent Build".to_string()),
-        }),
-        //
-        Box::new(gh3::Match {
-            common: CommonMatchInfo {
-                uuid: Uuid::now_v7().into(),
-                timestamp: NsTimestamp::now(),
-                song_id: "example2".to_string(),
-                proof: Vec::new(),
-                comment: None,
-                metadata: MatchMetadata::new(),
-            },
-            mode: gh3::Mode::Quickplay,
-            score: 123456,
-            notes_hit: 2345,
-            max_streak: 1234,
-            game_version: Some("gh3 Nonexistent Build".to_string()),
-        }),
-        //
-    ])
+
+    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
+    make_get_list_response_ok(match_db.matches)
+}
+
+#[get("/api/match/{uuid}")]
+pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> impl Responder {
+    log_fn_name!("get_match");
+
+    let uuid = path.into_inner();
+    info!("received get request for match: {uuid}");
+
+    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
+    let match_data = match_db.find_match_by_uuid(uuid).expect("match not found");
+    make_get_response_ok(&match_data)
 }
 
 #[put("/api/match/{uuid}")]
-pub async fn put_match(req: HttpRequest, req_body: web::Json<in_falsus::Match>) -> impl Responder {
+pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web::Json<AnyMatch>) -> impl Responder {
     log_fn_name!("put_match");
-    let uuid: Uuid = req
-        .match_info()
-        .get("uuid")
-        .expect("uuid not provided")
-        .parse()
-        .expect("invalid uuid");
-    let data = req_body.0;
-    info!("received put request for match with uuid {uuid} -- {data:?}");
-    make_put_response_ok(data)
+
+    let uuid = path.into_inner();
+    let match_data = body.into_inner();
+    info!("received put request for match: {uuid} -> {match_data:?}");
+
+    assert_eq!(uuid, match_data.uuid(), "uuid in url should match uuid in request body");
+
+    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let mut match_db = MatchDatabase::lock_and_read(app_data.config.match_database_path(), None).expect("could not read match database");
+
+    let res = make_put_response_ok(&match_data);
+    match_db.insert(match_data).expect("could not insert match into database");
+    match_db.save_and_close().expect("could not save match database");
+    res
 }

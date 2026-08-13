@@ -6,6 +6,7 @@ use actix_web::{Error, HttpRequest};
 use relative_path::{Component, RelativePathBuf};
 use std::path::PathBuf;
 
+use crate::config::Config;
 use crate::util::relative_path_from_segments;
 use crate::{debug, info, log_fn_name, log_should_print_debug};
 
@@ -55,6 +56,10 @@ async fn hey() -> impl Responder {
     HttpResponse::Ok().body("Hey there!")
 }
 
+pub struct AppData {
+    pub config: &'static Config,
+}
+
 #[actix_web::main]
 pub async fn web_main() -> std::io::Result<()> {
     log_fn_name!("web_main");
@@ -63,11 +68,15 @@ pub async fn web_main() -> std::io::Result<()> {
     info!("starting server on: http://{HOST}:{PORT}");
     HttpServer::new(|| {
         App::new()
+            .app_data(AppData {
+                config: Config::load().expect("could not load config"),
+            })
             .service(index)
             .service(static_handler)
             .service(echo)
             .service(hey)
             .service(api::get_match_list)
+            .service(api::get_match)
             .service(api::put_match)
     })
     .bind((HOST, PORT))?
