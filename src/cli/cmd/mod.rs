@@ -60,18 +60,28 @@ impl<'a> CmdlineContext<'a> {
         Ok(cmd_opt)
     }
 
-    fn last_cmd(&mut self) -> Option<&String> {
-        self.arguments.get(self.top - 1)
+    fn last_cmd(&mut self) -> Option<&str> {
+        self.arguments.get(self.top - 1).map(String::as_str)
     }
 
     pub fn pull_arg<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<T, CmdError> {
-        let arg = parse_arg(self.arguments.get(self.top), name, description, &self.full_command_name)?;
+        let arg = parse_arg(
+            self.arguments.get(self.top).map(String::as_str),
+            name,
+            description,
+            &self.full_command_name,
+        )?;
         self.top += 1;
         Ok(arg)
     }
 
     pub fn pull_arg_opt<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<Option<T>, CmdError> {
-        let arg = parse_arg_opt(self.arguments.get(self.top), name, description, &self.full_command_name)?;
+        let arg = parse_arg_opt(
+            self.arguments.get(self.top).map(String::as_str),
+            name,
+            description,
+            &self.full_command_name,
+        )?;
         self.top += 1;
         Ok(arg)
     }

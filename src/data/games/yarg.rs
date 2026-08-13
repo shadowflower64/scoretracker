@@ -120,7 +120,7 @@ impl PerformanceTrait for Performance {
         &self.common
     }
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
-        self.common.comment = Some(ask_string("comment", self.comment().clone())?);
+        self.common.comment = Some(ask_string("comment", self.comment().map(str::to_owned))?);
         Ok(())
     }
     fn sorting_key(&self) -> f64 {

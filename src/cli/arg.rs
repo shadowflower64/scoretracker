@@ -25,7 +25,7 @@ pub trait CmdlineArgument: CmdlineArgumentParse {
     fn arg_type() -> &'static str;
 }
 
-pub fn parse_arg<T: CmdlineArgument>(arg: Option<&String>, name: &str, description: &str, fcn: &str) -> Result<T, CmdError> {
+pub fn parse_arg<T: CmdlineArgument>(arg: Option<&str>, name: &str, description: &str, fcn: &str) -> Result<T, CmdError> {
     if let Some(arg) = arg {
         T::try_from_arg(arg).map_err(|e| CmdError::WrongArgumentType {
             cmd: fcn.to_string(),
@@ -43,7 +43,7 @@ pub fn parse_arg<T: CmdlineArgument>(arg: Option<&String>, name: &str, descripti
     }
 }
 
-pub fn parse_arg_opt<T: CmdlineArgument>(arg: Option<&String>, name: &str, description: &str, fcn: &str) -> Result<Option<T>, CmdError> {
+pub fn parse_arg_opt<T: CmdlineArgument>(arg: Option<&str>, name: &str, description: &str, fcn: &str) -> Result<Option<T>, CmdError> {
     if let Some(arg) = arg {
         T::try_from_arg(arg).map(Some).map_err(|e| CmdError::WrongArgumentType {
             cmd: fcn.to_string(),

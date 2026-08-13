@@ -5,8 +5,8 @@ use regex::Regex;
 use scoretracker::config::Config;
 use scoretracker::data::game::game_instance_from_id;
 use scoretracker::data::library::database::{LibraryDatabase, LibraryEntry};
-use scoretracker::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
-use scoretracker::data::scoreboard::performance::{AnyPerformance, PerformanceDatabase};
+use scoretracker::data::scoreboard::r#match::{MatchDatabase, MatchTrait};
+use scoretracker::data::scoreboard::performance::{PerformanceDatabase, PerformanceTrait};
 use scoretracker::data::scoreboard::player::{Player, PlayerDatabase};
 use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::TaskState;
@@ -269,7 +269,7 @@ pub enum PerformanceCheckError {
 }
 
 fn check_performance(
-    performance: &AnyPerformance,
+    performance: &dyn PerformanceTrait,
     player_db: &PlayerDatabase,
     match_db: &MatchDatabase,
     performance_db: &PerformanceDatabase,
@@ -328,7 +328,7 @@ pub enum MatchCheckError {
 }
 
 fn check_match(
-    match_data: &AnyMatch,
+    match_data: &dyn MatchTrait,
     player_db: &PlayerDatabase,
     match_db: &MatchDatabase,
     performance_db: &PerformanceDatabase,
@@ -438,7 +438,7 @@ fn check_scoreboard_databases(
     for (i, performance) in performance_db.performances.iter().enumerate() {
         print_check_status(&format!("({}/{performance_count})", i + 1));
         check_performance(
-            performance,
+            performance.as_ref(),
             &player_db,
             &match_db,
             &performance_db,
@@ -456,7 +456,7 @@ fn check_scoreboard_databases(
     for (i, match_data) in match_db.matches.iter().enumerate() {
         print_check_status(&format!("({}/{match_count})", i + 1));
         check_match(
-            match_data,
+            match_data.as_ref(),
             &player_db,
             &match_db,
             &performance_db,

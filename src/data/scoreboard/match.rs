@@ -51,14 +51,14 @@ pub trait MatchTrait: Debug {
     fn timestamp(&self) -> NsTimestamp {
         self.common().timestamp
     }
-    fn song_id(&self) -> &String {
+    fn song_id(&self) -> &str {
         &self.common().song_id
     }
-    fn proof(&self) -> &Vec<UuidString> {
+    fn proof(&self) -> &[UuidString] {
         &self.common().proof
     }
-    fn comment(&self) -> &Option<String> {
-        &self.common().comment
+    fn comment(&self) -> Option<&str> {
+        self.common().comment.as_deref()
     }
     fn metadata(&self) -> &MatchMetadata {
         &self.common().metadata
@@ -94,21 +94,21 @@ impl MatchDatabase {
         &CACHE
     }
 
-    pub fn find_other_close_matches(&self, req_m: &AnyMatch, threshold: NsDuration) -> Vec<(&AnyMatch, NsDuration)> {
+    pub fn find_other_close_matches(&self, req_m: &dyn MatchTrait, threshold: NsDuration) -> Vec<(&dyn MatchTrait, NsDuration)> {
         let mut search_results = self
             .matches
             .iter()
             .filter_map(|m| {
                 let difference = (m.timestamp() - req_m.timestamp()).abs();
-                (m.uuid() != req_m.uuid() && m.game_id() == req_m.game_id() && difference <= threshold).then_some((m, difference))
+                (m.uuid() != req_m.uuid() && m.game_id() == req_m.game_id() && difference <= threshold).then_some((m.as_ref(), difference))
             })
             .collect::<Vec<_>>();
-        search_results.sort_by(|(_, a), (_, b)| a.cmp(b));
+        search_results.sort_by_key(|(_, how_close)| *how_close);
         search_results
     }
 
-    pub fn find_match_by_uuid(&self, uuid: UuidString) -> Option<&AnyMatch> {
-        self.matches.iter().find(|x| x.uuid() == uuid)
+    pub fn find_match_by_uuid(&self, uuid: UuidString) -> Option<&dyn MatchTrait> {
+        self.matches.iter().find(|x| x.uuid() == uuid).map(|x| x.as_ref())
     }
 
     pub fn find_match_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut AnyMatch> {
@@ -117,7 +117,7 @@ impl MatchDatabase {
 
     pub fn add(&mut self, match_data: AnyMatch) -> Result<Uuid, Uuid> {
         let threshold = NsDuration::from_secs_f64(Self::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
-        if let Some((close_match, _how_close)) = self.find_other_close_matches(&match_data, threshold).first() {
+        if let Some((close_match, _how_close)) = self.find_other_close_matches(match_data.as_ref(), threshold).first() {
             return Err(close_match.uuid().0);
         }
 

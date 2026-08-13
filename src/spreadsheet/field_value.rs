@@ -29,9 +29,9 @@ impl FieldValue {
     pub const ALLOW_FLOATS_AS_BOOLS: bool = true;
     pub const ALLOW_INTS_AS_BOOLS: bool = true;
 
-    pub fn as_string(&self) -> Option<&String> {
+    pub fn as_str(&self) -> Option<&str> {
         match self {
-            Self::String(a) => Some(a),
+            Self::String(a) => Some(a.as_str()),
             _ => None,
         }
     }

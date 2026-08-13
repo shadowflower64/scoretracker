@@ -77,11 +77,11 @@ pub trait PerformanceTrait: Debug {
     fn match_uuid(&self) -> UuidString {
         self.common().match_uuid
     }
-    fn proof(&self) -> &Vec<UuidString> {
+    fn proof(&self) -> &[UuidString] {
         &self.common().proof
     }
-    fn comment(&self) -> &Option<String> {
-        &self.common().comment
+    fn comment(&self) -> Option<&str> {
+        self.common().comment.as_deref()
     }
     fn metadata(&self) -> &PerformanceMetadata {
         &self.common().metadata
@@ -119,26 +119,26 @@ impl PerformanceDatabase {
 
     pub fn find_close_performances_from_diff_match(
         &self,
-        req_p: &AnyPerformance,
+        req_p: &dyn PerformanceTrait,
         threshold: NsDuration,
         match_db: &MatchDatabase,
-    ) -> Vec<(&AnyPerformance, NsDuration)> {
+    ) -> Vec<(&dyn PerformanceTrait, NsDuration)> {
         let req_m = match_db.find_match_by_uuid(req_p.match_uuid()).expect("todo");
-        let mut search_results: Vec<(&AnyPerformance, NsDuration)> = self
+        let mut search_results: Vec<(&dyn PerformanceTrait, NsDuration)> = self
             .performances
             .iter()
             .filter_map(|p| {
                 let m = match_db.find_match_by_uuid(p.match_uuid()).expect("todo");
                 let difference = (m.timestamp() - req_m.timestamp()).abs();
-                (m.uuid() != req_m.uuid() && p.game_id() == req_p.game_id() && difference <= threshold).then_some((p, difference))
+                (m.uuid() != req_m.uuid() && p.game_id() == req_p.game_id() && difference <= threshold).then_some((p.as_ref(), difference))
             })
             .collect();
-        search_results.sort_by(|(_, a), (_, b)| a.cmp(b));
+        search_results.sort_by_key(|(_, how_close)| *how_close);
         search_results
     }
 
-    pub fn find_performance_by_uuid(&self, uuid: UuidString) -> Option<&AnyPerformance> {
-        self.performances.iter().find(|x| x.uuid() == uuid)
+    pub fn find_performance_by_uuid(&self, uuid: UuidString) -> Option<&dyn PerformanceTrait> {
+        self.performances.iter().find(|x| x.uuid() == uuid).map(|x| x.as_ref())
     }
 
     pub fn find_performance_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut AnyPerformance> {
@@ -148,7 +148,7 @@ impl PerformanceDatabase {
     pub fn add(&mut self, performance: AnyPerformance, match_db: &MatchDatabase) -> Result<Uuid, Uuid> {
         let threshold = NsDuration::from_secs_f64(MatchDatabase::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
         if let Some((close_performance, _how_close)) = self
-            .find_close_performances_from_diff_match(&performance, threshold, match_db)
+            .find_close_performances_from_diff_match(performance.as_ref(), threshold, match_db)
             .first()
         {
             return Err(close_performance.uuid().0);

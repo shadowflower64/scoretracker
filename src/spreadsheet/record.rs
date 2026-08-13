@@ -57,11 +57,11 @@ impl Record {
     ///
     /// Returns `Ok(String)` if a string is present in the cell.
     /// Returns an `Err(_)` if the field does not exist, if the cell is empty, or if the cell contains another data type.
-    pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<&String, BadRecordError> {
+    pub fn string<K: Into<FieldPath>>(&self, key: K) -> Result<&str, BadRecordError> {
         let path = key.into();
         let value = self.field_value(path.clone())?;
         value
-            .as_string()
+            .as_str()
             .ok_or_else(|| BadRecordError::NotAString(path, Box::new(value.clone())))
     }
 
@@ -69,13 +69,13 @@ impl Record {
     ///
     /// Returns `Ok(Some(String))` if a string is present in the cell, or `Ok(None)` if the cell is empty.
     /// Returns an `Err(_)` if the field does not exist, or if the cell contains another data type.
-    pub fn string_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&String>, BadRecordError> {
+    pub fn string_opt<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&str>, BadRecordError> {
         let path = key.into();
         let Some(value) = self.field_contents(path.clone())?.val() else {
             return Ok(None);
         };
         value
-            .as_string()
+            .as_str()
             .ok_or_else(|| BadRecordError::NotAString(path, Box::new(value.clone())))
             .map(Some)
     }
@@ -84,9 +84,9 @@ impl Record {
     ///
     /// Returns `Ok(Some(String))` if a string is present in the cell, or `Ok(None)` if the cell is empty or contains another data type.
     /// Returns an `Err(_)` if the field does not exist.
-    pub fn string_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&String>, BadRecordError> {
+    pub fn string_var<K: Into<FieldPath>>(&self, key: K) -> Result<Option<&str>, BadRecordError> {
         let path = key.into();
-        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_string()))
+        Ok(self.field_contents(path.clone())?.val().and_then(|x| x.as_str()))
     }
 
     /// Parse the field as a `i64`.
@@ -273,8 +273,7 @@ impl Record {
     pub fn string_enum<K: Into<FieldPath>, T: for<'a> TryFrom<&'a str, Error = &'static str>>(&self, key: K) -> Result<T, BadRecordError> {
         let path = key.into();
         let string = self.string(path.clone())?;
-        T::try_from(string.as_str())
-            .map_err(|enum_name| BadRecordError::NotAValidEnumVariant(path, enum_name.to_string(), string.to_owned()))
+        T::try_from(string).map_err(|enum_name| BadRecordError::NotAValidEnumVariant(path, enum_name.to_string(), string.to_owned()))
     }
 }
 

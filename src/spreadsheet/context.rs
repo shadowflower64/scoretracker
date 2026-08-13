@@ -99,7 +99,7 @@ impl Context<'_> {
         let comment = match record.field_value("comment") {
             Ok(value) => Some(
                 value
-                    .as_string()
+                    .as_str()
                     .ok_or(BadRecordError::NotAString("comment".into(), Box::new(value.to_owned())))?
                     .to_owned(),
             ),
