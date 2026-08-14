@@ -5,6 +5,7 @@ use scoretracker::util::file_ex::FileEx;
 use scoretracker::util::filelocked::FileLockableDataWithDefaultPath;
 use scoretracker::util::lockfile;
 use scoretracker::{info_npr, success_npr, warn_npr};
+use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
@@ -50,6 +51,10 @@ pub fn init() -> Result<(), CmdError> {
         default_library_dir_path,
         shared_data_repo_path,
     };
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| CmdError::CreateDirAllError(parent.to_owned(), e))?;
+    }
     path.write_as_json_pretty(&config)
         .map_err(lockfile::Error::from)
         .map_err(CmdError::ConfigWriteError)?;

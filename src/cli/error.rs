@@ -1,5 +1,6 @@
 use scoretracker::util::{command_line::AskError, file_ex, lockfile};
 use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerCreateError, spreadsheet::SpreadsheetImportError};
+use std::path::PathBuf;
 use std::{io, process::ExitCode};
 use thiserror::Error;
 use uuid::Uuid;
@@ -93,6 +94,8 @@ pub enum CmdError {
     PlayerAlreadyInDatabase(Uuid),
     #[error("could not serialize config: {0}")]
     ConfigSerializationError(serde_json::Error),
+    #[error("could not create directory: {0}; reason: {1}")]
+    CreateDirAllError(PathBuf, io::Error),
     // ---
     #[error("library needs to be rescanned: uuid not found in library database: {0}")]
     LibraryRescanNeeded(Uuid),
@@ -136,6 +139,7 @@ impl CmdError {
             Self::RevealDirectoryError(..) => 34,
             Self::PlayerAlreadyInDatabase(..) => 35,
             Self::ConfigSerializationError(..) => 36,
+            Self::CreateDirAllError(..) => 37,
             // ---
             Self::LibraryRescanNeeded(..) => 51,
         }

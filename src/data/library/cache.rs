@@ -13,7 +13,6 @@ use crate::util::timestamp::NsTimestamp;
 use crate::{debug, log_fn_name, log_should_print_debug};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 /// Library cache entry for one file.
@@ -126,9 +125,10 @@ impl LibraryCache {
     /// compute the hash of the file, update the cache file and save it to disk automatically.
     pub fn fetch_file_sha256_hash(&mut self, path: &Path) -> Option<String> {
         let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-        let file_size = fs::metadata(path).unwrap().size();
-        let birth_timestamp = fs::metadata(path).unwrap().created().unwrap().into();
-        let modify_timestamp = fs::metadata(path).unwrap().modified().unwrap().into();
+        let metadata = fs::metadata(path).unwrap();
+        let file_size = metadata.len();
+        let birth_timestamp = metadata.created().unwrap().into();
+        let modify_timestamp = metadata.modified().unwrap().into();
 
         self.find_cached_sha256_hash(&filename, file_size, birth_timestamp, modify_timestamp)
     }
@@ -144,9 +144,10 @@ impl LibraryCache {
         log_should_print_debug!(VERBOSE_SCANNING);
 
         let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-        let file_size = fs::metadata(path).unwrap().size();
-        let birth_timestamp = fs::metadata(path).unwrap().created().unwrap().into();
-        let modify_timestamp = fs::metadata(path).unwrap().modified().unwrap().into();
+        let metadata = fs::metadata(path).unwrap();
+        let file_size = metadata.len();
+        let birth_timestamp = metadata.created().unwrap().into();
+        let modify_timestamp = metadata.modified().unwrap().into();
 
         if let Some(cached_hash) = self.find_cached_sha256_hash(&filename, file_size, birth_timestamp, modify_timestamp) {
             debug!("using cached hash for {path:?}: {cached_hash}");
