@@ -1,3 +1,4 @@
+//! Module containing code for hive worker processes.
 pub mod data;
 pub mod ipc;
 pub mod names;
@@ -27,6 +28,7 @@ use std::{io, panic, process};
 use thiserror::Error;
 use uuid::Uuid;
 
+/// Error while performing worker functions.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("cannot read lock from queue: {0}")]
@@ -51,6 +53,7 @@ pub enum Error {
     CannotReadLibraryIndex(file_ex::Error),
 }
 
+/// Error while starting a worker process.
 #[derive(Debug, Error)]
 pub enum WorkerCreateError {
     #[error("configuration error: {0}")]
@@ -63,10 +66,16 @@ pub enum WorkerCreateError {
     TcpListenerLocalAddrError(io::Error),
 }
 
+/// Worker data structure, containing a config, some mutable data, and channels for sending updates to clients connected via TCP.
 #[derive(Debug)]
 pub struct Worker {
     config: Config,
+    data: Arc<Mutex<WorkerData>>,
+    worker_status_tx: Sender<WorkerStatus>,
+    task_progress_tx: Sender<TaskProgress>,
+}
 
+impl Worker {
     /// All data that is related to this worker.
     ///
     /// This structure is shareable across threads.
@@ -74,20 +83,17 @@ pub struct Worker {
     /// * [`WorkerInfo`], an immutable structure containing basic info about the worker;
     /// * [`WorkerStatus`], which holds the current state of the worker (is it paused, running, etc.);
     /// * [`TaskProgress`], which contains information about progress on the current task.
-    data: Arc<Mutex<WorkerData>>,
-    worker_status_tx: Sender<WorkerStatus>,
-    task_progress_tx: Sender<TaskProgress>,
-}
-
-impl Worker {
     pub fn data(&self) -> &Arc<Mutex<WorkerData>> {
         &self.data
     }
 
+    /// A short way of cloning the [`WorkerInfo`] structure living inside the mutex-locked data.
     pub fn info_cloned(&self) -> WorkerInfo {
         self.data().lock().unwrap().info.clone()
     }
 
+    /// Global scoretracker configuration
+    // TODO: this doesn't really make sense right? [`Config`] already has a global instance thing
     pub fn config(&self) -> &Config {
         &self.config
     }
@@ -121,6 +127,7 @@ impl Worker {
         self.data.lock().unwrap().task_progress.clone()
     }
 
+    /// Save the status to internal data and also send a worker status update message to clients connected via TCP.
     pub fn update_worker_status(&self, status: WorkerStatus) {
         log_fn_name!("update_worker_status");
         self.data.lock().unwrap().status = status.clone();
@@ -130,6 +137,7 @@ impl Worker {
             .inspect_err(|e| warn!("worker_status_tx channel disconnected: {e:?}"));
     }
 
+    /// Save the progress to internal data and also send a task progress update message to clients connected via TCP.
     pub fn update_task_progress(&self, task_progress: TaskProgress) {
         log_fn_name!("update_task_progress");
         self.data.lock().unwrap().task_progress = Some(task_progress.clone());
@@ -139,6 +147,9 @@ impl Worker {
             .inspect_err(|e| warn!("task_progress_tx channel disconnected: {e:?}"));
     }
 
+    /// A very over-simplified way of updating task progress using just a string.
+    // TODO: this shouldn't really be used in final code
+    // #[deprecated]
     pub fn update_task_progress_very_simple(&self, message: String) {
         let task_progress = TaskProgress {
             done: false,
@@ -152,6 +163,7 @@ impl Worker {
         self.update_task_progress(task_progress);
     }
 
+    /// Create a new worker structure and start the TCP listener thread.
     pub fn new_with_listener(short_name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
         log_fn_name!("worker:new_with_listener");
 
@@ -185,15 +197,18 @@ impl Worker {
         Ok(worker)
     }
 
+    /// Create a new worker structure and a TCP listener.
     pub fn new(short_name: String, config: Config) -> Result<Self, WorkerCreateError> {
         let listener = TcpListener::bind("127.0.0.1:0").map_err(WorkerCreateError::TcpListenerBindError)?;
         Self::new_with_listener(short_name, config, listener)
     }
 
+    /// Create a full worker name from a short name (usually chosen randomly from [`names`]) and a process ID (pid) number.
     pub fn make_full_name(short_name: &str, pid: u32) -> String {
         format!("{}-{pid}.scoretracker-worker.local", short_name.to_lowercase())
     }
 
+    /// Create a new worker structure and a TCP listener with a randomly chosen name and a default config.
     pub fn new_default() -> Result<Self, WorkerCreateError> {
         let config = Config::load()?;
         Self::new(random_name().to_owned(), config.clone())
