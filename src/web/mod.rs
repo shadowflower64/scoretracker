@@ -10,20 +10,18 @@ use crate::config::Config;
 use crate::util::relative_path_from_segments;
 use crate::{debug, info, log_fn_name, log_should_print_debug};
 
-pub const WEB_FRONTEND_FILE_PATH_SEGMENTS: &[&str] = &["web-frontend"];
-pub fn web_frontend_file_path() -> PathBuf {
-    relative_path_from_segments(WEB_FRONTEND_FILE_PATH_SEGMENTS).to_path(".")
+pub const WEB_FRONTEND_DIR_PATH_SEGMENTS: &[&str] = &["web-frontend"];
+pub fn web_frontend_dir_path() -> PathBuf {
+    relative_path_from_segments(WEB_FRONTEND_DIR_PATH_SEGMENTS).to_path(".")
 }
 
-pub fn static_files_path() -> PathBuf {
-    relative_path_from_segments(WEB_FRONTEND_FILE_PATH_SEGMENTS)
-        .join("app")
-        .to_path(".")
+pub fn static_file_dir_path() -> PathBuf {
+    relative_path_from_segments(WEB_FRONTEND_DIR_PATH_SEGMENTS).join("app").to_path(".")
 }
 
 #[get("/")]
 async fn index() -> Result<NamedFile, Error> {
-    Ok(NamedFile::open(static_files_path().join("app.html"))?)
+    Ok(NamedFile::open(web_frontend_dir_path().join("app.html"))?)
 }
 
 #[get("/app/{filename:.*}")]
@@ -40,7 +38,7 @@ async fn static_handler(req: HttpRequest) -> Result<NamedFile, Error> {
             Component::Normal(_) => {}
         }
     }
-    let fullpath = relpath.to_path(static_files_path());
+    let fullpath = relpath.to_path(static_file_dir_path());
     debug!("requested path: {relpath:?} -> {fullpath:?}");
     let file = NamedFile::open(fullpath)?;
     Ok(

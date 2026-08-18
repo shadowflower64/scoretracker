@@ -4,7 +4,7 @@ use crate::ffmpeg::ffmpeg_process_video;
 use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::util::uuid::UuidString;
-use rust_ffmpeg::{Codec, CodecOptions};
+use rust_ffmpeg::{Codec, CodecOptions, VideoFilter};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
@@ -12,24 +12,57 @@ use std::{path::PathBuf, sync::Arc};
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessingType {
+    /// Turn a video into the [`QualityState::Folded`] state.
     CompressFoldVideo,
+
+    /// Turn a video into the [`QualityState::Messy`] state.
+    CompressMessUpVideo,
+
+    /// Turn a video into the [`QualityState::Crumpled`] state.
     CompressCrumpleVideo,
+
+    /// Turn a video into the [`QualityState::Shredded`] state.
     CompressShredVideo,
 }
 
 impl ProcessingType {
-    pub fn vcodec(&self) -> CodecOptions {
-        CodecOptions::new(Codec::h265())
+    pub fn audio_settings(&self) -> CodecOptions {
+        match self {
+            Self::CompressFoldVideo | Self::CompressMessUpVideo => CodecOptions::new(Codec::copy()),
+            Self::CompressCrumpleVideo => CodecOptions::new(Codec::opus()).bitrate("32k"),
+            Self::CompressShredVideo => CodecOptions::new(Codec::opus()).bitrate("16k"),
+        }
     }
-    pub fn acodec(&self) -> CodecOptions {
-        // TODO - which is better?? just copy and don't care about audio size, or actually compress audio?
-        // CodecOptions::new(Codec::opus())
-        // CodecOptions::new(Codec::copy())
-        todo!()
+
+    pub fn preserve_all_streams(&self) -> bool {
+        match self {
+            Self::CompressFoldVideo | Self::CompressMessUpVideo | Self::CompressCrumpleVideo => true,
+            Self::CompressShredVideo => false,
+        }
     }
+
+    pub fn video_settings(&self) -> (CodecOptions, Vec<VideoFilter>) {
+        match self {
+            Self::CompressFoldVideo => (CodecOptions::new(Codec::h265()).quality(26).option("preset", "slow"), Vec::new()),
+            Self::CompressMessUpVideo => (
+                CodecOptions::new(Codec::h265()).quality(29).option("preset", "slower"),
+                vec![VideoFilter::scale(-1, 720)],
+            ),
+            Self::CompressCrumpleVideo => (
+                CodecOptions::new(Codec::h265()).quality(35).option("preset", "slow"),
+                vec![VideoFilter::scale(-2, 480)],
+            ),
+            Self::CompressShredVideo => (
+                CodecOptions::new(Codec::h265()).quality(38).option("preset", "slow"),
+                vec![VideoFilter::scale(-1, 360)],
+            ),
+        }
+    }
+
     pub fn resulting_quality_state(&self) -> QualityState {
         match self {
             Self::CompressFoldVideo => QualityState::Folded,
+            Self::CompressMessUpVideo => QualityState::Messy,
             Self::CompressCrumpleVideo => QualityState::Crumpled,
             Self::CompressShredVideo => QualityState::Shredded,
         }
@@ -41,6 +74,7 @@ impl FromStr for ProcessingType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "fold" => Ok(Self::CompressFoldVideo),
+            "mess_up" => Ok(Self::CompressMessUpVideo),
             "crumple" => Ok(Self::CompressCrumpleVideo),
             "shred" => Ok(Self::CompressShredVideo),
             a => Err(format!("invalid processing type: {a}")),
