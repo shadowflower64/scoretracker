@@ -169,7 +169,7 @@ pub enum QualityState {
     /// - Time: 00:33:48 (5.40 fps, 0,090x speed) -- 00:11:06 per 1 minute of video
     /// - File size: 116.03 MiB (5332.4kbits/s)   -- 38.11 MiB per 1 minute of video
     ///
-    /// See also: [`ProcessingType::CompressFoldVideo`](crate::hive::jobs::process_library_video::ProcessingType::CompressFoldVideo)
+    /// See also: [`Operation::CompressFoldVideo`](crate::hive::jobs::process_library_video::Operation::CompressFoldVideo)
     Folded,
 
     /// Transcoded cut video, lossy but still looking good and definitely watchable. Possibly in worse resolution. Should take up less than 20 MiB per minute of video.
@@ -185,7 +185,7 @@ pub enum QualityState {
     /// - Time: 01:08:37 (2.66 fps, 0,044x speed) -- 00:22:32 per 1 minute of video
     /// - File size: 44.53 MiB (2048.8kbits/s)    -- 14.63 MiB per 1 minute of video
     ///
-    /// See also: [`ProcessingType::CompressMessUpVideo`](crate::hive::jobs::process_library_video::ProcessingType::CompressMessUpVideo)
+    /// See also: [`Operation::CompressMessUpVideo`](crate::hive::jobs::process_library_video::Operation::CompressMessUpVideo)
     Messy,
 
     /// Transcoded cut video, in worse resolution but still readable quality. Has to take up less than 4 MiB per minute of video.
@@ -202,7 +202,7 @@ pub enum QualityState {
     /// - Time: 00:06:21 (28.74 fps, 0.479x speed) -- 00:02:05 per 1 minute of video
     /// - File size: 12.35 MiB (3758.1kbits/s)     -- 4.06 MiB per 1 minute of video
     ///
-    /// See also: [`ProcessingType::CompressCrumpleVideo`](crate::hive::jobs::process_library_video::ProcessingType::CompressCrumpleVideo)
+    /// See also: [`Operation::CompressCrumpleVideo`](crate::hive::jobs::process_library_video::Operation::CompressCrumpleVideo)
     Crumpled,
 
     /// Transcoded cut video, with terrible bitrate and 360p. Takes up around 2 MiB per minute of video.
@@ -219,7 +219,7 @@ pub enum QualityState {
     /// - Time: 00:03:30 (52.12 fps, 0.869x speed) -- 00:01:09 per 1 minute of video
     /// - File size: 5.17 MiB (240.6kbits/s)       -- 1.70 MiB per 1 minute of video
     ///
-    /// See also: [`ProcessingType::CompressShredVideo`](crate::hive::jobs::process_library_video::ProcessingType::CompressShredVideo)
+    /// See also: [`Operation::CompressShredVideo`](crate::hive::jobs::process_library_video::Operation::CompressShredVideo)
     Shredded,
 }
 
