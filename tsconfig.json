@@ -1,12 +1,12 @@
 {
   "include": [
-    "web-frontend/static/ts/**/*"
+    "web-frontend/app/ts/**/*"
   ],
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     // File Layout
-    "rootDir": "web-frontend/static/ts",
-    "outDir": "web-frontend/static/js",
+    "rootDir": "web-frontend/app/ts",
+    "outDir": "web-frontend/app/js",
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "module": "esnext",

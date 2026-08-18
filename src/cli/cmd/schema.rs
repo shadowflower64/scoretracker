@@ -60,7 +60,9 @@ pub fn gen_types() -> Result<(), CmdError> {
          */";
 
     #[cfg(target_family = "windows")]
-    let banner_comment = BANNER_COMMENT.replace("\n", " "); // batch files are not allowed to have newlines in cmdline parameters i think...?
+    // batch files are not allowed to have newlines in cmdline parameters i think...?
+    // TODO: maybe this can be fixed in a better way
+    let banner_comment = BANNER_COMMENT.replace("\n", " ");
     #[cfg(target_family = "unix")]
     let banner_comment = BANNER_COMMENT;
 

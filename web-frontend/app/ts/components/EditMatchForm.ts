@@ -39,16 +39,15 @@ export const EditMatchDialogGenericPartTop = ComponentTemplate.named("edit-match
         }
     };
 });
-export const EditMatchDialogGenericPartBottom = ComponentTemplate.named("edit-match-dialog-generic-part-bottom", (f, params: { performance_ids: string[], proof: string[], comment?: string | null, metadata: MatchMetadata; }) => {
+export const EditMatchDialogGenericPartBottom = ComponentTemplate.named("edit-match-dialog-generic-part-bottom", (f, params: { proof: string[], comment?: string | null, metadata: MatchMetadata; }) => {
     const comment = select(f, "textarea", "#comment");
-    const performanceTableEditor = place(f, "performance-table-editor", PerformanceTableEditor.create({ performanceIds: [] }));
+    // const performanceTableEditor = place(f, "performance-table-editor", PerformanceTableEditor.create({ performanceIds: [] })); // TODO
     const proofTableEditor = place(f, "proof-table-editor", ProofTableEditor.create({ performanceIds: [] }));
     const metadataTableEditor = place(f, "metadata-table-editor", MetadataTableEditor.create({ metadata: params.metadata }));
     return {
         metadataTableEditor: metadataTableEditor.component,
         getFormValues() {
             return {
-                performance_ids: performanceTableEditor.component.getData(),
                 proof: proofTableEditor.component.getData(),
                 comment: comment.value,
                 metadata: metadataTableEditor.component.getData()

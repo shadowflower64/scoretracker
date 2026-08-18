@@ -107,6 +107,11 @@ export type CommonPerformanceInfo = {
     player_uuid: UuidString,
 
     /**
+     * Match UUID.
+     */
+    match_uuid: UuidString,
+
+    /**
      * List of library entry UUIDs that are proof of this performance.
      */
     proof: UuidString[],
@@ -137,11 +142,6 @@ export type CommonMatchInfo = {
      * Named ID of the song.
      */
     song_id: string,
-
-    /**
-     * Performances belonging to this match.
-     */
-    performance_ids: UuidString[],
 
     /**
      * List of library entry UUIDs that are proof of this match.

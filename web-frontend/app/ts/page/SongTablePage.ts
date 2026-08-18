@@ -23,7 +23,6 @@ export class SongTablePage extends AbstractPage {
                 uuid: UUID7.generate().toString(),
                 timestamp: Nanoseconds.fromMillisParts(Date.now(), 123456789),
                 song_id: "xi-freedom_dive",
-                performance_ids: [],
                 proof: [],
                 comment: "Example user comment",
                 metadata: { abc: "def", ghi: 123, jkl: true }

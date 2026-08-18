@@ -10,9 +10,15 @@ use crate::config::Config;
 use crate::util::relative_path_from_segments;
 use crate::{debug, info, log_fn_name, log_should_print_debug};
 
-pub const STATIC_FILE_PATH_SEGMENTS: &[&str] = &["web-frontend", "static"];
+pub const WEB_FRONTEND_FILE_PATH_SEGMENTS: &[&str] = &["web-frontend"];
+pub fn web_frontend_file_path() -> PathBuf {
+    relative_path_from_segments(WEB_FRONTEND_FILE_PATH_SEGMENTS).to_path(".")
+}
+
 pub fn static_files_path() -> PathBuf {
-    relative_path_from_segments(STATIC_FILE_PATH_SEGMENTS).to_path(".")
+    relative_path_from_segments(WEB_FRONTEND_FILE_PATH_SEGMENTS)
+        .join("app")
+        .to_path(".")
 }
 
 #[get("/")]
@@ -20,7 +26,7 @@ async fn index() -> Result<NamedFile, Error> {
     Ok(NamedFile::open(static_files_path().join("app.html"))?)
 }
 
-#[get("/static/{filename:.*}")]
+#[get("/app/{filename:.*}")]
 async fn static_handler(req: HttpRequest) -> Result<NamedFile, Error> {
     log_fn_name!("static_handler");
     log_should_print_debug!(true);
