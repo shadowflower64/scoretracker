@@ -1,3 +1,4 @@
+//! Example job that prints a specified message to the console.
 use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::{info, log_fn_name};

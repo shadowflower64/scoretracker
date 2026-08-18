@@ -1,3 +1,4 @@
+//! Example job that waits for a specified amount of time.
 use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use serde::{Deserialize, Serialize};

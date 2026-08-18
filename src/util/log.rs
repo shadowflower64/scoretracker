@@ -125,6 +125,7 @@ macro_rules! log_print {
     }};
 }
 
+/// Prints out a message on `stderr` (by calling [`on_log`]) without a prefix. (`npr` stands for "no prefix".)
 #[macro_export]
 macro_rules! log_print_npr {
     ($log_level: literal, $log_level_color: ident, $($arg:tt)*) => {{

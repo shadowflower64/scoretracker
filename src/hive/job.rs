@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 
+/// Successful result of a job.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", content = "details")]
 pub enum Success {
@@ -25,6 +26,7 @@ pub enum Success {
     CutVideo { cloth: ClothInfo, fragment: Option<UuidString> },
 }
 
+/// Failed result of a job.
 #[derive(Debug, Clone, Error, Deserialize, Serialize)]
 #[serde(tag = "type", content = "details")]
 pub enum Fail {
@@ -97,6 +99,7 @@ impl From<worker::Error> for Fail {
     }
 }
 
+/// Enum containing variants for every job that a worker can do.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "details")]
 #[serde(rename_all = "snake_case")]
@@ -108,6 +111,7 @@ pub enum AnyJob {
     ProcessLibraryVideo(ProcessLibraryVideoJob),
 }
 
+/// Trait implemented by structures representing jobs.
 pub trait Job {
     fn run(&self, worker: Arc<Worker>) -> impl Future<Output = Result<Success, Fail>>;
     fn into_any(self) -> AnyJob;

@@ -5,7 +5,7 @@ use crate::error::CmdError;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
-use scoretracker::hive::jobs::process_library_video::{ProcessLibraryVideoJob, ProcessingType};
+use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
 use scoretracker::info_npr;
 use scoretracker::util::timestamp::NsLocalTimestamp;
 use scoretracker::web::web_main;
@@ -178,7 +178,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                     "process-video" => {
                         let source_path: PathBuf = ctx.pull_arg("source_path", "source path to cloth video")?;
                         let destination_path: PathBuf = ctx.pull_arg("destination_path", "destination path to fragment video")?;
-                        let processing_type: ProcessingType =
+                        let processing_type: Operation =
                             ctx.pull_arg("processing_type", "type/quality preset of video compression to do")?;
                         cmd::hive::add_task(ProcessLibraryVideoJob {
                             source_path,

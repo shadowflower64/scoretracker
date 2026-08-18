@@ -1,3 +1,4 @@
+//! Losslessly cut a video from the library and save result to library
 use crate::data::library::database::ClothInfo;
 use crate::data::library::{create_stpl_url_to_relfile, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
 use crate::ffmpeg::ffmpeg_cut_video_streamcopy;

@@ -1,3 +1,4 @@
+//! Process (compress) a video from the library and save result to library
 use crate::data::library::database::QualityState;
 use crate::data::library::{create_stpl_url_to_relfile, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
 use crate::ffmpeg::ffmpeg_process_video;
@@ -11,7 +12,7 @@ use std::{path::PathBuf, sync::Arc};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ProcessingType {
+pub enum Operation {
     /// Turn a video into the [`QualityState::Folded`] state.
     CompressFoldVideo,
 
@@ -25,7 +26,8 @@ pub enum ProcessingType {
     CompressShredVideo,
 }
 
-impl ProcessingType {
+impl Operation {
+    /// Create audio codec options for ffmpeg.
     pub fn audio_settings(&self) -> CodecOptions {
         match self {
             Self::CompressFoldVideo | Self::CompressMessUpVideo => CodecOptions::new(Codec::copy()),
@@ -34,6 +36,8 @@ impl ProcessingType {
         }
     }
 
+    /// Returns [`true`] if this operation should preserve all video and audio streams
+    /// Returns [`false`] if this operation should only include one video and one audio stream in the final output video.
     pub fn preserve_all_streams(&self) -> bool {
         match self {
             Self::CompressFoldVideo | Self::CompressMessUpVideo | Self::CompressCrumpleVideo => true,
@@ -41,6 +45,7 @@ impl ProcessingType {
         }
     }
 
+    /// Create video codec options, as well as a list of video filters for ffmpeg.
     pub fn video_settings(&self) -> (CodecOptions, Vec<VideoFilter>) {
         match self {
             Self::CompressFoldVideo => (CodecOptions::new(Codec::h265()).quality(26).option("preset", "slow"), Vec::new()),
@@ -59,6 +64,7 @@ impl ProcessingType {
         }
     }
 
+    /// Fetch the [`QualityState`] of the resulting video after this operation is concluded.
     pub fn resulting_quality_state(&self) -> QualityState {
         match self {
             Self::CompressFoldVideo => QualityState::Folded,
@@ -69,7 +75,7 @@ impl ProcessingType {
     }
 }
 
-impl FromStr for ProcessingType {
+impl FromStr for Operation {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -86,7 +92,7 @@ impl FromStr for ProcessingType {
 pub struct ProcessLibraryVideoJob {
     pub source_path: PathBuf,
     pub source_proof_uuid_precondition_check: Option<UuidString>,
-    pub processing_type: ProcessingType,
+    pub processing_type: Operation,
     pub destination_path: PathBuf,
 }
 

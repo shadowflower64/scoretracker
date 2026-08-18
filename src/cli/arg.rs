@@ -1,8 +1,6 @@
 use crate::error::CmdError;
-use scoretracker::{
-    data::library::stpl_url::{LibraryDomain, LibraryDomainName},
-    hive::jobs::process_library_video::ProcessingType,
-};
+use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
+use scoretracker::hive::jobs::process_library_video::Operation;
 use std::{fmt, path::PathBuf, str::FromStr};
 
 pub struct ArgError {
@@ -103,7 +101,7 @@ impl CmdlineArgument for LibraryDomain {
     }
 }
 
-impl CmdlineArgument for ProcessingType {
+impl CmdlineArgument for Operation {
     fn arg_type() -> &'static str {
         "video compression preset type"
     }

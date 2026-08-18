@@ -24,15 +24,25 @@
 //!
 //! # Glossary
 //! Here is some of the terminology used in "scoretracker":
-//! - **Chart** - A set of notes that the player must play.
+//! - **Chart** - A complete set of notes that the player must play to finish a song.
+//! - **Hive** - A centralized system that manages multiple workers and gives out tasks requested by the user to them.
 //! - **Library item** (name wip) - An entry in the [`data::library`].
-//!   One *library item* represents a unique file in the library.
-//!   Duplicate files (files with the same SHA256 hash) are considered the same library item.
+//!   One *library item* represents a unique file in the library, with respect to ownership
+//!   (so, if multiple users upload the same exact file, it will still be classified as a separate library item).
+//!   Duplicate files (files with the same SHA256 hash owned by the same user) are considered the same library item.
 //!   For that reason, a library item can have multiple locations/paths recorded in it.
+//! - **Match** - A grouping of several performances that happened at the same exact time.
+//!   Most useful for multiplayer matches (both versus and co-op).
+//!   Every performance has a match record associated with it; multiple performances can reference one match.
+//!   The match data contains information that is always associated with all of the performances at once, such as
+//!   the timestamp, the song ID, the game version, and other such data.
+//!   Even if a game is completely singleplayer, a match record is created for consistency across the entire scoretracker system.
 //! - **Performance** - One play of one player on one chart of a song, with a given difficulty level, an instrument, and a score.
-//! - **Proof** - A library item that proves a performance is real.
+//!   Every performance stores a UUID to a *match* record, which contains some additional information about the play.
+//! - **Proof** - A library item that proves a performance is real (and was achieved legitimately).
 //! - **Score** - Numerical amount of points usually displayed at the end of a song.
 //! - **Song** - A song in a rhythm game. One song can have multiple charts (for example, different difficulties, or different instruments).
+//! - **Worker** - A process that contributes computational resources by taking on various tasks from a central system called the "*Hive*".
 
 pub mod config;
 pub mod data;

@@ -1,4 +1,4 @@
-use crate::{error, hive::jobs::process_library_video::ProcessingType, info, log_fn_name, success};
+use crate::{error, hive::jobs::process_library_video::Operation, info, log_fn_name, success};
 use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress, StreamSpecifier, StreamType};
 use std::path::Path;
 
@@ -55,20 +55,20 @@ pub async fn ffmpeg_cut_video_streamcopy(
 pub async fn ffmpeg_process_video(
     source_path: &Path,
     destination_path: &Path,
-    processing_type: ProcessingType,
+    operation: Operation,
     on_progress: impl Fn(Progress) + Send + Sync + 'static,
 ) -> Result<(), rust_ffmpeg::Error> {
     log_fn_name!("ffmpeg_cut_video_streamcopy");
 
     let mut ffmpeg = FFmpegBuilder::new()?;
 
-    let (vcodec, vfilters) = processing_type.video_settings();
-    let acodec = processing_type.audio_settings();
+    let (vcodec, vfilters) = operation.video_settings();
+    let acodec = operation.audio_settings();
 
     let input = Input::new(source_path.to_string_lossy().to_string());
     ffmpeg = ffmpeg.input(input);
 
-    if processing_type.preserve_all_streams() {
+    if operation.preserve_all_streams() {
         ffmpeg = ffmpeg.map_all_from_input(0);
     } else {
         ffmpeg = ffmpeg
