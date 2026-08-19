@@ -1,22 +1,22 @@
+use crate::data::library::stpl_url::StplUrl;
 use crate::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
 use crate::info;
 use crate::log_fn_name;
+use crate::server::{AppData, UserAuth};
 use crate::util::filelocked::FileLockableData;
 use crate::util::uuid::UuidString;
-use crate::web::AppData;
 use actix_web::{HttpRequest, HttpResponse, Responder, get, put, web};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 enum ResponseGet<T: Serialize> {
-    Ok { item: T },
+    Ok(T),
     _Error,
 }
 
-fn make_get_response_ok<T: Serialize>(item: &T) -> HttpResponse {
-    let response = ResponseGet::Ok { item };
-    HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
+fn respond_as_json(data: impl Serialize) -> HttpResponse {
+    HttpResponse::Ok().body(serde_json::to_string(&data).expect("could not convert response to json"))
 }
 
 #[derive(Serialize)]
@@ -36,11 +36,6 @@ fn make_get_list_response_ok<T: Serialize>(items: Vec<T>) -> HttpResponse {
 enum ResponsePut<T: Serialize> {
     Ok { item: T },
     _Error,
-}
-
-fn make_put_response_ok<T: Serialize>(item: &T) -> HttpResponse {
-    let response = ResponsePut::Ok { item };
-    HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
 }
 
 #[get("/api/match")]
@@ -63,7 +58,7 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> impl Re
     let app_data = req.app_data::<AppData>().expect("app data should be present");
     let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
     let match_data = match_db.find_match_by_uuid(uuid).expect("match not found");
-    make_get_response_ok(&match_data)
+    respond_as_json(ResponseGet::Ok(match_data))
 }
 
 #[put("/api/match/{uuid}")]
@@ -79,8 +74,32 @@ pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web:
     let app_data = req.app_data::<AppData>().expect("app data should be present");
     let mut match_db = MatchDatabase::lock_and_read(app_data.config.match_database_path(), None).expect("could not read match database");
 
-    let res = make_put_response_ok(&match_data);
+    let response = respond_as_json(ResponsePut::Ok { item: &match_data });
     match_db.insert(match_data).expect("could not insert match into database");
     match_db.save_and_close().expect("could not save match database");
-    res
+    response
+}
+
+#[derive(Deserialize)]
+pub struct ResolveStplUrlRequest {
+    stpl_url: StplUrl,
+}
+
+#[get("/api/resolve_stpl_url")]
+pub async fn resolve_stpl_url(req: HttpRequest, q: web::Query<ResolveStplUrlRequest>) -> impl Responder {
+    let stpl_url = &q.stpl_url;
+    log_fn_name!("resolve_stpl_url");
+    info!("resolving url: {stpl_url}");
+
+    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let resolved = app_data
+        .resolve_domain(
+            stpl_url.domain.global().expect("non-global domains are deprecated"),
+            UserAuth::guest(),
+        )
+        .with_path_opt(stpl_url.path.as_deref());
+
+    //let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
+    //make_get_list_response_ok(match_db.matches)
+    respond_as_json(resolved)
 }

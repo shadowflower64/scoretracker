@@ -77,8 +77,17 @@ impl<'de> Deserialize<'de> for LibraryDomainName {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LibraryDomain {
-    Local(LibraryDomainName),
+    Local(LibraryDomainName), // TODO: entirely get rid of local domains (local-ness should be resolved properly)
     Global(LibraryDomainName),
+}
+
+impl LibraryDomain {
+    pub fn global(&self) -> Option<&LibraryDomainName> {
+        match self {
+            Self::Local(_) => None,
+            Self::Global(a) => Some(a),
+        }
+    }
 }
 
 impl TryFrom<String> for LibraryDomain {

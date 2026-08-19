@@ -7,8 +7,8 @@ use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
 use scoretracker::info_npr;
+use scoretracker::server::server_main;
 use scoretracker::util::timestamp::NsLocalTimestamp;
-use scoretracker::web::web_main;
 use std::path::PathBuf;
 
 pub mod automark;
@@ -119,10 +119,10 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             info_npr!("hello world!");
             Ok(())
         }
-        "app" => match ctx.cmd()? {
+        "server" => match ctx.cmd()? {
             "start" => {
                 // info_npr!("starting web application");
-                web_main().expect("application error");
+                server_main().expect("server error");
                 Ok(())
             }
             _ => ctx.unknown_cmd(),
