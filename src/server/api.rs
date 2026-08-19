@@ -6,6 +6,7 @@ use crate::server::{AppData, UserAuth};
 use crate::util::filelocked::FileLockableData;
 use crate::util::uuid::UuidString;
 use actix_web::{HttpRequest, HttpResponse, Responder, get, put, web};
+use function_name::named;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
@@ -39,8 +40,9 @@ enum ResponsePut<T: Serialize> {
 }
 
 #[get("/api/match")]
+#[named]
 pub async fn get_match_list(req: HttpRequest) -> impl Responder {
-    log_fn_name!("get_match_list");
+    log_fn_name!(auto);
     info!("received get request for match list");
 
     let app_data = req.app_data::<AppData>().expect("app data should be present");
@@ -49,8 +51,9 @@ pub async fn get_match_list(req: HttpRequest) -> impl Responder {
 }
 
 #[get("/api/match/{uuid}")]
+#[named]
 pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> impl Responder {
-    log_fn_name!("get_match");
+    log_fn_name!(auto);
 
     let uuid = path.into_inner();
     info!("received get request for match: {uuid}");
@@ -62,8 +65,9 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> impl Re
 }
 
 #[put("/api/match/{uuid}")]
+#[named]
 pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web::Json<AnyMatch>) -> impl Responder {
-    log_fn_name!("put_match");
+    log_fn_name!(auto);
 
     let uuid = path.into_inner();
     let match_data = body.into_inner();
@@ -86,9 +90,10 @@ pub struct ResolveStplUrlRequest {
 }
 
 #[get("/api/resolve_stpl_url")]
+#[named]
 pub async fn resolve_stpl_url(req: HttpRequest, q: web::Query<ResolveStplUrlRequest>) -> impl Responder {
     let stpl_url = &q.stpl_url;
-    log_fn_name!("resolve_stpl_url");
+    log_fn_name!(auto);
     info!("resolving url: {stpl_url}");
 
     let app_data = req.app_data::<AppData>().expect("app data should be present");

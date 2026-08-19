@@ -26,6 +26,7 @@ use calamine::{Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_wo
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Europe::Warsaw;
 use chrono_tz::Tz;
+use function_name::named;
 use std::error::Error;
 use std::path::Path;
 use std::{fmt, fs};
@@ -177,6 +178,7 @@ fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_re
 }
 
 #[allow(clippy::too_many_arguments)]
+#[named]
 fn import_org_spreadsheet_page<T: fmt::Debug>(
     game: AnyGame,
     game_id: &str,
@@ -189,7 +191,7 @@ fn import_org_spreadsheet_page<T: fmt::Debug>(
     on_fixable: impl Fn(BadRecordErrorWithContext, &mut Context),
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
-    log_fn_name!("import_org_spreadsheet_page");
+    log_fn_name!(auto);
 
     for (i, record) in records.iter().enumerate() {
         let row = i + 2;
@@ -319,11 +321,12 @@ fn import_org_spreadsheet_songs(
     Ok(())
 }
 
+#[named]
 pub fn import_org_spreadsheet_generic(
     mut worksheets: Vec<(String, Range<Data>)>,
     mut read_hyperlinks: impl FnMut(&str) -> Vec<Hyperlink>,
 ) -> Result<(), SpreadsheetImportError> {
-    log_fn_name!("import_org_spreadsheet_generic");
+    log_fn_name!(auto);
 
     let total_worksheets = worksheets.len();
     worksheets.retain(|(name, _)| name.starts_with("j."));
@@ -444,8 +447,9 @@ pub fn import_org_spreadsheet_generic(
     Ok(())
 }
 
+#[named]
 pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<(), SpreadsheetImportError> {
-    log_fn_name!("import_org_spreadsheet_ods");
+    log_fn_name!(auto);
     info!("loading workbook from path: {ods_path:?}");
     let mut workbook: Ods<_> = open_workbook(ods_path)?;
     info!("loading workbook from path done");
@@ -457,8 +461,9 @@ pub fn import_org_spreadsheet_ods(ods_path: &Path) -> Result<(), SpreadsheetImpo
     import_org_spreadsheet_generic(worksheets, |_| Vec::new())
 }
 
+#[named]
 pub fn import_org_spreadsheet_xlsx(xlsx_path: &Path) -> Result<(), SpreadsheetImportError> {
-    log_fn_name!("import_org_spreadsheet_xlsx");
+    log_fn_name!(auto);
     info!("loading workbook from path: {xlsx_path:?}");
     let mut workbook: Xlsx<_> = open_workbook(xlsx_path)?;
     info!("loading workbook from path done");

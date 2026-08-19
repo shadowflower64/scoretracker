@@ -4,18 +4,21 @@ pub mod config;
 use crate::config::Config;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::LibraryDomainName;
-use crate::server::config::ServerConfig;
+use crate::server::config::{ServerConfig, ServerConfigError};
 use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
 use crate::{debug, error, info, log_fn_name, log_should_print_debug};
 use actix_files::NamedFile;
 use actix_web::{App, HttpServer, get};
 use actix_web::{Error, HttpRequest};
+use function_name::named;
 use relative_path::{Component, RelativePathBuf};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::io;
 use std::path::PathBuf;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, Mutex};
+use thiserror::Error;
 
 pub const WEB_FRONTEND_DIR_PATH_SEGMENTS: &[&str] = &["web-frontend"];
 pub fn web_frontend_dir_path() -> PathBuf {
@@ -32,8 +35,9 @@ async fn index() -> Result<NamedFile, Error> {
 }
 
 #[get("/app/{filename:.*}")]
+#[named]
 async fn static_handler(req: HttpRequest) -> Result<NamedFile, Error> {
-    log_fn_name!("static_handler");
+    log_fn_name!(auto);
     log_should_print_debug!(true);
 
     let path_str = req.match_info().query("filename");
@@ -96,7 +100,7 @@ pub struct LibraryConnectionInfo {
 
 pub struct AppData {
     pub config: &'static Config, // TODO: this is wrong, don't use this for servers.
-    pub server_config: &'static ServerConfig,
+    pub server_config: Arc<ServerConfig>,
     pub connected_libraries: Arc<Mutex<LibraryConnections>>,
 }
 
@@ -156,8 +160,9 @@ impl AppData {
 
 type LibraryConnections = HashMap<LibraryDomainName, LibraryConnectionInfo>;
 
+#[named]
 fn connect_local_libraries(library_dirs: &[PathBuf]) -> LibraryConnections {
-    log_fn_name!("connect_local_libraries");
+    log_fn_name!(auto);
 
     let mut connections = HashMap::new();
     for library_dir in library_dirs {
@@ -182,22 +187,31 @@ fn connect_local_libraries(library_dirs: &[PathBuf]) -> LibraryConnections {
     connections
 }
 
+#[derive(Debug, Error)]
+pub enum ServerStartError {
+    #[error("configuration error: {0}")]
+    ServerConfigError(#[from] ServerConfigError),
+    #[error("http server error: {0}")]
+    HttpServerError(#[from] io::Error),
+}
+
 #[actix_web::main]
-pub async fn server_main() -> std::io::Result<()> {
-    log_fn_name!("web_main");
+#[named]
+pub async fn server_main() -> Result<(), ServerStartError> {
+    log_fn_name!(auto);
     const HOST: &str = "127.0.0.1";
     const PORT: u16 = 8080;
     info!("starting server on: http://{HOST}:{PORT}");
 
-    static SERVER_CONFIG: LazyLock<ServerConfig> = LazyLock::new(ServerConfig::load);
+    let server_config = Arc::new(ServerConfig::load()?);
     let local_library_connections: Arc<Mutex<LibraryConnections>> =
-        Arc::new(Mutex::new(connect_local_libraries(&SERVER_CONFIG.internal_library_dirs)));
+        Arc::new(Mutex::new(connect_local_libraries(&server_config.internal_library_dirs)));
 
-    HttpServer::new(move || {
+    Ok(HttpServer::new(move || {
         App::new()
             .app_data(AppData {
-                config: Config::load().expect("todo"),
-                server_config: &SERVER_CONFIG,
+                config: Config::load().expect("todo"), // TODO: server process probably should not use the default scoretracker-toolkit config...
+                server_config: Arc::clone(&server_config),
                 connected_libraries: Arc::clone(&local_library_connections),
             })
             .service(index)
@@ -210,5 +224,5 @@ pub async fn server_main() -> std::io::Result<()> {
     })
     .bind((HOST, PORT))?
     .run()
-    .await
+    .await?)
 }

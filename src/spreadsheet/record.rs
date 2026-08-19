@@ -5,6 +5,7 @@ use crate::{info, log_fn_name};
 use calamine::{Data, Hyperlink, Range};
 use chrono::NaiveDate;
 use chrono_tz::Tz;
+use function_name::named;
 use indexmap::IndexMap;
 use std::fmt::{self, Display};
 
@@ -306,8 +307,9 @@ impl Display for Record {
 
 pub type Records = Vec<Record>;
 
+#[named]
 pub fn parse_records(sheet_name: &str, range: Range<Data>, hyperlinks: Vec<Hyperlink>) -> Records {
-    log_fn_name!("parse_records");
+    log_fn_name!(auto);
 
     info!("parsing sheet: {sheet_name}");
     let mut rows = range.rows();

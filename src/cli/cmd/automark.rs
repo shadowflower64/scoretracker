@@ -1,5 +1,6 @@
 use crate::error::CmdError;
 use constcat::concat;
+use function_name::named;
 use regex::Regex;
 use relative_path::RelativePath;
 use scoretracker::config::Config;
@@ -65,8 +66,9 @@ pub fn identify_media_based_on_relpath(relpath: &RelativePath) -> MediaCategory 
     }
 }
 
+#[named]
 pub fn automark_library_files(library_dir: PathBuf) -> Result<(), CmdError> {
-    log_fn_name!("automark_library_files");
+    log_fn_name!(auto);
 
     info!("reading database");
     let config = Config::load().map_err(CmdError::ConfigReadError)?;

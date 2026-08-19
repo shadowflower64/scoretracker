@@ -30,6 +30,7 @@ use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::{file_ex, lockfile};
 use crate::util::{filelocked::FileLockableData, uuid::UuidString};
 use crate::{debug, info, log_fn_name, log_should_print_debug, warn};
+use function_name::named;
 use relative_path::{PathExt, RelativePath, RelativePathBuf};
 use std::collections::{HashMap, HashSet};
 use std::path::{self, Path, PathBuf};
@@ -142,12 +143,13 @@ pub const VERBOSE_SCANNING: bool = false;
 /// 6. Now that we have all SHA256 hashes for files in the directory, search for them in the [`LibraryDatabase`] and fetch the proof UUID, or generate a new one if the hash does not exist in the database.
 /// 7. Generate a completely new [`LibraryIndex`] file with path paths and UUIDs fetched from the database.
 /// 8. Synchronize with the database; iterate through *every* database entry, remove any existing proof URLs that have the domain of this database, and add fresh ones.
+#[named]
 pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<(), LibraryScanError> {
-    // let info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("could not read library info");
     type E = LibraryScanError;
-
-    log_fn_name!("library:scan_full");
+    log_fn_name!("library" : auto);
     log_should_print_debug!(VERBOSE_SCANNING);
+
+    // let info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("could not read library info");
 
     let scanning_start_timestamp = Instant::now();
 
@@ -279,7 +281,7 @@ pub fn scan_register_added_files(
     _entry_mutator: impl Fn(&mut LibraryEntry),
     _worker_info: Option<&WorkerInfo>,
 ) -> Result<Vec<UuidString>, LibraryScanError> {
-    //log_fn_name!("library:scan_register_added_files");
+    //log_fn_name!("library" : auto);
 
     todo!()
 }
@@ -298,6 +300,7 @@ pub fn scan_register_added_file(
     )
 }
 
+#[named]
 pub fn scan_register_removed_files(
     library_dir: &Path,
     library_db_path: &Path,
@@ -305,7 +308,7 @@ pub fn scan_register_removed_files(
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
     type E = LibraryScanError;
-    log_fn_name!("library:scan_register_removed_files");
+    log_fn_name!("library" : auto);
 
     let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = LibraryDomain::Local(library_info.domain);
@@ -346,6 +349,7 @@ pub fn scan_register_removed_file(
     scan_register_removed_files(library_dir, library_db_path, vec![file_path], worker_info)
 }
 
+#[named]
 pub fn sync_library_index_with_db_essence(
     library_dir: &Path,
     library_index: LibraryIndex,
@@ -354,7 +358,7 @@ pub fn sync_library_index_with_db_essence(
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
     type E = LibraryScanError;
-    log_fn_name!("library:sync_library_index_with_db");
+    log_fn_name!("library" : auto);
 
     let mut reverse_index: HashMap<UuidString, Vec<RelativePathBuf>> = HashMap::new();
     let mut unused_proof_uuids_in_index = HashSet::new();

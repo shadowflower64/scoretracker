@@ -11,6 +11,7 @@ use crate::util::file_ex::{self, FileEx};
 use crate::util::filelocked::{FileLockableData, FileLocked};
 use crate::util::timestamp::NsTimestamp;
 use crate::{debug, log_fn_name, log_should_print_debug};
+use function_name::named;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -139,8 +140,9 @@ impl LibraryCache {
     ///
     /// If this file has not been recorded in the cache yet, this function will read in the whole file,
     /// compute the hash of the file, update the cache file and save it to disk automatically.
+    #[named]
     pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> (String, bool) {
-        log_fn_name!("library_cache:fetch_or_compute_file_sha256_hash");
+        log_fn_name!("library_cache" : auto);
         log_should_print_debug!(VERBOSE_SCANNING);
 
         let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
@@ -192,8 +194,9 @@ impl LibraryCache {
 }
 
 impl FileLockableData for LibraryCache {
+    #[named]
     fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
-        log_fn_name!("scan:read_or_create_new");
+        log_fn_name!("scan" : auto);
         log_should_print_debug!(VERBOSE_SCANNING);
 
         let inner_opt = file_ex.read_from_json()?;
@@ -237,8 +240,9 @@ enum HashingMethod {
     MD5,
 }
 
+#[named]
 pub fn compute_hash_of_file(path: &Path) -> String {
-    log_fn_name!("scan:compute_hash_of_file");
+    log_fn_name!("scan" : auto);
     log_should_print_debug!(VERBOSE_SCANNING);
 
     // note: changing the hashing method does not change the behaviour/naming of the hash in other places - everywhere else its still called sha256

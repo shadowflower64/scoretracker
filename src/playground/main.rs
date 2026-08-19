@@ -1,4 +1,5 @@
 use ctrlc::{self};
+use function_name::named;
 use scoretracker::config::Config;
 use scoretracker::data::game::game_instance_from_id;
 use scoretracker::data::library::scan_full;
@@ -25,13 +26,14 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 #[allow(unused)]
+#[named]
 pub fn test_lockfile(_args: &[String]) {
     #[derive(Deserialize, Serialize, Default, Debug)]
     pub struct TestCounter {
         pub counter: i32,
     }
 
-    log_fn_name!("playground:lockfile");
+    log_fn_name!("playground" : auto);
 
     let sigint = Arc::new(AtomicBool::new(false));
     let sigint_clone = sigint.clone();
@@ -71,8 +73,9 @@ pub fn test_lockfile(_args: &[String]) {
 }
 
 #[allow(unused)]
+#[named]
 pub fn test_scanning(args: &[String]) {
-    log_fn_name!("playground:scanning");
+    log_fn_name!("playground" : auto);
 
     let library_dir = Path::new(args.get(1).expect("library dir path not provided"));
     let shared_data_repo_path = &Config::load().expect("invalid config").shared_data_repo_path;
@@ -112,8 +115,9 @@ pub fn test_timestamp(_args: &[String]) {
 }
 
 #[allow(unused)]
+#[named]
 pub async fn test_queue(_args: &[String]) {
-    log_fn_name!("playground:queue");
+    log_fn_name!("playground" : auto);
 
     let mut currently_doing_task_opt = None;
 
@@ -199,8 +203,9 @@ pub fn test_result(_args: &[String]) {
 }
 
 #[allow(unused)]
+#[named]
 pub fn ask_edit(args: &[String]) {
-    log_fn_name!("playground:ask_edit");
+    log_fn_name!("playground" : auto);
 
     let game_id = args.get(1).expect("no argument provided");
     let game = game_instance_from_id(game_id).unwrap_or_else(|| panic!("unknown game: {}", game_id));

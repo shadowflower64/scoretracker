@@ -3,6 +3,7 @@ use std::time::Duration;
 use calamine::{Data, ExcelDateTime, Hyperlink};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, offset::LocalResult};
 use chrono_tz::Tz;
+use function_name::named;
 
 use crate::spreadsheet::field_value::CellContents::{Empty, Filled};
 use crate::spreadsheet::{BadRecordError, field_path::FieldPath};
@@ -164,8 +165,9 @@ impl CellContents {
     }
 }
 
+#[named]
 pub fn parse_cell_contents(cell: &Data, hyperlink: Option<&Hyperlink>, formula_mode: bool, log_prefix: Option<&str>) -> CellContents {
-    log_fn_name!("parse_cell_contents");
+    log_fn_name!(auto);
     log_should_print_debug!(false);
 
     let log_prefix = log_prefix.map(|x| format!("{x}; ")).unwrap_or_default();

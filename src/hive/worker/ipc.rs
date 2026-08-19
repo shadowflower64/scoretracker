@@ -1,6 +1,7 @@
 use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
 use crate::{debug, error, info, log_fn_name, log_should_print_debug, warn};
 use crossbeam_channel::{Receiver, RecvError};
+use function_name::named;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
@@ -62,8 +63,9 @@ pub enum IncomingMessage {
 }
 
 impl IncomingMessage {
+    #[named]
     pub fn parse(bytes: &[u8]) -> Result<Self, Error> {
-        log_fn_name!("incoming_message:parse");
+        log_fn_name!("incoming_message" : auto);
         log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
 
         let message = serde_json::from_slice(bytes);
@@ -86,8 +88,9 @@ pub struct ConnectionInfo {
     pub subscription_task_progress: bool,
 }
 
+#[named]
 fn receive_message_bytes(tcp_stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
-    log_fn_name!("receive_message_bytes");
+    log_fn_name!(auto);
     log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
 
     let mut size_bytes = MessageSize::default().to_le_bytes();
@@ -106,8 +109,9 @@ fn receive_message_bytes(tcp_stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     Ok(content)
 }
 
+#[named]
 pub fn send_message(tcp_stream: &mut TcpStream, message: &OutgoingMessage) -> Result<(), Error> {
-    log_fn_name!("send_message");
+    log_fn_name!(auto);
     log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
 
     debug!("outgoing message: {message:?}");
@@ -139,6 +143,7 @@ pub fn send_message(tcp_stream: &mut TcpStream, message: &OutgoingMessage) -> Re
     Ok(())
 }
 
+#[named]
 fn handle_incoming_message(
     tcp_stream: &mut TcpStream,
     message: IncomingMessage,
@@ -147,7 +152,7 @@ fn handle_incoming_message(
     make_worker_status_rx: impl Fn() -> Receiver<WorkerStatus>,
     _make_task_progress_rx: impl Fn() -> Receiver<TaskProgress>,
 ) -> Result<(), Error> {
-    log_fn_name!("handle_incoming_message");
+    log_fn_name!(auto);
     log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
 
     match message {
@@ -201,6 +206,7 @@ fn handle_incoming_message(
     Ok(())
 }
 
+#[named]
 fn recv_connection_loop(
     tcp_stream: &mut TcpStream,
     connection_info: &Arc<Mutex<ConnectionInfo>>,
@@ -208,7 +214,7 @@ fn recv_connection_loop(
     make_worker_status_rx: impl Fn() -> Receiver<WorkerStatus>,
     make_task_progress_rx: impl Fn() -> Receiver<TaskProgress>,
 ) -> Result<(), Error> {
-    log_fn_name!("recv_connection_loop");
+    log_fn_name!(auto);
 
     let message_bytes = receive_message_bytes(tcp_stream)?;
     match IncomingMessage::parse(&message_bytes) {
@@ -233,8 +239,6 @@ fn start_subscription_thread(
     connection_info: &Arc<Mutex<ConnectionInfo>>,
     loop_fn: impl Send + 'static + Fn(&mut TcpStream, &Arc<Mutex<ConnectionInfo>>) -> Result<(), Error>,
 ) -> Result<JoinHandle<()>, Error> {
-    // log_fn_name!("start_connsend_thread");
-
     let mut tcp_stream = tcp_stream.try_clone().map_err(Error::CloneTcpStream)?;
     let peer_addr = tcp_stream.peer_addr().map_err(Error::FetchPeerAddr)?;
     let connection_info = Arc::clone(connection_info);
@@ -258,6 +262,7 @@ fn start_subscription_thread(
         .map_err(Error::CreateSubscriptionThread)
 }
 
+#[named]
 fn start_connection_thread(
     mut tcp_stream: TcpStream,
     peer_addr: SocketAddr,
@@ -265,7 +270,7 @@ fn start_connection_thread(
     worker_status_rx: Arc<Receiver<WorkerStatus>>,
     task_progress_rx: Arc<Receiver<TaskProgress>>,
 ) {
-    log_fn_name!("start_connection_thread");
+    log_fn_name!(auto);
 
     let connection_info = Arc::new(Mutex::new(ConnectionInfo::default()));
     if let Err(e) = thread::Builder::new()
@@ -299,13 +304,14 @@ fn start_connection_thread(
     }
 }
 
+#[named]
 pub fn start_listener_thread(
     listener: TcpListener,
     worker_data: Arc<Mutex<WorkerData>>,
     worker_status_rx: Receiver<WorkerStatus>,
     task_progress_rx: Receiver<TaskProgress>,
 ) {
-    log_fn_name!("listener");
+    log_fn_name!(auto);
 
     let local_address = match listener.local_addr() {
         Ok(addr) => addr,

@@ -48,3 +48,5 @@ actix-web = "4.14.1"
 actix-files = "0.6.10"
 schemars = { version = "1.2.2", features = ["indexmap2", "preserve_order"] }
 linkme = "0.3.37"
+toml = "1.1.4"
+function_name = "0.3.0"

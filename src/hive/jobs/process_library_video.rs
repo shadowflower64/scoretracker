@@ -5,6 +5,7 @@ use crate::ffmpeg::ffmpeg_process_video;
 use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::util::uuid::UuidString;
+use crate::{info, log_fn_name};
 use rust_ffmpeg::{Codec, CodecOptions, VideoFilter};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -98,6 +99,11 @@ pub struct ProcessLibraryVideoJob {
 
 impl Job for ProcessLibraryVideoJob {
     async fn run(&self, worker: Arc<Worker>) -> Result<Success, Fail> {
+        log_fn_name!("job:process_library_video");
+
+        let ffmpeg_version = rust_ffmpeg::version().await;
+        info!("ffmpeg version: {:?}", ffmpeg_version);
+
         let worker_info = Some(&worker.info_cloned());
         let config = worker.config();
 

@@ -1,5 +1,6 @@
 use crate::error::CmdError;
 use fs_extra::file::write_all;
+use function_name::named;
 use scoretracker::data::games::registered_games;
 use scoretracker::util::relative_path_from_segments;
 use scoretracker::{error, info, log_fn_name, success, success_npr};
@@ -24,8 +25,9 @@ pub fn gen_full() -> Result<(), CmdError> {
     Ok(())
 }
 
+#[named]
 pub fn gen_json() -> Result<(), CmdError> {
-    log_fn_name!("gen_json");
+    log_fn_name!(auto);
     info!("generating json schemas from rust types");
 
     let dir = schemas_dir_path();
@@ -41,8 +43,9 @@ pub fn gen_json() -> Result<(), CmdError> {
     Ok(())
 }
 
+#[named]
 pub fn gen_types() -> Result<(), CmdError> {
-    log_fn_name!("gen_types");
+    log_fn_name!(auto);
     info!("generating typescript .d.ts files from json schemas");
 
     #[cfg(target_family = "windows")]

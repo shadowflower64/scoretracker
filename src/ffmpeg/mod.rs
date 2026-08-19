@@ -1,7 +1,9 @@
 use crate::{error, hive::jobs::process_library_video::Operation, info, log_fn_name, success};
+use function_name::named;
 use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress, StreamSpecifier, StreamType};
 use std::path::Path;
 
+#[named]
 pub async fn ffmpeg_cut_video_streamcopy(
     source_path: &Path,
     destination_path: &Path,
@@ -9,7 +11,7 @@ pub async fn ffmpeg_cut_video_streamcopy(
     end_time_ms: Option<u64>,
     on_progress: impl Fn(Progress) + Send + Sync + 'static,
 ) -> Result<(), rust_ffmpeg::Error> {
-    log_fn_name!("ffmpeg_cut_video_streamcopy");
+    log_fn_name!(auto);
 
     let input = Input::new(source_path.to_string_lossy().to_string());
     let input = if let Some(start_time_ms) = start_time_ms {
@@ -52,13 +54,14 @@ pub async fn ffmpeg_cut_video_streamcopy(
     }
 }
 
+#[named]
 pub async fn ffmpeg_process_video(
     source_path: &Path,
     destination_path: &Path,
     operation: Operation,
     on_progress: impl Fn(Progress) + Send + Sync + 'static,
 ) -> Result<(), rust_ffmpeg::Error> {
-    log_fn_name!("ffmpeg_cut_video_streamcopy");
+    log_fn_name!(auto);
 
     let mut ffmpeg = FFmpegBuilder::new()?;
 

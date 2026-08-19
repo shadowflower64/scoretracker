@@ -1,5 +1,6 @@
 use crate::cmd::CmdError;
 use chrono::{DateTime, Local};
+use function_name::named;
 use scoretracker::hive::job::Job;
 use scoretracker::hive::task::Task;
 use scoretracker::hive::{queue::TaskQueue, worker::Worker};
@@ -9,8 +10,9 @@ use scoretracker::{config::Config, error, info, log_fn_name, success};
 use std::sync::Arc;
 use std::time::SystemTime;
 
+#[named]
 pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
-    log_fn_name!("cmd:spawn_worker");
+    log_fn_name!("cmd" : auto);
 
     let worker = Arc::new(Worker::new_default()?);
     if persistent {
@@ -41,8 +43,9 @@ pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
     Ok(())
 }
 
+#[named]
 pub fn add_task(job: impl Job) -> Result<(), CmdError> {
-    log_fn_name!("cmd:add_task");
+    log_fn_name!("cmd" : auto);
 
     let job = job.into_any();
     let config = Config::load().map_err(CmdError::ConfigReadError)?;

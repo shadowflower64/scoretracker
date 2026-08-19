@@ -6,6 +6,7 @@ use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::util::timestamp::NsLocalTimestamp;
 use crate::util::uuid::UuidString;
+use crate::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc};
 
@@ -20,6 +21,11 @@ pub struct CutLibraryVideoJob {
 
 impl Job for CutLibraryVideoJob {
     async fn run(&self, worker: Arc<Worker>) -> Result<Success, Fail> {
+        log_fn_name!("job:cut_library_video");
+
+        let ffmpeg_version = rust_ffmpeg::version().await;
+        info!("ffmpeg version: {:?}", ffmpeg_version);
+
         let worker_info = Some(&worker.info_cloned());
         let config = worker.config();
 

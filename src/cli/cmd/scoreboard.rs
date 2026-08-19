@@ -3,6 +3,7 @@ use crate::error::CmdError::{
     ConfigReadError, MatchDatabaseOpenError, MatchDatabaseWriteError, PerformanceDatabaseOpenError, PerformanceDatabaseWriteError,
     PlayerDatabaseOpenError, PlayerDatabaseWriteError,
 };
+use function_name::named;
 use scoretracker::config::Config;
 use scoretracker::data::game::game_instance_from_id;
 use scoretracker::data::scoreboard::r#match::MatchDatabase;
@@ -28,8 +29,9 @@ pub fn init() -> Result<(), CmdError> {
     Ok(())
 }
 
+#[named]
 pub fn add_performance(game_id: String) -> Result<(), CmdError> {
-    log_fn_name!("cmd:performance_add");
+    log_fn_name!("cmd" : auto);
 
     let game = game_instance_from_id(&game_id).ok_or(CmdError::NoGameWithId(game_id))?;
     info_npr!("adding new performance for {}", game.pretty_name());
@@ -48,8 +50,9 @@ pub fn add_performance(game_id: String) -> Result<(), CmdError> {
     Ok(())
 }
 
+#[named]
 pub fn add_player(name: String) -> Result<(), CmdError> {
-    log_fn_name!("cmd:player_add");
+    log_fn_name!("cmd" : auto);
     info_npr!("adding new player: '{name}'");
 
     let player_db_path = Config::load().map_err(CmdError::ConfigReadError)?.player_database_path();

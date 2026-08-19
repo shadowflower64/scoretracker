@@ -21,6 +21,7 @@ use crate::util::timestamp::NsTimestamp;
 use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success, warn};
 use crossbeam_channel::Sender;
+use function_name::named;
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -128,8 +129,9 @@ impl Worker {
     }
 
     /// Save the status to internal data and also send a worker status update message to clients connected via TCP.
+    #[named]
     pub fn update_worker_status(&self, status: WorkerStatus) {
-        log_fn_name!("update_worker_status");
+        log_fn_name!(auto);
         self.data.lock().unwrap().status = status.clone();
         let _ = self
             .worker_status_tx
@@ -138,8 +140,9 @@ impl Worker {
     }
 
     /// Save the progress to internal data and also send a task progress update message to clients connected via TCP.
+    #[named]
     pub fn update_task_progress(&self, task_progress: TaskProgress) {
-        log_fn_name!("update_task_progress");
+        log_fn_name!(auto);
         self.data.lock().unwrap().task_progress = Some(task_progress.clone());
         let _ = self
             .task_progress_tx
@@ -164,8 +167,9 @@ impl Worker {
     }
 
     /// Create a new worker structure and start the TCP listener thread.
+    #[named]
     pub fn new_with_listener(short_name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
-        log_fn_name!("worker:new_with_listener");
+        log_fn_name!("worker" : auto);
 
         let pid = process::id();
         let full_name = Self::make_full_name(&short_name, pid);
@@ -222,8 +226,9 @@ impl Worker {
     /// The queue file should be written to before calling this method.
     ///
     /// The result of the task should also be saved to the queue after this method finishes, so that no data is lost and the task is not done twice.
+    #[named]
     async fn execute_task_body(self: Arc<Self>, task: &mut Task) {
-        log_fn_name!("worker:execute task");
+        log_fn_name!("worker" : auto);
 
         let result = panic::catch_unwind(|| smol::block_on(task.job.run(self)));
         match result {
@@ -263,12 +268,13 @@ impl Worker {
     /// This function will mark the task as being worked on and write to the [`TaskQueue`] file using [`lockfile`];
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
+    #[named]
     pub async fn execute_task(
         self: Arc<Self>,
         mut queue: FileLocked<TaskQueue>,
         task_getter: impl Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>,
     ) -> Result<FileLocked<TaskQueue>, Error> {
-        log_fn_name!("worker:exec_task_safe");
+        log_fn_name!("worker" : auto);
 
         // Take on a task
         let task_to_do = task_getter(&mut queue)?;

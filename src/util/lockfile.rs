@@ -4,6 +4,7 @@ use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
 use crate::{VERSION, debug, info, log_fn_name, log_should_print_debug, warn};
+use function_name::named;
 use notify::{ErrorKind, Event, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
@@ -161,8 +162,9 @@ impl LockfileHandle {
         content.as_toml_pretty()
     }
 
+    #[named]
     fn create_lockfile_on_disk(lockfile_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<()> {
-        log_fn_name!("lockfile:create_lockfile_on_disk");
+        log_fn_name!("lockfile" : auto);
         log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         let parent = lockfile_path.parent().ok_or(Error::NoParentPath(lockfile_path.to_owned()))?;
@@ -241,8 +243,9 @@ impl LockfileHandle {
     /// # Errors
     /// If the path for the lockfile cannot be generated, this function may return [`Error::NoParentPath`], [`Error::NoFilename`], or [`Error::FilenameIsNotUTF8`].
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
+    #[named]
     pub fn acquire_wait(path: impl AsRef<Path>, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
-        log_fn_name!("lockfile:acquire_wait");
+        log_fn_name!("lockfile" : auto);
         log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         // Try to create initial lockfile
@@ -315,8 +318,9 @@ impl LockfileHandle {
         unreachable!();
     }
 
+    #[named]
     pub fn unlock(mut self) -> lockfile::Result<()> {
-        log_fn_name!("lockfile:unlock");
+        log_fn_name!("lockfile" : auto);
         log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         fs::remove_file(&self.lockfile_path).map_err(Error::CannotRemoveLockfile)?;
@@ -328,8 +332,9 @@ impl LockfileHandle {
 }
 
 impl Drop for LockfileHandle {
+    #[named]
     fn drop(&mut self) {
-        log_fn_name!("lockfile:drop");
+        log_fn_name!("lockfile" : auto);
         log_should_print_debug!(dynamic: DEBUG_PRINT);
 
         if self.unlocked_manually {

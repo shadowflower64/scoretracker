@@ -3,6 +3,7 @@ use crate::hive::worker::data::WorkerInfo;
 use crate::util::dirs;
 use crate::util::terminal_colors::{ANSI_COLOR_BOLD_BLACK, ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET};
 use chrono::{DateTime, Local, SecondsFormat};
+use function_name::named;
 use smol::io;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -15,6 +16,12 @@ use thiserror::Error;
 /// Sets the function name used in log macros to the given value.
 #[macro_export]
 macro_rules! log_fn_name {
+    ($arg:literal : auto) => {
+        pub const LOG_FN_NAME: &str = concat!($arg, ":", function_name!());
+    };
+    (auto) => {
+        pub const LOG_FN_NAME: &str = function_name!();
+    };
     ($arg:literal) => {
         pub const LOG_FN_NAME: &str = $arg;
     };
@@ -56,9 +63,10 @@ pub enum LogError {
 }
 
 /// Changes the active log file to the specified path.
+#[named]
 pub fn open_log_file(path: &Path) -> Result<(), LogError> {
     use crate::info;
-    log_fn_name!("open_log_file");
+    log_fn_name!(auto);
     info!("switching log file to: {path:?}");
     let log_file_parent = path.parent().ok_or_else(|| LogError::NoParentPath { path: path.to_path_buf() })?;
     fs::create_dir_all(log_file_parent).map_err(|e| LogError::CreateDirectoriesError {
