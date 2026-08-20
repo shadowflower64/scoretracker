@@ -2,13 +2,14 @@ use crate::arg::{CmdlineArgument, parse_arg, parse_arg_opt};
 use crate::cmd;
 use crate::cmd::CmdError::NoCommandProvided;
 use crate::error::CmdError;
+use crate::server::config::ServerConfig;
 use crate::server::start::server_main;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
-use scoretracker::info_npr;
 use scoretracker::util::timestamp::NsLocalTimestamp;
+use scoretracker::{info_npr, success_npr};
 use std::path::PathBuf;
 
 pub mod automark;
@@ -120,9 +121,15 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             Ok(())
         }
         "server" => match ctx.cmd()? {
+            "init" => {
+                let path = ServerConfig::default_path();
+                ServerConfig::default().write_new(&path)?;
+                success_npr!("config successfully written to: {path:?}");
+                Ok(())
+            }
             "start" => {
                 // info_npr!("starting web application");
-                server_main().expect("server error");
+                server_main()?;
                 Ok(())
             }
             _ => ctx.unknown_cmd(),
@@ -198,6 +205,10 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
                 let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;
                 cmd::library::init(&library_dir, library_domain)
+            }
+            "install" => {
+                let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
+                cmd::library::install(&library_dir)
             }
             "rescan" => {
                 let library_dir: PathBuf = if let Some(arg) = ctx.pull_arg_opt("library_dir", "path of the library directory")? {

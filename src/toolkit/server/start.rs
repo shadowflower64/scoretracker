@@ -1,5 +1,5 @@
 use super::api;
-use super::config::{InternalLibrary, ServerConfig, ServerConfigError};
+use super::config::{ServerConfig, ServerConfigError};
 use actix_files::NamedFile;
 use actix_web::{App, HttpServer, get};
 use actix_web::{Error, HttpRequest};
@@ -185,16 +185,15 @@ impl AppData {
 type LibraryConnections = HashMap<LibraryDomain, LibraryConnectionInfo>;
 
 #[named]
-fn connect_internal_libraries(library_dirs: &[InternalLibrary]) -> LibraryConnections {
+fn connect_internal_libraries(internal_libraries: &HashMap<LibraryDomain, Vec<PathBuf>>) -> LibraryConnections {
     log_fn_name!(auto);
 
     let mut connections = HashMap::new();
-    for internal_library in library_dirs {
-        let domain = &internal_library.domain;
+    for (domain, paths) in internal_libraries {
         info!("connecting internal library with domain: {domain}");
 
         let mut loaded_library_info = None;
-        let paths: Vec<_> = internal_library.paths.iter().map(|library_dir| {
+        let paths: Vec<_> = paths.iter().map(|library_dir| {
             let Ok(library_info) = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)) else {
                 warn!("{domain}: library directory offline: {library_dir:?}, skipping");
                 return (library_dir.to_owned(), Status::Unavailable);

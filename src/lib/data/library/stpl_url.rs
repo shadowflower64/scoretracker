@@ -35,6 +35,12 @@ impl FromStr for LibraryDomain {
     }
 }
 
+impl AsRef<str> for LibraryDomain {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Display for LibraryDomain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)

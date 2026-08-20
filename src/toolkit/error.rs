@@ -1,3 +1,5 @@
+use crate::server::config::ServerConfigError;
+use crate::server::start::ServerStartError;
 use scoretracker::util::{command_line::AskError, file_ex, lockfile};
 use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerCreateError, spreadsheet::SpreadsheetImportError};
 use std::path::PathBuf;
@@ -88,6 +90,11 @@ pub enum CmdError {
     WorkerCreateError(#[from] WorkerCreateError),
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
+    #[error("server start error: {0}")]
+    ServerStartError(#[from] ServerStartError),
+    #[error("server config error: {0}")]
+    ServerConfigError(#[from] ServerConfigError),
+    // ---
     #[error("could not reveal directory: {0}")]
     RevealDirectoryError(io::Error),
     #[error("player was already in database: {0}")]
@@ -140,6 +147,8 @@ impl CmdError {
             Self::PlayerAlreadyInDatabase(..) => 35,
             Self::ConfigSerializationError(..) => 36,
             Self::CreateDirAllError(..) => 37,
+            Self::ServerStartError(..) => 38,
+            Self::ServerConfigError(..) => 39,
             // ---
             Self::LibraryRescanNeeded(..) => 51,
         }
