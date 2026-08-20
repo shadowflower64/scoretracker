@@ -3,11 +3,11 @@ pub mod config;
 
 use crate::config::Config;
 use crate::data::library::info::LibraryInfo;
-use crate::data::library::stpl_url::LibraryDomainName;
-use crate::server::config::{ServerConfig, ServerConfigError};
+use crate::data::library::stpl_url::LibraryDomain;
+use crate::server::config::{InternalLibrary, ServerConfig, ServerConfigError};
 use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
-use crate::{debug, error, info, log_fn_name, log_should_print_debug};
+use crate::{debug, error, info, log_fn_name, log_should_print_debug, warn};
 use actix_files::NamedFile;
 use actix_web::{App, HttpServer, get};
 use actix_web::{Error, HttpRequest};
@@ -16,7 +16,7 @@ use relative_path::{Component, RelativePathBuf};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -75,10 +75,36 @@ mod test {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+pub enum Status {
+    Available,
+    Unavailable,
+}
+
+#[derive(Debug, Clone)]
+pub struct InternalLibraryConnection {
+    all_paths: Vec<(PathBuf, Status)>,
+}
+
+impl InternalLibraryConnection {
+    pub fn new(mut all_paths: Vec<(PathBuf, Status)>) -> Self {
+        all_paths.sort_by_key(|x| x.1);
+        Self { all_paths }
+    }
+
+    /// Return the first path to the library that was actually available for use when it was loaded.
+    pub fn main_path(&self) -> Option<&Path> {
+        self.all_paths
+            .first()
+            .filter(|(_, status)| *status == Status::Available)
+            .map(|(path, _)| path.as_ref())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum LibraryConnection {
     /// This library is on the same system as the server, and the files of the library can be directly accessed by the server process.
-    Internal { path: PathBuf },
+    Internal(InternalLibraryConnection),
 
     /// This library is on a different server, and direct filesystem access is not available.
     //External { address: IpAddr, port: u16 },
@@ -87,8 +113,8 @@ pub enum LibraryConnection {
 
 #[derive(Debug, Clone)]
 pub enum AccessRules {
-    DenyByDefault { allowlist: Vec<String> },
-    AllowByDefault { denylist: Vec<String> },
+    DenyByDefault { allowlist: Vec<String> }, // TODO: implement authorization
+    AllowByDefault { denylist: Vec<String> }, // TODO: implement authorization
 }
 
 #[derive(Debug, Clone)]
@@ -143,7 +169,7 @@ impl UserAuth {
 }
 
 impl AppData {
-    pub fn resolve_domain(&self, domain: &LibraryDomainName, auth: UserAuth) -> DomainResolveResult {
+    pub fn resolve_domain(&self, domain: &LibraryDomain, auth: UserAuth) -> DomainResolveResult {
         if let Some(connection_info) = self.connected_libraries.lock().unwrap().get(domain) {
             if !auth.has_access_to(connection_info) {
                 return DomainResolveResult::Forbidden;
@@ -158,28 +184,52 @@ impl AppData {
     }
 }
 
-type LibraryConnections = HashMap<LibraryDomainName, LibraryConnectionInfo>;
+type LibraryConnections = HashMap<LibraryDomain, LibraryConnectionInfo>;
 
 #[named]
-fn connect_local_libraries(library_dirs: &[PathBuf]) -> LibraryConnections {
+fn connect_internal_libraries(library_dirs: &[InternalLibrary]) -> LibraryConnections {
     log_fn_name!(auto);
 
     let mut connections = HashMap::new();
-    for library_dir in library_dirs {
-        info!("connecting local library at: {library_dir:?}");
-        let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("todo");
-        let domain = library_info.domain.clone();
+    for internal_library in library_dirs {
+        let domain = &internal_library.domain;
+        info!("connecting internal library with domain: {domain}");
+
+        let mut loaded_library_info = None;
+        let paths: Vec<_> = internal_library.paths.iter().map(|library_dir| {
+            let Ok(library_info) = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)) else {
+                warn!("{domain}: library directory offline: {library_dir:?}, skipping");
+                return (library_dir.to_owned(), Status::Unavailable);
+            };
+
+            let domain_from_info = library_info.domain.clone();
+            if *domain != domain_from_info {
+                error!(
+                    "{domain}: installed domain name and library info domain name ({domain_from_info}) do not match; please reinstall the library"
+                );
+                return (library_dir.to_owned(), Status::Unavailable);
+            }
+
+            if loaded_library_info.is_none() {
+                loaded_library_info = Some(library_info);
+            }
+            (library_dir.to_owned(), Status::Available)
+        }).collect();
+
+        let Some(library_info) = loaded_library_info else {
+            error!("{domain}: no paths are available");
+            continue;
+        };
+
         let conn_info = LibraryConnectionInfo {
-            connection: LibraryConnection::Internal {
-                path: library_dir.to_owned(),
-            },
-            library_info,
+            connection: LibraryConnection::Internal(InternalLibraryConnection { all_paths: paths }),
+            library_info: library_info,
             permissions: AccessRules::AllowByDefault { denylist: Vec::new() },
         };
         let prev_conn_info = connections.insert(domain.clone(), conn_info.clone());
         if let Some(prev_conn_info) = prev_conn_info {
             error!(
-                "library domain name collision ({domain}): trying to insert {:?} but {:?} was already inserted",
+                "{domain}: library domain name collision: trying to insert {:?} but {:?} was already inserted",
                 prev_conn_info, conn_info
             )
         }
@@ -205,7 +255,7 @@ pub async fn server_main() -> Result<(), ServerStartError> {
 
     let server_config = Arc::new(ServerConfig::load()?);
     let local_library_connections: Arc<Mutex<LibraryConnections>> =
-        Arc::new(Mutex::new(connect_local_libraries(&server_config.internal_library_dirs)));
+        Arc::new(Mutex::new(connect_internal_libraries(&server_config.internal_libraries)));
 
     Ok(HttpServer::new(move || {
         App::new()

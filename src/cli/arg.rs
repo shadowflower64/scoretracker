@@ -1,5 +1,5 @@
 use crate::error::CmdError;
-use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
+use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::hive::jobs::process_library_video::Operation;
 use std::{fmt, path::PathBuf, str::FromStr};
 
@@ -86,12 +86,6 @@ impl CmdlineArgument for f64 {
 impl CmdlineArgument for bool {
     fn arg_type() -> &'static str {
         "boolean"
-    }
-}
-
-impl CmdlineArgument for LibraryDomainName {
-    fn arg_type() -> &'static str {
-        "valid library domain name"
     }
 }
 

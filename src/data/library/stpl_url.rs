@@ -15,32 +15,33 @@ pub enum StplUrlError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct LibraryDomainName(String);
+pub struct LibraryDomain(String);
 
-impl TryFrom<String> for LibraryDomainName {
+impl TryFrom<String> for LibraryDomain {
     type Error = StplUrlError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.contains("/") {
             return Err(StplUrlError::DomainNameContainsChar('/'));
         }
+        // TODO: further restrict valid domain names
         Ok(Self(value))
     }
 }
 
-impl FromStr for LibraryDomainName {
+impl FromStr for LibraryDomain {
     type Err = StplUrlError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::try_from(s.to_string())
     }
 }
 
-impl Display for LibraryDomainName {
+impl Display for LibraryDomain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Serialize for LibraryDomainName {
+impl Serialize for LibraryDomain {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_string())
     }
@@ -48,7 +49,7 @@ impl Serialize for LibraryDomainName {
 struct LibraryDomainNameVisitor;
 
 impl<'de> Visitor<'de> for LibraryDomainNameVisitor {
-    type Value = LibraryDomainName;
+    type Value = LibraryDomain;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "a properly-formed url domain name string")
@@ -69,57 +70,9 @@ impl<'de> Visitor<'de> for LibraryDomainNameVisitor {
     // }
 }
 
-impl<'de> Deserialize<'de> for LibraryDomainName {
+impl<'de> Deserialize<'de> for LibraryDomain {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_string(LibraryDomainNameVisitor)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LibraryDomain {
-    Local(LibraryDomainName), // TODO: entirely get rid of local domains (local-ness should be resolved properly)
-    Global(LibraryDomainName),
-}
-
-impl LibraryDomain {
-    pub fn global(&self) -> Option<&LibraryDomainName> {
-        match self {
-            Self::Local(_) => None,
-            Self::Global(a) => Some(a),
-        }
-    }
-}
-
-impl TryFrom<String> for LibraryDomain {
-    type Error = StplUrlError;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.rsplit_once(".local") {
-            Some((prefix, suffix)) => {
-                assert_eq!(suffix, "", "suffix (after .local) should be empty");
-                let domain_name = prefix.to_owned().try_into()?;
-                Ok(Self::Local(domain_name))
-            }
-            None => {
-                let domain_name = value.try_into()?;
-                Ok(Self::Global(domain_name))
-            }
-        }
-    }
-}
-
-impl FromStr for LibraryDomain {
-    type Err = StplUrlError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::try_from(s.to_string())
-    }
-}
-
-impl Display for LibraryDomain {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Global(identifier) => write!(f, "{identifier}"),
-            Self::Local(identifier) => write!(f, "{identifier}.local"),
-        }
     }
 }
 

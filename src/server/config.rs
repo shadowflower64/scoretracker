@@ -1,3 +1,4 @@
+use crate::data::library::stpl_url::LibraryDomain;
 use crate::util::dirs::config_dir;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -13,8 +14,14 @@ pub enum ServerConfigError {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InternalLibrary {
+    pub paths: Vec<PathBuf>,
+    pub domain: LibraryDomain,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
-    pub internal_library_dirs: Vec<PathBuf>,
+    pub internal_libraries: Vec<InternalLibrary>,
 }
 
 impl ServerConfig {

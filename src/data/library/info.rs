@@ -2,7 +2,7 @@
 //!
 //! A "library info file" is a file that contains basic information about the library.
 //! For example, this file contains the domain name for this library dir.
-use crate::data::library::stpl_url::LibraryDomainName;
+use crate::data::library::stpl_url::LibraryDomain;
 use crate::util::file_ex::FileEx;
 use crate::util::{file_ex, filelocked::FileLockableData};
 use serde::{Deserialize, Serialize};
@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 /// Basic info about the library.
 ///
 /// This structure contains information about the library. Currently, it only contains the domain name.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LibraryInfo {
-    pub domain: LibraryDomainName,
+    pub domain: LibraryDomain,
 }
 
 impl LibraryInfo {

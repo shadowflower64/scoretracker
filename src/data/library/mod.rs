@@ -94,10 +94,7 @@ pub fn create_stpl_url_to_file(
 }
 
 pub fn create_stpl_url_to_relfile(library_info: LibraryInfo, target_file_relpath: impl AsRef<RelativePath>) -> StplUrl {
-    StplUrl::new(
-        LibraryDomain::Local(library_info.domain),
-        Some(target_file_relpath.as_ref().to_string()),
-    )
+    StplUrl::new(library_info.domain, Some(target_file_relpath.as_ref().to_string()))
 }
 
 #[derive(Debug, Error)]
@@ -154,7 +151,7 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
     let scanning_start_timestamp = Instant::now();
 
     let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
-    let library_domain = LibraryDomain::Local(library_info.domain);
+    let library_domain = library_info.domain;
 
     let mut index = LibraryIndex::default();
     let mut cache =
@@ -311,7 +308,7 @@ pub fn scan_register_removed_files(
     log_fn_name!("library" : auto);
 
     let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
-    let library_domain = LibraryDomain::Local(library_info.domain);
+    let library_domain = library_info.domain;
 
     let mut library_index =
         LibraryIndex::lock_and_read(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info).map_err(E::CannotOpenIndex)?;
@@ -418,7 +415,7 @@ pub fn sync_library_index_with_db(
 ) -> Result<(), LibraryScanError> {
     type E = LibraryScanError;
     let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
-    let library_domain = LibraryDomain::Local(library_info.domain);
+    let library_domain = library_info.domain;
 
     let library_index =
         LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(E::CannotReadIndex)?;

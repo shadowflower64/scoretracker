@@ -98,10 +98,7 @@ pub async fn resolve_stpl_url(req: HttpRequest, q: web::Query<ResolveStplUrlRequ
 
     let app_data = req.app_data::<AppData>().expect("app data should be present");
     let resolved = app_data
-        .resolve_domain(
-            stpl_url.domain.global().expect("non-global domains are deprecated"),
-            UserAuth::guest(),
-        )
+        .resolve_domain(&stpl_url.domain, UserAuth::guest())
         .with_path_opt(stpl_url.path.as_deref());
 
     //let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");

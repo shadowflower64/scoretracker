@@ -3,7 +3,7 @@ use crate::cmd;
 use crate::cmd::CmdError::NoCommandProvided;
 use crate::error::CmdError;
 use scoretracker::config::Config;
-use scoretracker::data::library::stpl_url::{LibraryDomain, LibraryDomainName};
+use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
 use scoretracker::info_npr;
@@ -196,8 +196,8 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
         "library" => match ctx.cmd()? {
             "init" => {
                 let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
-                let library_domain_name: LibraryDomainName = ctx.pull_arg("library_domain_name", "library domain name")?;
-                cmd::library::init(&library_dir, library_domain_name)
+                let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;
+                cmd::library::init(&library_dir, library_domain)
             }
             "rescan" => {
                 let library_dir: PathBuf = if let Some(arg) = ctx.pull_arg_opt("library_dir", "path of the library directory")? {
