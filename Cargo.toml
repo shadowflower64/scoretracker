@@ -6,11 +6,15 @@ default-run = "scoretracker-toolkit"
 
 [lib]
 name = "scoretracker"
-path = "src/lib.rs"
+path = "src/lib/lib.rs"
 
 [[bin]]
 name = "scoretracker-toolkit"
-path = "src/cli/main.rs"
+path = "src/toolkit/main.rs"
+
+[[bin]]
+name = "scoretracker-server"
+path = "src/toolkit/server/main.rs"
 
 [[bin]]
 name = "scoretracker-playground"

@@ -1,18 +1,16 @@
-pub mod api;
-pub mod config;
-
-use crate::config::Config;
-use crate::data::library::info::LibraryInfo;
-use crate::data::library::stpl_url::LibraryDomain;
-use crate::server::config::{InternalLibrary, ServerConfig, ServerConfigError};
-use crate::util::filelocked::FileLockableData;
-use crate::util::relative_path_from_segments;
-use crate::{debug, error, info, log_fn_name, log_should_print_debug, warn};
+use super::api;
+use super::config::{InternalLibrary, ServerConfig, ServerConfigError};
 use actix_files::NamedFile;
 use actix_web::{App, HttpServer, get};
 use actix_web::{Error, HttpRequest};
 use function_name::named;
 use relative_path::{Component, RelativePathBuf};
+use scoretracker::config::Config;
+use scoretracker::data::library::info::LibraryInfo;
+use scoretracker::data::library::stpl_url::LibraryDomain;
+use scoretracker::util::filelocked::FileLockableData;
+use scoretracker::util::relative_path_from_segments;
+use scoretracker::{debug, error, info, log_fn_name, log_should_print_debug, warn};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io;
@@ -61,7 +59,7 @@ async fn static_handler(req: HttpRequest) -> Result<NamedFile, Error> {
     )
 }
 
-mod test {
+mod testing_area {
     use actix_web::{HttpResponse, Responder, get, post};
 
     #[post("/test/echo")]
@@ -266,8 +264,8 @@ pub async fn server_main() -> Result<(), ServerStartError> {
             })
             .service(index)
             .service(static_handler)
-            .service(test::echo)
-            .service(test::hey)
+            .service(testing_area::echo)
+            .service(testing_area::hey)
             .service(api::get_match_list)
             .service(api::get_match)
             .service(api::put_match)

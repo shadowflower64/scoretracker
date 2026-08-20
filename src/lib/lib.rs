@@ -48,7 +48,6 @@ pub mod config;
 pub mod data;
 pub mod ffmpeg;
 pub mod hive;
-pub mod server;
 pub mod spreadsheet;
 pub mod tests;
 pub mod util;
