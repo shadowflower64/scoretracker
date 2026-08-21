@@ -4,6 +4,7 @@
 //! One worker may take on a job, and then report a success, or a failure.
 use crate::data::library::database::{ClothInfo, LibraryEntry};
 use crate::data::library::stpl_url::StplUrl;
+use crate::ffmpeg::FFmpegError;
 use crate::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use crate::hive::jobs::display_message::DisplayMessageJob;
 use crate::hive::jobs::display_message_and_sleep::DisplayMessageAndSleepJob;
@@ -36,7 +37,7 @@ pub enum Fail {
     Panic(String),
     //
     #[error("ffmpeg process error: {0}")]
-    FFmpegProcessError(String),
+    FFmpegError(String),
     //
     #[error("could not open library database: {0}")]
     CannotOpenLibraryDatabase(String),
@@ -76,9 +77,9 @@ pub enum Fail {
     Custom { message: String },
 }
 
-impl From<rust_ffmpeg::Error> for Fail {
-    fn from(value: rust_ffmpeg::Error) -> Self {
-        Self::FFmpegProcessError(value.to_string())
+impl From<FFmpegError> for Fail {
+    fn from(value: FFmpegError) -> Self {
+        Self::FFmpegError(value.to_string())
     }
 }
 

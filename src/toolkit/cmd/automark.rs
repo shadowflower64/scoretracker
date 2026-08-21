@@ -83,7 +83,7 @@ pub fn automark_library_files(library_dir: PathBuf) -> Result<(), CmdError> {
 
     for (relpath, uuid) in library_index.files {
         let entry = library_db
-            .find_entry_by_uuid_mut(uuid)
+            .find_entry_by_uuid_mut(uuid.0)
             .ok_or(CmdError::LibraryRescanNeeded(uuid.0))?;
 
         if entry.media_category == MediaCategory::Unspecified {

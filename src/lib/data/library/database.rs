@@ -441,12 +441,12 @@ impl LibraryDatabase {
         &CACHE
     }
 
-    pub fn find_entry_by_uuid(&self, uuid: UuidString) -> Option<&LibraryEntry> {
-        self.entries.iter().find(|x| x.uuid == uuid)
+    pub fn find_entry_by_uuid(&self, uuid: Uuid) -> Option<&LibraryEntry> {
+        self.entries.iter().find(|x| x.uuid.0 == uuid)
     }
 
-    pub fn find_entry_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut LibraryEntry> {
-        self.entries.iter_mut().find(|x| x.uuid == uuid)
+    pub fn find_entry_by_uuid_mut(&mut self, uuid: Uuid) -> Option<&mut LibraryEntry> {
+        self.entries.iter_mut().find(|x| x.uuid.0 == uuid)
     }
 
     pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
@@ -497,7 +497,7 @@ impl LibraryDatabase {
     }
 
     pub fn insert(&mut self, entry: LibraryEntry) -> Result<Uuid, InsertError> {
-        if let Some(existing_performance) = self.find_entry_by_uuid(entry.uuid) {
+        if let Some(existing_performance) = self.find_entry_by_uuid(entry.uuid.0) {
             return Err(InsertError::ExistsAlready(existing_performance.uuid.0));
         }
 

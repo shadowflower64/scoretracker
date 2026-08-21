@@ -1,7 +1,7 @@
 //! Process (compress) a video from the library and save result to library
 use crate::data::library::database::QualityState;
 use crate::data::library::{create_stpl_url_to_relfile, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
-use crate::ffmpeg::ffmpeg_process_video;
+use crate::ffmpeg::{ffmpeg_process_video, get_version};
 use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::util::uuid::UuidString;
@@ -93,7 +93,8 @@ impl FromStr for Operation {
 pub struct ProcessLibraryVideoJob {
     pub source_path: PathBuf,
     pub source_proof_uuid_precondition_check: Option<UuidString>,
-    pub processing_type: Operation,
+    #[serde(alias = "processing_type")]
+    pub operation: Operation,
     pub destination_path: PathBuf,
 }
 
@@ -101,7 +102,7 @@ impl Job for ProcessLibraryVideoJob {
     async fn run(&self, worker: Arc<Worker>) -> Result<Success, Fail> {
         log_fn_name!("job:process_library_video");
 
-        let ffmpeg_version = rust_ffmpeg::version().await;
+        let ffmpeg_version = get_version().await;
         info!("ffmpeg version: {:?}", ffmpeg_version);
 
         let worker_info = Some(&worker.info_cloned());
@@ -125,15 +126,16 @@ impl Job for ProcessLibraryVideoJob {
             .ok_or_else(|| Fail::FileNotInIndex {
                 library_dir: source_library_dir.clone(),
                 target_relpath: source_relpath.clone(),
-            })?;
+            })?
+            .0;
 
         // Check if it matches the precondition (if it doesn't, that means that the input request was incorrect!)
         if let Some(precondition_uuid) = self.source_proof_uuid_precondition_check
-            && *source_proof_uuid != precondition_uuid
+            && source_proof_uuid != precondition_uuid.0
         {
             Err(Fail::PreconditionUuidDoesNotMatch {
                 file_path: self.source_path.clone(),
-                read_proof_uuid: *source_proof_uuid,
+                read_proof_uuid: source_proof_uuid.into(),
                 precondition_uuid,
             })?
         }
@@ -141,8 +143,8 @@ impl Job for ProcessLibraryVideoJob {
         // Get source proof entry from the database
         let library_db = worker.read_library_db()?;
         let proof_entry = library_db
-            .find_entry_by_uuid(*source_proof_uuid)
-            .ok_or(Fail::EntryNotFound(*source_proof_uuid))?
+            .find_entry_by_uuid(source_proof_uuid)
+            .ok_or(Fail::EntryNotFound(source_proof_uuid.into()))?
             .to_owned();
         drop(library_db);
 
@@ -159,7 +161,7 @@ impl Job for ProcessLibraryVideoJob {
 
         // Launch ffmpeg to cut the video losslessly
         let worker2 = Arc::clone(&worker);
-        ffmpeg_process_video(&self.source_path, &self.destination_path, self.processing_type, move |progress| {
+        ffmpeg_process_video(&self.source_path, &self.destination_path, self.operation, move |progress| {
             worker2.update_task_progress_very_simple(format!("{progress:?}"));
         })
         .await?;
@@ -167,28 +169,27 @@ impl Job for ProcessLibraryVideoJob {
         // Get library info of the destination file
         let wet = if let Some(destination_library_dir) = get_library_dir_of_path(&self.source_path) {
             // Register new file to index and to database
-            Some(
-                scan_register_added_file(
-                    &destination_library_dir,
-                    &config.library_database_path(),
-                    &self.destination_path,
-                    |entry| {
-                        entry.dry = Some(*source_proof_uuid);
-                        entry.quality = self.processing_type.resulting_quality_state()
-                    },
-                    worker_info,
-                )
-                .map_err(|e| Fail::CannotRegisterFileIntoLibrary {
-                    file_path: self.destination_path.to_owned(),
-                    reason: e.to_string(),
-                })?,
+            let (_rel_path, uuid) = scan_register_added_file(
+                &destination_library_dir,
+                &config.library_database_path(),
+                &self.destination_path,
+                |entry| {
+                    entry.dry = Some(source_proof_uuid.into());
+                    entry.quality = self.operation.resulting_quality_state()
+                },
+                worker_info,
             )
+            .map_err(|e| Fail::CannotRegisterFileIntoLibrary {
+                file_path: self.destination_path.to_owned(),
+                reason: e.to_string(),
+            })?;
+            Some(uuid.into())
         } else {
             None
         };
 
         Ok(Success::ProcessedVideo {
-            dry: *source_proof_uuid,
+            dry: source_proof_uuid.into(),
             wet,
         })
     }

@@ -257,16 +257,16 @@ fn check_library_entry(
     }
 
     if let Some(cloth) = &entry.cloth {
-        library_db.find_entry_by_uuid(cloth.uuid).ok_or(E::ClothNotFound(cloth.uuid))?;
+        library_db.find_entry_by_uuid(cloth.uuid.0).ok_or(E::ClothNotFound(cloth.uuid))?;
     }
 
     if let Some(dry_uuid) = entry.dry {
-        library_db.find_entry_by_uuid(dry_uuid).ok_or(E::DryNotFound(dry_uuid))?;
+        library_db.find_entry_by_uuid(dry_uuid.0).ok_or(E::DryNotFound(dry_uuid))?;
     }
 
     if let Some(clips) = &entry.clips {
         for clip_uuid in clips {
-            library_db.find_entry_by_uuid(*clip_uuid).ok_or(E::ClipNotFound(*clip_uuid))?;
+            library_db.find_entry_by_uuid(clip_uuid.0).ok_or(E::ClipNotFound(*clip_uuid))?;
         }
     }
 
@@ -323,7 +323,7 @@ fn check_performance(
     let match_data = match_db.find_match_by_uuid(match_uuid).ok_or(E::MatchNotFound(match_uuid))?;
 
     for proof_uuid in performance.proof() {
-        let _entry = library_db.find_entry_by_uuid(*proof_uuid).ok_or(E::EntryNotFound(*proof_uuid))?;
+        let _entry = library_db.find_entry_by_uuid(proof_uuid.0).ok_or(E::EntryNotFound(*proof_uuid))?;
     }
 
     let game_id = performance.game_id();
@@ -378,7 +378,7 @@ fn check_match(
     // TODO: check song id here
 
     for proof_uuid in match_data.proof() {
-        let _entry = library_db.find_entry_by_uuid(*proof_uuid).ok_or(E::EntryNotFound(*proof_uuid))?;
+        let _entry = library_db.find_entry_by_uuid(proof_uuid.0).ok_or(E::EntryNotFound(*proof_uuid))?;
     }
 
     let game_id = match_data.game_id();

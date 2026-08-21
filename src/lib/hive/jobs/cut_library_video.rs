@@ -63,7 +63,7 @@ impl Job for CutLibraryVideoJob {
         // Get source proof entry from the database
         let library_db = worker.read_library_db()?;
         let proof_entry = library_db
-            .find_entry_by_uuid(*source_proof_uuid)
+            .find_entry_by_uuid(source_proof_uuid.0)
             .ok_or(Fail::EntryNotFound(*source_proof_uuid))?
             .to_owned();
         drop(library_db);
@@ -95,25 +95,24 @@ impl Job for CutLibraryVideoJob {
         // Get library info of the destination file
         let fragment = if let Some(destination_library_dir) = get_library_dir_of_path(&self.source_path) {
             // Register new file to index and to database
-            Some(
-                scan_register_added_file(
-                    &destination_library_dir,
-                    &config.library_database_path(),
-                    &self.destination_path,
-                    |entry| {
-                        entry.cloth = Some(ClothInfo {
-                            uuid: *source_proof_uuid,
-                            start_point: self.cut_start_point,
-                            end_point: self.cut_end_point,
-                        })
-                    },
-                    worker_info,
-                )
-                .map_err(|e| Fail::CannotRegisterFileIntoLibrary {
-                    file_path: self.destination_path.to_owned(),
-                    reason: e.to_string(),
-                })?,
+            let (_rel_path, uuid) = scan_register_added_file(
+                &destination_library_dir,
+                &config.library_database_path(),
+                &self.destination_path,
+                |entry| {
+                    entry.cloth = Some(ClothInfo {
+                        uuid: *source_proof_uuid,
+                        start_point: self.cut_start_point,
+                        end_point: self.cut_end_point,
+                    })
+                },
+                worker_info,
             )
+            .map_err(|e| Fail::CannotRegisterFileIntoLibrary {
+                file_path: self.destination_path.to_owned(),
+                reason: e.to_string(),
+            })?;
+            Some(uuid.into())
         } else {
             None
         };

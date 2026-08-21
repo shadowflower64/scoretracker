@@ -1,7 +1,19 @@
 use crate::{error, hive::jobs::process_library_video::Operation, info, log_fn_name, success};
 use function_name::named;
 use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress, StreamSpecifier, StreamType};
-use std::path::Path;
+use smol::process;
+use std::{path::Path, process::ExitStatus};
+use thiserror::Error;
+
+#[named]
+pub async fn spawn_ffmpeg(args: &[String]) -> process::Output {
+    let child = process::Command::new("ffmpeg").args(args).spawn().expect("todo"); //TODO: implement on_progress
+    child.output().await.expect("todo")
+}
+
+pub async fn get_version() -> String {
+    String::from("VERSION TODO")
+}
 
 #[named]
 pub async fn ffmpeg_cut_video_streamcopy(
@@ -10,7 +22,7 @@ pub async fn ffmpeg_cut_video_streamcopy(
     start_time_ms: Option<u64>,
     end_time_ms: Option<u64>,
     on_progress: impl Fn(Progress) + Send + Sync + 'static,
-) -> Result<(), rust_ffmpeg::Error> {
+) -> Result<(), FFmpegError> {
     log_fn_name!(auto);
 
     let input = Input::new(source_path.to_string_lossy().to_string());
@@ -34,24 +46,35 @@ pub async fn ffmpeg_cut_video_streamcopy(
         .no_overwrite()
         .on_progress(on_progress);
 
-    let args = ffmpeg.build_args();
+    let args = ffmpeg.build_args().expect("todo");
     info!("running ffmpeg with arguments: {args:?}");
 
-    match ffmpeg.run().await.unwrap().into_result() {
-        Ok(out) => {
-            success!(
-                "ffmpeg process finished successfully (exit code {}): stdout: {:?}, stderr: {:?}",
-                out.status,
-                out.stdout_str(),
-                out.stderr_str()
-            );
-            Ok(())
-        }
-        Err(e) => {
-            error!("ffmpeg process finished with an error (non-zero exit code): {e:?}");
-            Err(e)?
-        }
+    let out = spawn_ffmpeg(&args).await;
+    if out.status.success() {
+        success!(
+            "ffmpeg process finished successfully (exit status: {}): stdout: {:?}, stderr: {:?}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Ok(())
+    } else {
+        error!(
+            "ffmpeg process finished with an error (exit status: {}): stdout: {:?}, stderr: {:?}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Err(FFmpegError::CommandError(out.status))
     }
+}
+
+#[derive(Debug, Error)]
+pub enum FFmpegError {
+    #[error("rust_ffmpeg: {0}")]
+    RustFFmpeg(#[from] rust_ffmpeg::Error),
+    #[error("command error: {0}")]
+    CommandError(ExitStatus),
 }
 
 #[named]
@@ -60,7 +83,7 @@ pub async fn ffmpeg_process_video(
     destination_path: &Path,
     operation: Operation,
     on_progress: impl Fn(Progress) + Send + Sync + 'static,
-) -> Result<(), rust_ffmpeg::Error> {
+) -> Result<(), FFmpegError> {
     log_fn_name!(auto);
 
     let mut ffmpeg = FFmpegBuilder::new()?;
@@ -89,22 +112,25 @@ pub async fn ffmpeg_process_video(
         .audio_codec_opts(acodec);
     ffmpeg = ffmpeg.output(output).no_overwrite().on_progress(on_progress);
 
-    let args = ffmpeg.build_args();
+    let args = ffmpeg.build_args().expect("todo");
     info!("running ffmpeg with arguments: {args:?}");
 
-    match ffmpeg.run().await.unwrap().into_result() {
-        Ok(out) => {
-            success!(
-                "ffmpeg process finished successfully (exit code {}): stdout: {:?}, stderr: {:?}",
-                out.status,
-                out.stdout_str(),
-                out.stderr_str()
-            );
-            Ok(())
-        }
-        Err(e) => {
-            error!("ffmpeg process finished with an error (non-zero exit code): {e:?}");
-            Err(e)?
-        }
+    let out = spawn_ffmpeg(&args).await;
+    if out.status.success() {
+        success!(
+            "ffmpeg process finished successfully (exit status: {}): stdout: {:?}, stderr: {:?}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Ok(())
+    } else {
+        error!(
+            "ffmpeg process finished with an error (exit status: {}): stdout: {:?}, stderr: {:?}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Err(FFmpegError::CommandError(out.status))
     }
 }

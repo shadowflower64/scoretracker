@@ -10,7 +10,7 @@ use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::filelocked::FileLockableData;
 use scoretracker::util::relative_path_from_segments;
-use scoretracker::{debug, error, info, log_fn_name, log_should_print_debug, warn};
+use scoretracker::{debug, error, info, log_fn_name, log_should_print_debug, success, warn};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io;
@@ -251,13 +251,21 @@ pub async fn server_main() -> Result<(), ServerStartError> {
 
     let server_config = Arc::new(ServerConfig::load()?);
     let library_table = LibraryTable::load().expect("todo: error handling");
-    let inetrnal_library_connections = Arc::new(RwLock::new(connect_internal_libraries(&library_table.internal_libraries)));
+    let internal_library_connections = Arc::new(RwLock::new(connect_internal_libraries(&library_table.internal_libraries)));
+    {
+        let map = internal_library_connections.read().unwrap();
+        if map.len() == 0 {
+            warn!("no library connections established!")
+        } else {
+            success!("{} library connections established: {:?}", map.len(), map);
+        }
+    }
 
     Ok(HttpServer::new(move || {
         App::new()
             .app_data(AppData {
                 server_config: Arc::clone(&server_config),
-                connected_libraries: Arc::clone(&inetrnal_library_connections),
+                connected_libraries: Arc::clone(&internal_library_connections),
             })
             .service(index)
             .service(static_handler)
