@@ -46,7 +46,8 @@ pub async fn get_match_list(req: HttpRequest) -> impl Responder {
     info!("received get request for match list");
 
     let app_data = req.app_data::<AppData>().expect("app data should be present");
-    let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
+    let match_db =
+        MatchDatabase::read_without_locking(app_data.server_config.match_database_path()).expect("could not read match database");
     make_get_list_response_ok(match_db.matches)
 }
 
@@ -59,7 +60,8 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> impl Re
     info!("received get request for match: {uuid}");
 
     let app_data = req.app_data::<AppData>().expect("app data should be present");
-    let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
+    let match_db =
+        MatchDatabase::read_without_locking(app_data.server_config.match_database_path()).expect("could not read match database");
     let match_data = match_db.find_match_by_uuid(uuid).expect("match not found");
     respond_as_json(ResponseGet::Ok(match_data))
 }
@@ -76,7 +78,8 @@ pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web:
     assert_eq!(uuid, match_data.uuid(), "uuid in url should match uuid in request body");
 
     let app_data = req.app_data::<AppData>().expect("app data should be present");
-    let mut match_db = MatchDatabase::lock_and_read(app_data.config.match_database_path(), None).expect("could not read match database");
+    let mut match_db =
+        MatchDatabase::lock_and_read(app_data.server_config.match_database_path(), None).expect("could not read match database");
 
     let response = respond_as_json(ResponsePut::Ok { item: &match_data });
     match_db.insert(match_data).expect("could not insert match into database");

@@ -1,7 +1,10 @@
-use scoretracker::data::library::stpl_url::LibraryDomain;
+use scoretracker::data::library::database::LibraryDatabase;
+use scoretracker::data::scoreboard::r#match::MatchDatabase;
+use scoretracker::data::scoreboard::performance::PerformanceDatabase;
+use scoretracker::data::scoreboard::player::PlayerDatabase;
+use scoretracker::hive::queue::TaskQueue;
 use scoretracker::util::dirs::config_dir;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -22,7 +25,8 @@ pub enum ServerConfigError {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct ServerConfig {
-    pub internal_libraries: HashMap<LibraryDomain, Vec<PathBuf>>,
+    // pub display_name: String,
+    pub shared_data_repo_path: PathBuf,
 }
 
 impl ServerConfig {
@@ -91,5 +95,25 @@ impl ServerConfig {
             e,
         })?;
         Ok(())
+    }
+
+    pub fn library_database_path(&self) -> PathBuf {
+        LibraryDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
+    }
+
+    pub fn match_database_path(&self) -> PathBuf {
+        MatchDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
+    }
+
+    pub fn performance_database_path(&self) -> PathBuf {
+        PerformanceDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
+    }
+
+    pub fn player_database_path(&self) -> PathBuf {
+        PlayerDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
+    }
+
+    pub fn task_queue_path(&self) -> PathBuf {
+        self.shared_data_repo_path.join(TaskQueue::STANDARD_FILENAME)
     }
 }

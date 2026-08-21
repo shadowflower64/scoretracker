@@ -5,7 +5,7 @@ use actix_web::{App, HttpServer, get};
 use actix_web::{Error, HttpRequest};
 use function_name::named;
 use relative_path::{Component, RelativePathBuf};
-use scoretracker::config::Config;
+use scoretracker::config::libraries::LibraryTable;
 use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::filelocked::FileLockableData;
@@ -15,7 +15,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use thiserror::Error;
 
 pub const WEB_FRONTEND_DIR_PATH_SEGMENTS: &[&str] = &["web-frontend"];
@@ -123,9 +123,8 @@ pub struct LibraryConnectionInfo {
 }
 
 pub struct AppData {
-    pub config: &'static Config, // TODO: this is wrong, don't use this for servers.
     pub server_config: Arc<ServerConfig>,
-    pub connected_libraries: Arc<Mutex<LibraryConnections>>,
+    pub connected_libraries: Arc<RwLock<LibraryConnections>>,
 }
 
 #[derive(Serialize)]
@@ -168,13 +167,13 @@ impl UserAuth {
 
 impl AppData {
     pub fn resolve_domain(&self, domain: &LibraryDomain, auth: UserAuth) -> DomainResolveResult {
-        if let Some(connection_info) = self.connected_libraries.lock().unwrap().get(domain) {
+        if let Some(connection_info) = self.connected_libraries.read().unwrap().get(domain) {
             if !auth.has_access_to(connection_info) {
                 return DomainResolveResult::Forbidden;
             }
             match &connection_info.connection {
                 LibraryConnection::External { url } => DomainResolveResult::External { url: url.clone() },
-                LibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal,
+                LibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
             }
         } else {
             DomainResolveResult::NotKnown
@@ -251,15 +250,14 @@ pub async fn server_main() -> Result<(), ServerStartError> {
     info!("starting server on: http://{HOST}:{PORT}");
 
     let server_config = Arc::new(ServerConfig::load()?);
-    let local_library_connections: Arc<Mutex<LibraryConnections>> =
-        Arc::new(Mutex::new(connect_internal_libraries(&server_config.internal_libraries)));
+    let library_table = LibraryTable::load().expect("todo: error handling");
+    let inetrnal_library_connections = Arc::new(RwLock::new(connect_internal_libraries(&library_table.internal_libraries)));
 
     Ok(HttpServer::new(move || {
         App::new()
             .app_data(AppData {
-                config: Config::load().expect("todo"), // TODO: server process probably should not use the default scoretracker-toolkit config...
                 server_config: Arc::clone(&server_config),
-                connected_libraries: Arc::clone(&local_library_connections),
+                connected_libraries: Arc::clone(&inetrnal_library_connections),
             })
             .service(index)
             .service(static_handler)

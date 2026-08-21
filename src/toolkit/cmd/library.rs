@@ -1,7 +1,7 @@
 use crate::cmd::CmdError;
-use crate::server::config::ServerConfig;
 use function_name::named;
 use scoretracker::config::Config;
+use scoretracker::config::libraries::LibraryTable;
 use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::data::library::{remove_library_domain_from_db, scan_full};
@@ -32,15 +32,15 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
     let info =
         LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(CmdError::LibraryInfoReadError)?;
 
-    let source_toml = ServerConfig::load_raw()?;
-    let mut document: DocumentMut = source_toml.parse().expect("todo: invalid config");
+    let source_toml = LibraryTable::load_raw()?;
+    let mut document: DocumentMut = source_toml.parse().expect("todo: invalid library table");
 
-    let internal_libraries_tab = document["internal_libraries"].as_table_mut().expect("todo: invalid config");
+    let internal_libraries_tab = document["internal_libraries"].as_table_mut().expect("todo: invalid library table");
     if let Some(existing) = internal_libraries_tab.get_mut(info.domain.as_ref()) {
-        let paths_arr = existing.as_array_mut().expect("todo: invalid config");
+        let paths_arr = existing.as_array_mut().expect("todo: invalid library table");
         let exists = paths_arr
             .iter()
-            .find(|x| x.as_str().expect("todo: invalid config") == library_dir)
+            .find(|x| x.as_str().expect("todo: invalid library table") == library_dir)
             .is_some();
         if exists {
             panic!("todo: path is already installed");
@@ -54,7 +54,7 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
     }
 
     let modified_toml = document.to_string();
-    ServerConfig::write_raw(ServerConfig::default_path(), &modified_toml).expect("todo: write error");
+    LibraryTable::write_raw(LibraryTable::default_path(), &modified_toml).expect("todo: write error");
 
     success_npr!("installed library with domain '{}'", info.domain);
     Ok(())

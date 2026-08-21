@@ -1,3 +1,5 @@
+pub mod libraries;
+
 use crate::data::library::aux_data::LibraryAuxData;
 use crate::data::library::cache::LibraryCache;
 use crate::data::library::database::LibraryDatabase;

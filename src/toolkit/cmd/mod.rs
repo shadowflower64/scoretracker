@@ -5,6 +5,7 @@ use crate::error::CmdError;
 use crate::server::config::ServerConfig;
 use crate::server::start::server_main;
 use scoretracker::config::Config;
+use scoretracker::config::libraries::LibraryTable;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
@@ -120,20 +121,6 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             info_npr!("hello world!");
             Ok(())
         }
-        "server" => match ctx.cmd()? {
-            "init" => {
-                let path = ServerConfig::default_path();
-                ServerConfig::default().write_new(&path)?;
-                success_npr!("config successfully written to: {path:?}");
-                Ok(())
-            }
-            "start" => {
-                // info_npr!("starting web application");
-                server_main()?;
-                Ok(())
-            }
-            _ => ctx.unknown_cmd(),
-        },
         "automark" => {
             let library_dir: Option<PathBuf> = ctx.pull_arg_opt("library_dir", "path of the library directory")?;
             let library_dir = library_dir
@@ -150,13 +137,6 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 let config_value: String = ctx.pull_arg("config_value", "new value for the selected key")?;
                 cmd::config::set(config_key, config_value)
             }
-            _ => ctx.unknown_cmd(),
-        },
-        "schema" => match ctx.cmd()? {
-            "gen" => cmd::schema::gen_full(),
-            "gen-json" => cmd::schema::gen_json(),
-            "gen-types" => cmd::schema::gen_types(),
-            "clean" => cmd::schema::clean(),
             _ => ctx.unknown_cmd(),
         },
         "hive" => match ctx.cmd()? {
@@ -225,6 +205,15 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;
                 cmd::library::remove_domain(library_domain)
             }
+            "table" => match ctx.cmd()? {
+                "init" => {
+                    let path = LibraryTable::default_path();
+                    LibraryTable::default().write_new(&path)?;
+                    success_npr!("empty library table successfully written to: {path:?}");
+                    Ok(())
+                }
+                _ => ctx.unknown_cmd(),
+            },
             _ => ctx.unknown_cmd(),
         },
         "log" => match ctx.cmd()? {
@@ -247,6 +236,27 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 }
                 _ => ctx.unknown_cmd(),
             },
+            _ => ctx.unknown_cmd(),
+        },
+        "schema" => match ctx.cmd()? {
+            "gen" => cmd::schema::gen_full(),
+            "gen-json" => cmd::schema::gen_json(),
+            "gen-types" => cmd::schema::gen_types(),
+            "clean" => cmd::schema::clean(),
+            _ => ctx.unknown_cmd(),
+        },
+        "server" => match ctx.cmd()? {
+            "init" => {
+                let path = ServerConfig::default_path();
+                ServerConfig::default().write_new(&path)?;
+                success_npr!("config successfully written to: {path:?}");
+                Ok(())
+            }
+            "start" => {
+                // info_npr!("starting web application");
+                server_main()?;
+                Ok(())
+            }
             _ => ctx.unknown_cmd(),
         },
         "spreadsheet" => match ctx.cmd()? {

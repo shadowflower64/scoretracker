@@ -1,5 +1,6 @@
 use crate::server::config::ServerConfigError;
 use crate::server::start::ServerStartError;
+use scoretracker::config::libraries::LibraryTableError;
 use scoretracker::util::{command_line::AskError, file_ex, lockfile};
 use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerCreateError, spreadsheet::SpreadsheetImportError};
 use std::path::PathBuf;
@@ -94,6 +95,8 @@ pub enum CmdError {
     ServerStartError(#[from] ServerStartError),
     #[error("server config error: {0}")]
     ServerConfigError(#[from] ServerConfigError),
+    #[error("library table error: {0}")]
+    LibraryTableError(#[from] LibraryTableError),
     // ---
     #[error("could not reveal directory: {0}")]
     RevealDirectoryError(io::Error),
@@ -149,6 +152,7 @@ impl CmdError {
             Self::CreateDirAllError(..) => 37,
             Self::ServerStartError(..) => 38,
             Self::ServerConfigError(..) => 39,
+            Self::LibraryTableError(..) => 40,
             // ---
             Self::LibraryRescanNeeded(..) => 51,
         }
