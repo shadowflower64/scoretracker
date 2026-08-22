@@ -1,12 +1,13 @@
 //! Process (compress) a video from the library and save result to library
 use crate::data::library::database::QualityState;
 use crate::data::library::{create_stpl_url_to_relfile, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
+use crate::ffmpeg::audio_settings::{AudioEncoder, AudioSettings, Bitrate};
+use crate::ffmpeg::video_settings::{CpuPreset, VideoEncoder, VideoSettings};
 use crate::ffmpeg::{ffmpeg_process_video, get_version};
 use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::util::uuid::UuidString;
 use crate::{info, log_fn_name};
-use rust_ffmpeg::{Codec, CodecOptions, VideoFilter};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
@@ -29,11 +30,20 @@ pub enum Operation {
 
 impl Operation {
     /// Create audio codec options for ffmpeg.
-    pub fn audio_settings(&self) -> CodecOptions {
+    pub fn audio_settings(&self) -> AudioSettings {
         match self {
-            Self::CompressFoldVideo | Self::CompressMessUpVideo => CodecOptions::new(Codec::copy()),
-            Self::CompressCrumpleVideo => CodecOptions::new(Codec::opus()).bitrate("32k"),
-            Self::CompressShredVideo => CodecOptions::new(Codec::opus()).bitrate("16k"),
+            Self::CompressFoldVideo | Self::CompressMessUpVideo => AudioSettings {
+                encoder: AudioEncoder::Copy,
+                bitrate: None,
+            },
+            Self::CompressCrumpleVideo => AudioSettings {
+                encoder: AudioEncoder::Opus,
+                bitrate: Some(Bitrate::kbps(32)),
+            },
+            Self::CompressShredVideo => AudioSettings {
+                encoder: AudioEncoder::Opus,
+                bitrate: Some(Bitrate::kbps(16)),
+            },
         }
     }
 
@@ -47,21 +57,32 @@ impl Operation {
     }
 
     /// Create video codec options, as well as a list of video filters for ffmpeg.
-    pub fn video_settings(&self) -> (CodecOptions, Vec<VideoFilter>) {
+    pub fn video_settings(&self) -> VideoSettings {
         match self {
-            Self::CompressFoldVideo => (CodecOptions::new(Codec::h265()).quality(26).option("preset", "slow"), Vec::new()),
-            Self::CompressMessUpVideo => (
-                CodecOptions::new(Codec::h265()).quality(29).option("preset", "slower"),
-                vec![VideoFilter::scale(-1, 720)],
-            ),
-            Self::CompressCrumpleVideo => (
-                CodecOptions::new(Codec::h265()).quality(35).option("preset", "slow"),
-                vec![VideoFilter::scale(-2, 480)],
-            ),
-            Self::CompressShredVideo => (
-                CodecOptions::new(Codec::h265()).quality(38).option("preset", "slow"),
-                vec![VideoFilter::scale(-1, 360)],
-            ),
+            Self::CompressFoldVideo => VideoSettings {
+                encoder: VideoEncoder::H265,
+                crf: Some(26),
+                preset: Some(CpuPreset::Slow),
+                output_resolution: None,
+            },
+            Self::CompressMessUpVideo => VideoSettings {
+                encoder: VideoEncoder::H265,
+                crf: Some(29),
+                preset: Some(CpuPreset::Slower),
+                output_resolution: Some((-1, 720)),
+            },
+            Self::CompressCrumpleVideo => VideoSettings {
+                encoder: VideoEncoder::H265,
+                crf: Some(35),
+                preset: Some(CpuPreset::Slow),
+                output_resolution: Some((-2, 480)),
+            },
+            Self::CompressShredVideo => VideoSettings {
+                encoder: VideoEncoder::H265,
+                crf: Some(38),
+                preset: Some(CpuPreset::Slow),
+                output_resolution: Some((-1, 360)),
+            },
         }
     }
 

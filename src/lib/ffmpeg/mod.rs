@@ -1,18 +1,58 @@
-use crate::{error, hive::jobs::process_library_video::Operation, info, log_fn_name, success};
+pub mod audio_settings;
+pub mod mapping;
+pub mod video_settings;
+
+use crate::ffmpeg::{audio_settings::AudioSettings, mapping::Mapping, video_settings::VideoSettings};
+use crate::hive::jobs::process_library_video::Operation;
+use crate::{error, formats, info, log_fn_name, success};
 use function_name::named;
-use rust_ffmpeg::{Codec, Duration, FFmpegBuilder, Input, Output, Progress, StreamSpecifier, StreamType};
 use smol::process;
 use std::{path::Path, process::ExitStatus};
 use thiserror::Error;
 
+#[derive(Debug)]
+pub struct Progress {
+    // TODO
+}
+
+#[derive(Debug, Error)]
+pub enum FFmpegError {
+    #[error("command error: {0}")]
+    CommandError(ExitStatus),
+}
+
 #[named]
-pub async fn spawn_ffmpeg(args: &[String]) -> process::Output {
+pub async fn spawn_ffmpeg(args: &[String], _on_progress: impl Fn(Progress) + Send + Sync + 'static) -> process::Output {
+    log_fn_name!(auto);
+    info!("running ffmpeg with arguments: {args:?}");
     let child = process::Command::new("ffmpeg").args(args).spawn().expect("todo"); //TODO: implement on_progress
     child.output().await.expect("todo")
 }
 
 pub async fn get_version() -> String {
     String::from("VERSION TODO")
+}
+
+#[named]
+pub fn handle_ffmpeg_output(out: process::Output) -> Result<(), FFmpegError> {
+    log_fn_name!(auto);
+    if out.status.success() {
+        success!(
+            "ffmpeg process finished successfully (exit status: {}): stdout: {}, stderr: {}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Ok(())
+    } else {
+        error!(
+            "ffmpeg process finished with an error (exit status: {}): stdout: {}, stderr: {}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Err(FFmpegError::CommandError(out.status))
+    }
 }
 
 #[named]
@@ -25,56 +65,28 @@ pub async fn ffmpeg_cut_video_streamcopy(
 ) -> Result<(), FFmpegError> {
     log_fn_name!(auto);
 
-    let input = Input::new(source_path.to_string_lossy().to_string());
-    let input = if let Some(start_time_ms) = start_time_ms {
-        input.seek(Duration::from_millis(start_time_ms))
-    } else {
-        input
-    };
-    let input = if let Some(end_time_ms) = end_time_ms {
-        input.duration(Duration::from_millis(end_time_ms - start_time_ms.unwrap_or(0)))
-    } else {
-        input
-    };
-    let ffmpeg = FFmpegBuilder::new()?
-        .input(input)
-        .output(
-            Output::new(destination_path.to_string_lossy().to_string())
-                .audio_codec(Codec::copy())
-                .video_codec(Codec::copy()),
-        )
-        .no_overwrite()
-        .on_progress(on_progress);
+    let input_filename = source_path.to_string_lossy().to_string();
+    let output_filename = destination_path.to_string_lossy().to_string();
 
-    let args = ffmpeg.build_args().expect("todo");
-    info!("running ffmpeg with arguments: {args:?}");
-
-    let out = spawn_ffmpeg(&args).await;
-    if out.status.success() {
-        success!(
-            "ffmpeg process finished successfully (exit status: {}): stdout: {:?}, stderr: {:?}",
-            out.status,
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        );
-        Ok(())
-    } else {
-        error!(
-            "ffmpeg process finished with an error (exit status: {}): stdout: {:?}, stderr: {:?}",
-            out.status,
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        );
-        Err(FFmpegError::CommandError(out.status))
+    let mut args = Vec::new();
+    args.extend_from_slice(&formats!["-n", "-i", "{input_filename}"]);
+    if let Some(start_time_ms) = start_time_ms {
+        let ss_seconds = start_time_ms as f64 / 1000.0;
+        args.extend_from_slice(&formats!["-ss", "{ss_seconds}"]);
     }
-}
+    if let Some(end_time_ms) = end_time_ms {
+        let duration = end_time_ms - start_time_ms.unwrap_or(0);
+        let t_seconds = duration as f64 / 1000.0;
+        args.extend_from_slice(&formats!["-t", "{t_seconds}"]);
+    }
+    Mapping::AllFromSource.append_args(&mut args);
+    VideoSettings::copy().append_args(&mut args);
+    AudioSettings::copy().append_args(&mut args);
+    args.push(output_filename);
 
-#[derive(Debug, Error)]
-pub enum FFmpegError {
-    #[error("rust_ffmpeg: {0}")]
-    RustFFmpeg(#[from] rust_ffmpeg::Error),
-    #[error("command error: {0}")]
-    CommandError(ExitStatus),
+    info!("determined ffmpeg args for cutting");
+    let out = spawn_ffmpeg(&args, on_progress).await;
+    handle_ffmpeg_output(out)
 }
 
 #[named]
@@ -86,51 +98,24 @@ pub async fn ffmpeg_process_video(
 ) -> Result<(), FFmpegError> {
     log_fn_name!(auto);
 
-    let mut ffmpeg = FFmpegBuilder::new()?;
-
-    let (vcodec, vfilters) = operation.video_settings();
-    let acodec = operation.audio_settings();
-
-    let input = Input::new(source_path.to_string_lossy().to_string());
-    ffmpeg = ffmpeg.input(input);
-
-    if operation.preserve_all_streams() {
-        ffmpeg = ffmpeg.map_all_from_input(0);
+    let input_filename = source_path.to_string_lossy().to_string();
+    let output_filename = destination_path.to_string_lossy().to_string();
+    let video_settings = operation.video_settings();
+    let audio_settings = operation.audio_settings();
+    let mapping = if operation.preserve_all_streams() {
+        Mapping::AllFromSource
     } else {
-        ffmpeg = ffmpeg
-            .map_stream(0, StreamSpecifier::TypeIndex(StreamType::Video, 0))
-            .map_stream(0, StreamSpecifier::TypeIndex(StreamType::Audio, 0))
-        // TODO: umm these should be marked as "optional", with a trailing question mark (https://trac.ffmpeg.org/wiki/Map#Optionalmapping), but it seems like this is not possible with this library???
-    }
+        Mapping::MainVideoAudioOnly
+    };
 
-    for vfilter in vfilters {
-        ffmpeg = ffmpeg.video_filter(vfilter);
-    }
+    let mut args = Vec::new();
+    args.extend_from_slice(&formats!["-n", "-i", "{input_filename}"]);
+    mapping.append_args(&mut args);
+    video_settings.append_args(&mut args);
+    audio_settings.append_args(&mut args);
+    args.push(output_filename);
 
-    let output = Output::new(destination_path.to_string_lossy().to_string())
-        .video_codec_opts(vcodec)
-        .audio_codec_opts(acodec);
-    ffmpeg = ffmpeg.output(output).no_overwrite().on_progress(on_progress);
-
-    let args = ffmpeg.build_args().expect("todo");
-    info!("running ffmpeg with arguments: {args:?}");
-
-    let out = spawn_ffmpeg(&args).await;
-    if out.status.success() {
-        success!(
-            "ffmpeg process finished successfully (exit status: {}): stdout: {:?}, stderr: {:?}",
-            out.status,
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        );
-        Ok(())
-    } else {
-        error!(
-            "ffmpeg process finished with an error (exit status: {}): stdout: {:?}, stderr: {:?}",
-            out.status,
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        );
-        Err(FFmpegError::CommandError(out.status))
-    }
+    info!("determined ffmpeg args for processing");
+    let out = spawn_ffmpeg(&args, on_progress).await;
+    handle_ffmpeg_output(out)
 }

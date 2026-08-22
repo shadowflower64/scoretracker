@@ -48,7 +48,7 @@ use walkdir::{DirEntry, WalkDir};
 pub fn get_library_dir_of_path(path: &Path) -> Option<PathBuf> {
     let mut current_path = path.to_path_buf();
     while let Some(parent_path) = current_path.parent() {
-        if current_path.join("library_info.json").is_file() {
+        if current_path.join(LibraryInfo::STANDARD_FILENAME).is_file() {
             return Some(current_path);
         }
         current_path = parent_path.to_path_buf();

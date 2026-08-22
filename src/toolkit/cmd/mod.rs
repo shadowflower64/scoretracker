@@ -163,8 +163,8 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                         })
                     }
                     "process-video" => {
-                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to cloth video")?;
-                        let destination_path: PathBuf = ctx.pull_arg("destination_path", "destination path to fragment video")?;
+                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to dry video")?;
+                        let destination_path: PathBuf = ctx.pull_arg("destination_path", "destination path to wet video")?;
                         let processing_type: Operation =
                             ctx.pull_arg("processing_type", "type/quality preset of video compression to do")?;
                         cmd::hive::add_task(ProcessLibraryVideoJob {
@@ -174,8 +174,21 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                             destination_path,
                         })
                     }
-                    "fold-video" => {
+                    "execute-llc" => {
                         let source_path: PathBuf = ctx.pull_arg("source_path", "source path to cloth video")?;
+                        let file_stem = source_path.file_stem().expect("todo: invalid file name").to_string_lossy();
+                        let llc_project_file_name = format!("{file_stem}-proj.llc");
+                        let file_name = format!("{file_stem}-stcut.mkv",);
+                        let destination_path: PathBuf = source_path.with_file_name(file_name);
+                        cmd::hive::add_task(ProcessLibraryVideoJob {
+                            source_path,
+                            source_proof_uuid_precondition_check: None,
+                            operation: Operation::CompressFoldVideo,
+                            destination_path,
+                        })
+                    }
+                    "fold-video" => {
+                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to dry video")?;
                         let file_name = format!(
                             "{}-stfolded.mkv",
                             source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
@@ -234,6 +247,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "open" => cmd::log::open(),
             _ => ctx.unknown_cmd(),
         },
+        "logs" => cmd::log::open(),
         "scoreboard" => match ctx.cmd()? {
             "init" => cmd::scoreboard::init(),
             "performance" => match ctx.cmd()? {

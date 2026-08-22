@@ -1,7 +1,7 @@
 //! Losslessly cut a video from the library and save result to library
 use crate::data::library::database::ClothInfo;
 use crate::data::library::{create_stpl_url_to_relfile, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
-use crate::ffmpeg::ffmpeg_cut_video_streamcopy;
+use crate::ffmpeg::{ffmpeg_cut_video_streamcopy, get_version};
 use crate::hive::job::{AnyJob, Fail, Job, Success};
 use crate::hive::worker::Worker;
 use crate::util::timestamp::NsLocalTimestamp;
@@ -23,7 +23,7 @@ impl Job for CutLibraryVideoJob {
     async fn run(&self, worker: Arc<Worker>) -> Result<Success, Fail> {
         log_fn_name!("job:cut_library_video");
 
-        let ffmpeg_version = rust_ffmpeg::version().await;
+        let ffmpeg_version = get_version().await;
         info!("ffmpeg version: {:?}", ffmpeg_version);
 
         let worker_info = Some(&worker.info_cloned());

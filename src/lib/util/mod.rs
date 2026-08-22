@@ -90,3 +90,13 @@ pub const REVEAL_EXECUTABLE_NAME: &str = "xdg-open";
 pub fn reveal_directory(path: &Path) -> Result<Child, io::Error> {
     Command::new(REVEAL_EXECUTABLE_NAME).arg(path).spawn()
 }
+
+/// An array of strings created using the format!() macro.
+#[macro_export]
+macro_rules! formats {
+    [$($args:tt),*] => {
+        [$(
+            format!($args)
+        ),*]
+    };
+}

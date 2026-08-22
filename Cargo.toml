@@ -40,7 +40,6 @@ iso8601-duration = { version = "0.2.0", features = ["chrono"] }
 indexmap = { version = "2.14.0", features = ["serde"] }
 regex = "1.13.1"
 chrono-tz = "0.10.4"
-rust_ffmpeg = "1.0.0"
 smol = "2.0.2"
 crossbeam-channel = "0.5.16"
 rand = "0.10.2"
