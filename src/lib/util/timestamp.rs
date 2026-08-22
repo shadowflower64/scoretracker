@@ -312,6 +312,10 @@ impl NsDuration {
         self.0.frac()
     }
 
+    pub fn as_secs_f64(self) -> f64 {
+        self.0.as_secs_f64()
+    }
+
     pub fn as_millis(self) -> i128 {
         self.0.as_millis()
     }
@@ -370,6 +374,32 @@ impl NsDuration {
 
     pub fn abs(&self) -> Self {
         Self(self.0.abs())
+    }
+
+    /// Outputs the duration as a string in the following format: `hh.mm.ss.fff`.
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker::util::timestamp::NsDuration;
+    /// let ns_timestamp = NsDuration::from_secs_f64(460.023);
+    /// assert_eq!(&ns_timestamp.to_string_within_filename(), "00.07.40.023");
+    ///
+    /// let ns_timestamp = NsDuration::from_secs_f64(3723.004);
+    /// assert_eq!(&ns_timestamp.to_string_within_filename(), "01.02.03.004");
+    /// ```
+    pub fn to_string_within_filename(&self) -> String {
+        // 00.07.40.660
+        // target format: hh.mm.ss.fff
+
+        let millis = self.as_millis();
+        let millis_only = millis.rem_euclid(1000);
+        let seconds = millis.div_euclid(1000);
+        let seconds_only = seconds.rem_euclid(60);
+        let minutes = seconds.div_euclid(60);
+        let minutes_only = minutes.rem_euclid(60);
+        let hours = minutes.div_euclid(60);
+
+        format!("{hours:02}.{minutes_only:02}.{seconds_only:02}.{millis_only:03}")
     }
 
     fn as_serializable(self) -> SerializableStruct {
@@ -592,6 +622,12 @@ impl Nanoseconds {
         self.0.rem_euclid(1_000_000_000i128) as u32
     }
 
+    pub fn as_secs_f64(self) -> f64 {
+        let whole = self.as_secs() as f64;
+        let frac = (self.frac() as f64) / 1_000_000_000f64;
+        whole + frac
+    }
+
     /// Get the amount of milliseconds since [`UNIX_EPOCH`].
     ///
     /// This uses [`i128::div_euclid`] to divide the number of nanoseconds by `1_000_000i128`, which means it will always round down, towards `-Infinity`.
@@ -748,12 +784,22 @@ impl Nanoseconds {
     /// assert_eq!(Nanoseconds::from_secs_f64(-1.5).as_nanos(), -1_500_000_000);
     /// assert_eq!(Nanoseconds::from_secs_f64(-1.75).as_nanos(), -1_750_000_000);
     /// assert_eq!(Nanoseconds::from_secs_f64(0.0).as_nanos(), 0);
+    /// assert_eq!(Nanoseconds::from_secs_f64(3723.004).as_nanos(), 3_723_004_000_000); // This should be fine still
     /// assert_eq!(Nanoseconds::from_secs_f64(1_000_000_000.0).as_nanos(), 1_000_000_000_000_000_000);
-    /// assert_eq!(Nanoseconds::from_secs_f64(1_000_000_000.1).as_nanos(), 1_000_000_000_100_000_023); // Accuracy loss at large values
+    /// assert_eq!(Nanoseconds::from_secs_f64(1_000_000_000.1).as_nanos(), 1_000_000_000_100_000_024); // Accuracy loss at large values
     /// ```
     pub fn from_secs_f64(secs: f64) -> Self {
-        let seconds = (secs.floor() as i128) * 1_000_000_000;
-        let frac = (secs.rem_euclid(1.0) * 1_000_000_000f64) as i128;
+        let rounded_towards_0 = if secs < 0f64 { secs.ceil() } else { secs.floor() };
+        let seconds = (rounded_towards_0 as i128) * 1_000_000_000;
+        let frac = (secs.fract() * 1_000_000_000f64).round() as i128;
+        // println!(
+        //     "secs: {:?} | secs.fract(): {:?} | multiplied: {:?} | rounded: {:?} | frac: {:?}",
+        //     secs,
+        //     secs.fract(),
+        //     (secs.fract() * 1_000_000_000f64),
+        //     (secs.fract() * 1_000_000_000f64).round(),
+        //     frac
+        // );
         Self(seconds + frac)
     }
 

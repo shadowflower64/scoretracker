@@ -84,8 +84,8 @@ impl Job for CutLibraryVideoJob {
         ffmpeg_cut_video_streamcopy(
             &self.source_path,
             &self.destination_path,
-            self.cut_start_point.map(|x| x.as_millis() as u64),
-            self.cut_end_point.map(|x| x.as_millis() as u64),
+            self.cut_start_point.map(|x| x.as_secs_f64()),
+            self.cut_end_point.map(|x| x.as_secs_f64()),
             move |progress| {
                 worker2.update_task_progress_very_simple(format!("{progress:?}"));
             },

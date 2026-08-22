@@ -59,8 +59,8 @@ pub fn handle_ffmpeg_output(out: process::Output) -> Result<(), FFmpegError> {
 pub async fn ffmpeg_cut_video_streamcopy(
     source_path: &Path,
     destination_path: &Path,
-    start_time_ms: Option<u64>,
-    end_time_ms: Option<u64>,
+    start_time_sec: Option<f64>,
+    end_time_sec: Option<f64>,
     on_progress: impl Fn(Progress) + Send + Sync + 'static,
 ) -> Result<(), FFmpegError> {
     log_fn_name!(auto);
@@ -70,14 +70,12 @@ pub async fn ffmpeg_cut_video_streamcopy(
 
     let mut args = Vec::new();
     args.extend_from_slice(&formats!["-n", "-i", "{input_filename}"]);
-    if let Some(start_time_ms) = start_time_ms {
-        let ss_seconds = start_time_ms as f64 / 1000.0;
-        args.extend_from_slice(&formats!["-ss", "{ss_seconds}"]);
+    if let Some(start_time_sec) = start_time_sec {
+        args.extend_from_slice(&formats!["-ss", "{start_time_sec}"]);
     }
-    if let Some(end_time_ms) = end_time_ms {
-        let duration = end_time_ms - start_time_ms.unwrap_or(0);
-        let t_seconds = duration as f64 / 1000.0;
-        args.extend_from_slice(&formats!["-t", "{t_seconds}"]);
+    if let Some(end_time_sec) = end_time_sec {
+        let duration = end_time_sec - start_time_sec.unwrap_or(0.0);
+        args.extend_from_slice(&formats!["-t", "{duration}"]);
     }
     Mapping::AllFromSource.append_args(&mut args);
     VideoSettings::copy().append_args(&mut args);

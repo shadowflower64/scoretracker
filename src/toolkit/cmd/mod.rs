@@ -9,6 +9,7 @@ use scoretracker::config::libraries::LibraryTable;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
+use scoretracker::util::lossless_cut_project::LlcProj;
 use scoretracker::util::timestamp::NsLocalTimestamp;
 use scoretracker::{info_npr, success_npr};
 use std::path::PathBuf;
@@ -177,15 +178,32 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                     "execute-llc" => {
                         let source_path: PathBuf = ctx.pull_arg("source_path", "source path to cloth video")?;
                         let file_stem = source_path.file_stem().expect("todo: invalid file name").to_string_lossy();
-                        let llc_project_file_name = format!("{file_stem}-proj.llc");
-                        let file_name = format!("{file_stem}-stcut.mkv",);
-                        let destination_path: PathBuf = source_path.with_file_name(file_name);
-                        cmd::hive::add_task(ProcessLibraryVideoJob {
-                            source_path,
-                            source_proof_uuid_precondition_check: None,
-                            operation: Operation::CompressFoldVideo,
-                            destination_path,
-                        })
+                        let llc_proj_file_name = format!("{file_stem}-proj.llc");
+                        let llc = LlcProj::load_from_file(llc_proj_file_name).expect("todo: invalid llc proj");
+                        for (i, segment) in llc.cut_segments.iter().enumerate() {
+                            let segment_number = if llc.cut_segments.len() == 1 { None } else { Some(i + 1) };
+                            let segment_fragment = segment_number.map(|num| format!("-seg{num}")).unwrap_or_default();
+                            let cut_start_point = NsLocalTimestamp::from_secs_f64(segment.start);
+                            let cut_end_point = NsLocalTimestamp::from_secs_f64(segment.end);
+
+                            //{file_stem}-00.07.40.660-00.09.48.941-stcut.mkv
+                            //{file_stem}-00.07.40.660-00.09.48.941-seg4-stcut.mkv
+                            let file_name = format!(
+                                "{file_stem}-{}-{}{segment_fragment}-stcut.mkv",
+                                cut_start_point.to_string_within_filename(),
+                                cut_end_point.to_string_within_filename()
+                            );
+                            let destination_path: PathBuf = source_path.with_file_name(file_name);
+
+                            cmd::hive::add_task(CutLibraryVideoJob {
+                                source_path: source_path.to_path_buf(),
+                                source_proof_uuid_precondition_check: None,
+                                cut_start_point: Some(cut_start_point),
+                                cut_end_point: Some(cut_end_point),
+                                destination_path,
+                            })?;
+                        }
+                        Ok(())
                     }
                     "fold-video" => {
                         let source_path: PathBuf = ctx.pull_arg("source_path", "source path to dry video")?;

@@ -52,17 +52,18 @@ impl fmt::Display for Bitrate {
 ///
 /// # Examples
 /// ```
-/// #use scoretracker::ffmpeg::audio_settings::AudioSettings;
+/// use scoretracker::ffmpeg::audio_settings::{AudioSettings, AudioEncoder, Bitrate};
+///
 /// let audio_settings = AudioSettings { encoder: AudioEncoder::Copy, bitrate: None };
-/// assert_eq!(&audio_settings.to_string(), "-c:a copy")
+/// assert_eq!(&audio_settings.to_string(), "-c:a copy");
 ///
 /// let audio_settings = AudioSettings { encoder: AudioEncoder::Opus, bitrate: Some(Bitrate::kbps(32)) };
-/// assert_eq!(&audio_settings.to_string(), "-c:a libopus -b:a 32k")
+/// assert_eq!(&audio_settings.to_string(), "-c:a libopus -b:a 32k");
 ///
 /// let mut args = Vec::new();
 /// let audio_settings = AudioSettings { encoder: AudioEncoder::Opus, bitrate: Some(Bitrate::kbps(32)) };
 /// audio_settings.append_args(&mut args);
-/// assert_eq!(audio_settings.join(" "), "-c:a libopus -b:a 32k")
+/// assert_eq!(args.join(" "), "-c:a libopus -b:a 32k");
 /// ```
 pub struct AudioSettings {
     pub encoder: AudioEncoder,
