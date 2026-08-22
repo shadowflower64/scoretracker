@@ -66,6 +66,10 @@ impl<'a> CmdlineContext<'a> {
         self.arguments.get(self.top - 1).map(String::as_str)
     }
 
+    pub fn peek(&mut self) -> Option<&str> {
+        self.arguments.get(self.top).map(String::as_str)
+    }
+
     pub fn pull_arg<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<T, CmdError> {
         let arg = parse_arg(
             self.arguments.get(self.top).map(String::as_str),
@@ -86,6 +90,21 @@ impl<'a> CmdlineContext<'a> {
         )?;
         self.top += 1;
         Ok(arg)
+    }
+
+    pub fn pull_args<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<Vec<T>, CmdError> {
+        let mut vec = Vec::new();
+        while self.peek().is_some() {
+            let arg = parse_arg(
+                self.arguments.get(self.top).map(String::as_str),
+                name,
+                description,
+                &self.full_command_name,
+            )?;
+            self.top += 1;
+            vec.push(arg);
+        }
+        Ok(vec)
     }
 
     pub fn unknown_cmd(&mut self) -> Result<(), CmdError> {
@@ -175,12 +194,39 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                         })
                     }
                     "execute-llc" => {
-                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to cloth video")?;
-                        cmd::hive::add_task_execute_llc(source_path)
+                        let source_paths: Vec<PathBuf> = ctx.pull_args("source_path", "source path to cloth video")?;
+                        for source_path in source_paths {
+                            cmd::hive::add_task_execute_llc(source_path)?
+                        }
+                        Ok(())
                     }
                     "fold-video" => {
-                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to dry video")?;
-                        cmd::hive::add_task_fold_video(source_path)
+                        let source_paths: Vec<PathBuf> = ctx.pull_args("source_path", "source path to dry video")?;
+                        for source_path in source_paths {
+                            cmd::hive::add_task_fold_video(source_path)?
+                        }
+                        Ok(())
+                    }
+                    "mess-up-video" => {
+                        let source_paths: Vec<PathBuf> = ctx.pull_args("source_path", "source path to dry video")?;
+                        for source_path in source_paths {
+                            cmd::hive::add_task_mess_up_video(source_path)?
+                        }
+                        Ok(())
+                    }
+                    "crumple-video" => {
+                        let source_paths: Vec<PathBuf> = ctx.pull_args("source_path", "source path to dry video")?;
+                        for source_path in source_paths {
+                            cmd::hive::add_task_crumple_video(source_path)?
+                        }
+                        Ok(())
+                    }
+                    "shred-video" => {
+                        let source_paths: Vec<PathBuf> = ctx.pull_args("source_path", "source path to dry video")?;
+                        for source_path in source_paths {
+                            cmd::hive::add_task_shred_video(source_path)?
+                        }
+                        Ok(())
                     }
                     _ => ctx.unknown_cmd(),
                 },

@@ -3,7 +3,7 @@
 //! A library database file is a file shared globally across libraries, that maps "proof UUIDs" to actual information and metadata about the proof.
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
 //! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
-use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
+use crate::data::library::stpl_url::StplUrl;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
@@ -12,6 +12,8 @@ use crate::util::uuid::UuidString;
 use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
 use std::sync::LazyLock;
 use thiserror::Error;
 use uuid::Uuid;
@@ -39,10 +41,29 @@ pub struct FileStat {
     pub timestamp_modification: NsTimestamp,
 
     /// Status change - when were the permissions(?) changed for this file?
-    pub timestamp_status_change: NsTimestamp,
+    //pub timestamp_status_change: NsTimestamp,
+    // this doesn't seem to actually work cross-platform/it's not in the rust api.
 
     /// Timestamp of when was the file stat was read (This is not actually part of the `stat` command, and it is stored manually.)
     pub last_check: NsTimestamp,
+}
+
+impl FileStat {
+    pub fn from_path(path: impl AsRef<Path>) -> Self {
+        let metadata = fs::metadata(path).unwrap();
+        let size = metadata.len();
+        let timestamp_birth = metadata.created().unwrap().into();
+        let timestamp_access = metadata.accessed().unwrap().into();
+        let timestamp_modification = metadata.modified().unwrap().into();
+
+        FileStat {
+            size,
+            timestamp_birth,
+            timestamp_access,
+            timestamp_modification,
+            last_check: NsTimestamp::now(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -172,7 +193,8 @@ pub enum QualityState {
     /// See also: [`Operation::CompressFoldVideo`](crate::hive::jobs::process_library_video::Operation::CompressFoldVideo)
     Folded,
 
-    /// Transcoded cut video, lossy but still looking good and definitely watchable. Possibly in worse resolution. Should take up less than 20 MiB per minute of video.
+    /// Transcoded cut video, lossy but still looking good and definitely watchable. Possibly in worse resolution.
+    /// Should take up less than 20 MiB per minute of video.
     ///
     /// Example ffmpeg settings:
     /// - Codec: libx265
@@ -188,7 +210,8 @@ pub enum QualityState {
     /// See also: [`Operation::CompressMessUpVideo`](crate::hive::jobs::process_library_video::Operation::CompressMessUpVideo)
     Messy,
 
-    /// Transcoded cut video, in worse resolution but still readable quality. Has to take up less than 4 MiB per minute of video.
+    /// Transcoded cut video, in worse resolution but still readable quality.
+    /// Has to take up less than 4 MiB per minute of video.
     /// Useful for non-PB performances that would've usually been thrown in the trash entirely.
     ///
     /// Example ffmpeg settings:
@@ -205,7 +228,8 @@ pub enum QualityState {
     /// See also: [`Operation::CompressCrumpleVideo`](crate::hive::jobs::process_library_video::Operation::CompressCrumpleVideo)
     Crumpled,
 
-    /// Transcoded cut video, with terrible bitrate and 360p. Takes up around 2 MiB per minute of video.
+    /// Transcoded cut video, with terrible bitrate and 360p.
+    /// Takes up around 2 MiB per minute of video.
     /// Useful for unfinished performances or otherwise something that should be deleted usually, but may come in handy later (for example, for counting attempts).
     ///
     /// Example ffmpeg settings:
@@ -391,6 +415,12 @@ pub struct LibraryEntry {
     pub timestamp_added: NsTimestamp,
 }
 
+impl LibraryEntry {
+    pub fn update_stat(&mut self, url: StplUrl, path: impl AsRef<Path>) {
+        self.file_stat.insert(url, FileStat::from_path(path));
+    }
+}
+
 impl Default for LibraryEntry {
     fn default() -> Self {
         Self {
@@ -463,25 +493,8 @@ impl LibraryDatabase {
             .find(|x| x.youtube_id.as_ref().is_some_and(|id| id == youtube_id))
     }
 
-    pub fn insert_or_merge(&mut self, relative_path: &RelativePath, sha256: String, domain: LibraryDomain) -> (Uuid, bool) {
-        let url = StplUrl::new(domain.clone(), Some(relative_path.to_string()));
-        if let Some(existing_entry) = self.find_entry_by_sha256_hash_mut(&sha256) {
-            existing_entry.library_urls.push(url);
-            (existing_entry.uuid.0, true)
-        } else {
-            let new_library_entry = LibraryEntry {
-                library_urls: vec![url],
-                sha256: Some(sha256),
-                ..Default::default()
-            };
-            let uuid = new_library_entry.uuid.0;
-            self.entries.push(new_library_entry);
-            (uuid, false)
-        }
-    }
-
-    pub fn fetch_or_insert(&mut self, relative_path: &RelativePath, sha256: String, domain: LibraryDomain) -> (Uuid, bool) {
-        let url = StplUrl::new(domain.clone(), Some(relative_path.to_string()));
+    /// Returns a UUID for an existing database record without modification, or creates a new record, inserts it into the database, and returns the UUID for that.
+    pub fn fetch_or_insert(&mut self, sha256: String, url: StplUrl) -> (Uuid, bool) {
         if let Some(existing_entry) = self.find_entry_by_sha256_hash_mut(&sha256) {
             (existing_entry.uuid.0, true)
         } else {
@@ -496,6 +509,7 @@ impl LibraryDatabase {
         }
     }
 
+    /// Inserts an entry into the database, returning an error if a record with this UUID already exists.
     pub fn insert(&mut self, entry: LibraryEntry) -> Result<Uuid, InsertError> {
         if let Some(existing_performance) = self.find_entry_by_uuid(entry.uuid.0) {
             return Err(InsertError::ExistsAlready(existing_performance.uuid.0));

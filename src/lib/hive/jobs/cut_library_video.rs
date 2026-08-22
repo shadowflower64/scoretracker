@@ -104,7 +104,8 @@ impl Job for CutLibraryVideoJob {
                         uuid: *source_proof_uuid,
                         start_point: self.cut_start_point,
                         end_point: self.cut_end_point,
-                    })
+                    });
+                    entry.cut = Some(true);
                 },
                 worker_info,
             )

@@ -44,6 +44,7 @@ pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
             }
 
             // let the worker rest a little bit...
+            info!("worker sleeping for 5 seconds...");
             thread::sleep(Duration::from_secs(5));
         }
     });
@@ -118,6 +119,51 @@ pub fn add_task_fold_video(source_path: PathBuf) -> Result<(), CmdError> {
         source_path,
         source_proof_uuid_precondition_check: None,
         operation: Operation::CompressFoldVideo,
+        destination_path,
+    })
+}
+
+#[named]
+pub fn add_task_mess_up_video(source_path: PathBuf) -> Result<(), CmdError> {
+    let file_name = format!(
+        "{}-stmessy.mkv",
+        source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
+    );
+    let destination_path: PathBuf = source_path.with_file_name(file_name);
+    cmd::hive::add_task(ProcessLibraryVideoJob {
+        source_path,
+        source_proof_uuid_precondition_check: None,
+        operation: Operation::CompressMessUpVideo,
+        destination_path,
+    })
+}
+
+#[named]
+pub fn add_task_crumple_video(source_path: PathBuf) -> Result<(), CmdError> {
+    let file_name = format!(
+        "{}-stcrumpled.mkv",
+        source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
+    );
+    let destination_path: PathBuf = source_path.with_file_name(file_name);
+    cmd::hive::add_task(ProcessLibraryVideoJob {
+        source_path,
+        source_proof_uuid_precondition_check: None,
+        operation: Operation::CompressCrumpleVideo,
+        destination_path,
+    })
+}
+
+#[named]
+pub fn add_task_shred_video(source_path: PathBuf) -> Result<(), CmdError> {
+    let file_name = format!(
+        "{}-stshredded.mkv",
+        source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
+    );
+    let destination_path: PathBuf = source_path.with_file_name(file_name);
+    cmd::hive::add_task(ProcessLibraryVideoJob {
+        source_path,
+        source_proof_uuid_precondition_check: None,
+        operation: Operation::CompressShredVideo,
         destination_path,
     })
 }

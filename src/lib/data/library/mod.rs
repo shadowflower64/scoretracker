@@ -233,11 +233,12 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
     cache.save_and_unlock().map_err(E::CannotWriteCache)?;
 
     // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
-    info!("getting uuids from database");
+    info!("inserting and updating entries in database");
     let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
     let len = sha256_hashes.len();
     for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
-        let (uuid, existed) = library_db.fetch_or_insert(relative_path, sha256_hash.clone(), library_domain.clone());
+        let stpl_url = StplUrl::new(library_domain.clone(), Some(relative_path.to_string()));
+        let (uuid, existed) = library_db.fetch_or_insert(sha256_hash.clone(), stpl_url.clone());
         if existed {
             debug!(
                 "[{}/{}] fetching uuid for existing database entry ({uuid}) for: {relative_path:?}",
@@ -247,6 +248,12 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
         } else {
             debug!("[{}/{}] adding new database entry ({uuid}) for: {relative_path:?}", i + 1, len);
         }
+
+        let entry = library_db
+            .find_entry_by_uuid_mut(uuid)
+            .expect("uuid should always be valid, we just inserted a new proof");
+        entry.update_stat(stpl_url, relative_path.to_path(library_dir));
+        // entry_mutator(entry);
 
         index.files.insert((*relative_path).clone(), uuid.into());
     }
@@ -365,12 +372,13 @@ pub fn scan_register_added_files(
     cache.save_and_unlock().map_err(E::CannotWriteCache)?;
 
     // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
-    info!("getting uuids from database");
+    info!("inserting and updating entries in database");
     let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
     let len = sha256_hashes.len();
     let mut added_files = HashMap::new();
     for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
-        let (uuid, existed) = library_db.fetch_or_insert(relative_path, sha256_hash.clone(), library_domain.clone());
+        let stpl_url = StplUrl::new(library_domain.clone(), Some(relative_path.to_string()));
+        let (uuid, existed) = library_db.fetch_or_insert(sha256_hash.clone(), stpl_url.clone());
         if existed {
             debug!(
                 "[{}/{}] fetching uuid for existing database entry ({uuid}) for: {relative_path:?}",
@@ -384,6 +392,7 @@ pub fn scan_register_added_files(
         let entry = library_db
             .find_entry_by_uuid_mut(uuid)
             .expect("uuid should always be valid, we just inserted a new proof");
+        entry.update_stat(stpl_url, relative_path.to_path(library_dir));
         entry_mutator(entry);
 
         index.files.insert((*relative_path).clone(), uuid.into());
@@ -391,7 +400,7 @@ pub fn scan_register_added_files(
     }
 
     // Now sync all of the URLs within the index file with the database
-    info!("syncing database");
+    info!("syncing database with index");
     sync_library_index_with_db_essence(library_dir, &index.inner, |_| Ok(library_db), library_domain, worker_info)?;
     index.save_and_unlock().expect("todo"); //.map_err(E::CannotWriteReplaceIndex)?;
 

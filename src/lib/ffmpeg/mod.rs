@@ -69,7 +69,13 @@ pub async fn ffmpeg_cut_video_streamcopy(
     let output_filename = destination_path.to_string_lossy().to_string();
 
     let mut args = Vec::new();
-    args.extend_from_slice(&formats!["-n", "-i", "{input_filename}"]);
+    args.extend_from_slice(&formats!["-n"]); // `-n` - do not overwirte output file
+    // Keyframe cut mode - seek timestamp is before input file
+    // In this mode, the video will start on the latest keyframe available from that time.
+    // so if the requested cut is at 35 seconds, but keyframes are on 30 seconds and 40 seconds, the resulting video will start at 30 seconds.
+    // In the other mode, when the seek timestamp is after the input file, the video and audio starts at exactly 35 seconds,
+    // but the first 5 seconds of the video are blank or frozen, so the video data effectively starts at 40 seconds.
+    // https://stackoverflow.com/questions/63548027/cut-a-video-in-between-key-frames-without-re-encoding-the-full-video-using-ffpme
     if let Some(start_time_sec) = start_time_sec {
         args.extend_from_slice(&formats!["-ss", "{start_time_sec}"]);
     }
@@ -77,6 +83,7 @@ pub async fn ffmpeg_cut_video_streamcopy(
         let duration = end_time_sec - start_time_sec.unwrap_or(0.0);
         args.extend_from_slice(&formats!["-t", "{duration}"]);
     }
+    args.extend_from_slice(&formats!["-i", "{input_filename}"]); // Input file
     Mapping::AllFromSource.append_args(&mut args);
     VideoSettings::copy().append_args(&mut args);
     AudioSettings::copy().append_args(&mut args);
@@ -107,7 +114,7 @@ pub async fn ffmpeg_process_video(
     };
 
     let mut args = Vec::new();
-    args.extend_from_slice(&formats!["-n", "-i", "{input_filename}"]);
+    args.extend_from_slice(&formats!["-n", "-i", "{input_filename}"]); // `-n` - do not overwirte output file
     mapping.append_args(&mut args);
     video_settings.append_args(&mut args);
     audio_settings.append_args(&mut args);
