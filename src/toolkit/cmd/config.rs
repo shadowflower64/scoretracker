@@ -1,5 +1,6 @@
 use crate::cmd::CmdError;
 use scoretracker::config::Config;
+use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::command_line::{ask_string, ask_yn};
 use scoretracker::util::file_ex::FileEx;
 use scoretracker::util::filelocked::FileLockableDataWithDefaultPath;
@@ -43,11 +44,15 @@ pub fn init() -> Result<(), CmdError> {
         }
     }
 
-    let domain_name = ask_string("name of this device", None)?;
+    let default_library: LibraryDomain = ask_string("default library", None)?.try_into().expect("todo: error handling");
     let default_library_dir_path = ask_string("path to the library directory", None)?.into();
     let shared_data_repo_path = ask_string("path to the shared data repository", None)?.into();
     let config = Config {
-        domain_name,
+        default_library: if default_library.to_string().is_empty() {
+            None
+        } else {
+            Some(default_library)
+        },
         default_library_dir_path,
         shared_data_repo_path,
     };
@@ -72,7 +77,13 @@ pub fn set(key: String, value: String) -> Result<(), CmdError> {
     let mut config = Config::lock_default_and_read(None).map_err(CmdError::ConfigOpenError)?;
 
     match key.as_str() {
-        "domain_name" => config.inner.domain_name = value,
+        "default_library" => {
+            config.inner.default_library = if value.is_empty() {
+                None
+            } else {
+                Some(LibraryDomain::try_from(value).expect("todo: error handling"))
+            }
+        }
         "shared_data_repo_path" => config.inner.shared_data_repo_path = PathBuf::from(value),
         "default_library_dir_path" => config.inner.default_library_dir_path = PathBuf::from(value),
         key => Err(CmdError::InvalidConfigKey(key.to_string()))?,

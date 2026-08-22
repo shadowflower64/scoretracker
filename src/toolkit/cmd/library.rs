@@ -1,15 +1,78 @@
 use crate::cmd::CmdError;
 use function_name::named;
 use scoretracker::config::Config;
-use scoretracker::config::libraries::LibraryTable;
+use scoretracker::config::libraries::{LibraryTable, LibraryTableError};
 use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::data::library::{remove_library_domain_from_db, scan_full};
 use scoretracker::util::file_ex::FileEx;
 use scoretracker::util::filelocked::FileLockableData;
 use scoretracker::{log_fn_name, success_npr};
-use std::path::Path;
+use std::borrow::Cow;
+use std::convert::Infallible;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use thiserror::Error;
 use toml_edit::DocumentMut;
+
+#[derive(Debug, Clone)]
+pub enum LibraryIdentifier {
+    DomainName(LibraryDomain),
+    DirPath(PathBuf),
+}
+
+#[derive(Debug, Error)]
+pub enum LibraryIdentifierError {
+    #[error("cannot load library table: {0}")]
+    CannotLoadLibraryTable(LibraryTableError),
+    #[error("domain not found")]
+    DomainNotFound,
+    #[error("domain has no paths")]
+    DomainHasNoPaths,
+}
+
+impl LibraryIdentifier {
+    pub fn detect_from_pathbuf(path_or_domain: PathBuf) -> Self {
+        let string = path_or_domain.to_string_lossy().to_string();
+        if let Ok(domain) = LibraryDomain::try_from(string) {
+            LibraryIdentifier::DomainName(domain)
+        } else {
+            LibraryIdentifier::DirPath(path_or_domain)
+        }
+    }
+
+    pub fn detect_from_string(path_or_domain: String) -> Self {
+        if let Ok(domain) = LibraryDomain::try_from(path_or_domain.clone()) {
+            LibraryIdentifier::DomainName(domain)
+        } else {
+            LibraryIdentifier::DirPath(PathBuf::from(path_or_domain))
+        }
+    }
+
+    pub fn dir_path(&self) -> Result<Cow<'_, Path>, LibraryIdentifierError> {
+        type E = LibraryIdentifierError;
+        match self {
+            LibraryIdentifier::DomainName(domain) => Ok(Cow::Owned(
+                LibraryTable::load() // TODO: load this only once, like a config file
+                    .map_err(E::CannotLoadLibraryTable)?
+                    .internal_libraries
+                    .get(domain)
+                    .ok_or(E::DomainNotFound)?
+                    .first()
+                    .ok_or(E::DomainHasNoPaths)?
+                    .to_owned(),
+            )),
+            LibraryIdentifier::DirPath(path) => Ok(Cow::Borrowed(path)),
+        }
+    }
+}
+
+impl FromStr for LibraryIdentifier {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::detect_from_string(s.to_string()))
+    }
+}
 
 #[named]
 pub fn init(library_dir: &Path, domain: LibraryDomain) -> Result<(), CmdError> {

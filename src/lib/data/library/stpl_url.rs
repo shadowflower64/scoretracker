@@ -20,8 +20,11 @@ pub struct LibraryDomain(String);
 impl TryFrom<String> for LibraryDomain {
     type Error = StplUrlError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        if value.contains("/") {
+        if value.contains('/') {
             return Err(StplUrlError::DomainNameContainsChar('/'));
+        }
+        if value.contains('\\') {
+            return Err(StplUrlError::DomainNameContainsChar('\\'));
         }
         // TODO: further restrict valid domain names
         Ok(Self(value))

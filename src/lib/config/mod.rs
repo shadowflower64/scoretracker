@@ -4,6 +4,7 @@ use crate::data::library::aux_data::LibraryAuxData;
 use crate::data::library::cache::LibraryCache;
 use crate::data::library::database::LibraryDatabase;
 use crate::data::library::index::LibraryIndex;
+use crate::data::library::stpl_url::LibraryDomain;
 use crate::data::scoreboard::r#match::MatchDatabase;
 use crate::data::scoreboard::performance::PerformanceDatabase;
 use crate::data::scoreboard::player::PlayerDatabase;
@@ -18,9 +19,9 @@ use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
-    pub domain_name: String,
     pub shared_data_repo_path: PathBuf,
     pub default_library_dir_path: PathBuf,
+    pub default_library: Option<LibraryDomain>,
 }
 
 impl Config {

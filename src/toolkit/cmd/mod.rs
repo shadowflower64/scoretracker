@@ -1,6 +1,7 @@
 use crate::arg::{CmdlineArgument, parse_arg, parse_arg_opt};
 use crate::cmd;
 use crate::cmd::CmdError::NoCommandProvided;
+use crate::cmd::library::LibraryIdentifier;
 use crate::error::CmdError;
 use crate::server::config::ServerConfig;
 use crate::server::start::server_main;
@@ -245,15 +246,20 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 cmd::library::install(&library_dir)
             }
             "rescan" => {
-                let library_dir: PathBuf = if let Some(arg) = ctx.pull_arg_opt("library_dir", "path of the library directory")? {
-                    arg
-                } else {
-                    Config::load()
-                        .map_err(CmdError::ConfigReadError)?
-                        .default_library_dir_path
-                        .to_owned()
-                };
-                cmd::library::rescan(&library_dir)
+                let library: LibraryIdentifier =
+                    if let Some(arg) = ctx.pull_arg_opt("library", "library domain name or path to the library directory")? {
+                        Ok(arg)
+                    } else if let Some(default) = &Config::load().map_err(CmdError::ConfigReadError)?.default_library {
+                        Ok(LibraryIdentifier::DomainName(default.clone()))
+                    } else {
+                        Err(CmdError::ArgumentNotProvided {
+                            cmd: "library:rescan".to_string(),
+                            arg_name: "library".to_string(),
+                            arg_desc: "library domain name or path to the library directory".to_string(),
+                        })
+                    }?;
+                let dir_path = library.dir_path().expect("todo: invalid library domain/path");
+                cmd::library::rescan(&dir_path)
             }
             "remove-domain" => {
                 let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;

@@ -1,4 +1,4 @@
-use crate::error::CmdError;
+use crate::{cmd::library::LibraryIdentifier, error::CmdError};
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::hive::jobs::process_library_video::Operation;
 use std::{fmt, path::PathBuf, str::FromStr};
@@ -98,5 +98,11 @@ impl CmdlineArgument for LibraryDomain {
 impl CmdlineArgument for Operation {
     fn arg_type() -> &'static str {
         "video compression preset type"
+    }
+}
+
+impl CmdlineArgument for LibraryIdentifier {
+    fn arg_type() -> &'static str {
+        "library identifier"
     }
 }
