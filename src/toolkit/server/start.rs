@@ -1,7 +1,9 @@
 use super::api;
+use super::api::ApiDoc;
 use super::config::{ServerConfig, ServerConfigError};
 use actix_files::NamedFile;
-use actix_web::{App, HttpServer, get};
+use actix_web::http::StatusCode;
+use actix_web::{App, HttpServer, Scope, get};
 use actix_web::{Error, HttpRequest};
 use function_name::named;
 use relative_path::{Component, RelativePathBuf};
@@ -17,6 +19,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
+use utoipa::{OpenApi, ToSchema};
+use utoipa_swagger_ui::SwaggerUi;
 
 pub const WEB_FRONTEND_DIR_PATH_SEGMENTS: &[&str] = &["web-frontend"];
 pub fn web_frontend_dir_path() -> PathBuf {
@@ -58,6 +62,22 @@ async fn static_handler(req: HttpRequest) -> Result<NamedFile, Error> {
         }) */
     )
 }
+
+// #[get("/openapi.json")]
+// #[named]
+// pub async fn openapi_doc() -> impl Responder {
+//     log_fn_name!(auto);
+//     log_should_print_debug!(true);
+//     debug!("requested openapi doc");
+//     static API_DOC_JSON: LazyLock<String> = LazyLock::new(|| {
+//         debug!("documenting the api...");
+//         match ApiDoc::openapi().to_pretty_json() {
+//             Ok(json) => json,
+//             Err(e) => format!("error: {e}"),
+//         }
+//     });
+//     HttpResponse::Ok().body(API_DOC_JSON.clone())
+// }
 
 mod testing_area {
     use actix_web::{HttpResponse, Responder, get, post};
@@ -122,61 +142,104 @@ pub struct LibraryConnectionInfo {
     pub permissions: AccessRules,
 }
 
+impl LibraryConnectionInfo {
+    pub fn auth_required(&self) -> bool {
+        todo!()
+    }
+    pub fn does_user_have_access(&self, _auth: UserAuth) -> bool {
+        todo!()
+    }
+}
+
 pub struct AppData {
     pub server_config: Arc<ServerConfig>,
     pub connected_libraries: Arc<RwLock<LibraryConnections>>,
 }
 
-#[derive(Serialize)]
-#[serde(tag = "type")]
-pub enum DomainResolveResult {
+#[derive(Serialize, ToSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DomainResolved {
     /// This library lives on this server.
     Internal { url: String },
     /// This library is in another castle.
     External { url: String },
-    /// No authorization to access this domain.
+}
+
+impl DomainResolved {
+    /// Append to the end of URL.
+    pub fn with_path(self, s: &str) -> Self {
+        match self {
+            Self::Internal { url } => Self::Internal { url: format!("{url}/{s}") },
+            Self::External { url } => Self::External { url: format!("{url}/{s}") },
+        }
+    }
+
+    /// Append to the end of URL.
+    pub fn with_path_opt(self, s: Option<&str>) -> Self {
+        if let Some(a) = s { self.with_path(a) } else { self }
+    }
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum DomainResolveResult {
+    /// Resolved successfully
+    Ok { resolved: DomainResolved },
+    /// Authorization required to access this domain.
+    Unauthorized,
+    /// No permission to access this domain.
     Forbidden,
     /// Domain name not known.
     NotKnown,
 }
 
 impl DomainResolveResult {
-    /// Append to the end of URL
-    pub fn with_path(self, s: &str) -> Self {
+    /// Get HTTP status code for this result.
+    pub fn status_code(&self) -> StatusCode {
         match self {
-            Self::Internal { url } => Self::Internal { url: format!("{url}/{s}") },
-            Self::External { url } => Self::External { url: format!("{url}/{s}") },
-            a => a,
+            Self::Ok { .. } => StatusCode::OK,
+            Self::Unauthorized => StatusCode::UNAUTHORIZED,
+            Self::Forbidden => StatusCode::FORBIDDEN,
+            Self::NotKnown => StatusCode::NOT_FOUND,
         }
     }
-    pub fn with_path_opt(self, s: Option<&str>) -> Self {
-        if let Some(a) = s { self.with_path(a) } else { self }
+
+    /// Append to the end of URL.
+    pub fn with_path_opt(self, path: Option<&str>) -> Self {
+        match self {
+            Self::Ok { resolved } => Self::Ok {
+                resolved: resolved.with_path_opt(path),
+            },
+            other => other,
+        }
     }
 }
 
 pub struct UserAuth {}
 
-impl UserAuth {
-    pub fn has_access_to(&self, _conn: &LibraryConnectionInfo) -> bool {
-        todo!()
-    }
-    pub fn guest() -> Self {
-        Self {}
-    }
-}
+impl UserAuth {}
 
 impl AppData {
-    pub fn resolve_domain(&self, domain: &LibraryDomain, auth: UserAuth) -> DomainResolveResult {
-        if let Some(connection_info) = self.connected_libraries.read().unwrap().get(domain) {
-            if !auth.has_access_to(connection_info) {
+    pub fn resolve_domain(&self, domain: &LibraryDomain, auth_opt: Option<UserAuth>) -> DomainResolveResult {
+        let lock = self.connected_libraries.read().unwrap();
+        let Some(connection_info) = lock.get(domain) else {
+            return DomainResolveResult::NotKnown;
+        };
+
+        if connection_info.auth_required() {
+            let Some(auth) = auth_opt else {
+                return DomainResolveResult::Unauthorized;
+            };
+            if !connection_info.does_user_have_access(auth) {
                 return DomainResolveResult::Forbidden;
             }
-            match &connection_info.connection {
-                LibraryConnection::External { url } => DomainResolveResult::External { url: url.clone() },
-                LibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
-            }
-        } else {
-            DomainResolveResult::NotKnown
+        }
+
+        match &connection_info.connection {
+            LibraryConnection::External { url } => DomainResolveResult::Ok {
+                resolved: DomainResolved::External { url: url.clone() },
+            },
+            LibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
         }
     }
 }
@@ -267,14 +330,20 @@ pub async fn server_main() -> Result<(), ServerStartError> {
                 server_config: Arc::clone(&server_config),
                 connected_libraries: Arc::clone(&internal_library_connections),
             })
+            .service(SwaggerUi::new("/swagger-ui/{_:.*}").url("/openapi.json", ApiDoc::openapi()))
+            // .service(openapi_doc) // <- uncomment if swaggerui is not available for some reason
             .service(index)
             .service(static_handler)
             .service(testing_area::echo)
             .service(testing_area::hey)
-            .service(api::r#match::get_match_list)
-            .service(api::r#match::get_match)
-            .service(api::r#match::put_match)
-            .service(api::worker_connect::worker_connect)
+            .service(
+                Scope::new("/api")
+                    .service(api::r#match::get_match_list)
+                    .service(api::r#match::get_match)
+                    .service(api::r#match::put_match)
+                    .service(api::resolve_stpl_url)
+                    .service(api::worker_connect::worker_connect),
+            )
     })
     .bind((HOST, PORT))?
     .run()

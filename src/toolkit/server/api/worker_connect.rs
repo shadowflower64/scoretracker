@@ -173,7 +173,7 @@ pub struct WorkerConnectRequest {
 /// By default, data will be sent via MessagePack.
 ///
 /// Note that both JSON and MessagePack serverbound messages will be accepted by the server in either communication mode.
-#[get("/api/worker_connect")]
+#[get("/worker_connect")]
 #[named]
 pub async fn worker_connect(
     query: web::Query<WorkerConnectRequest>,

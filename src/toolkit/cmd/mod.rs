@@ -303,6 +303,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "gen" => cmd::schema::gen_full(),
             "gen-json" => cmd::schema::gen_json(),
             "gen-types" => cmd::schema::gen_types(),
+            "gen-api" => cmd::schema::gen_api(),
             "clean" => cmd::schema::clean(),
             _ => ctx.unknown_cmd(),
         },

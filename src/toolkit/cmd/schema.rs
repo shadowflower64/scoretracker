@@ -1,4 +1,5 @@
 use crate::error::CmdError;
+use crate::server::api::ApiDoc;
 use fs_extra::file::write_all;
 use function_name::named;
 use scoretracker::data::games::registered_games;
@@ -8,20 +9,28 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::Command;
+use utoipa::OpenApi;
 
 pub const SCHEMAS_DIR: &[&str] = &["gen", "schemas"];
 pub fn schemas_dir_path() -> PathBuf {
     relative_path_from_segments(SCHEMAS_DIR).to_path(".")
 }
 
-pub const TYPES_DIR: &[&str] = &["web-frontend", "static", "ts", "gen", "types"];
+pub const TYPES_DIR: &[&str] = &["web-frontend", "app", "ts", "gen", "types"];
 pub fn types_dir_path() -> PathBuf {
     relative_path_from_segments(TYPES_DIR).to_path(".")
+}
+
+pub const OPENAPI_FILENAME: &str = "openapi.json";
+pub const OPENAPI_FILE: &[&str] = &["web-frontend", OPENAPI_FILENAME];
+pub fn openapi_file_path() -> PathBuf {
+    relative_path_from_segments(OPENAPI_FILE).to_path(".")
 }
 
 pub fn gen_full() -> Result<(), CmdError> {
     gen_json()?;
     gen_types()?;
+    gen_api()?;
     Ok(())
 }
 
@@ -92,6 +101,27 @@ pub fn gen_types() -> Result<(), CmdError> {
         success!("process json2ts finished successfully: {}", out.status)
     } else {
         error!("process json2ts failed: {}", out.status)
+    }
+
+    Ok(())
+}
+
+#[named]
+pub fn gen_api() -> Result<(), CmdError> {
+    log_fn_name!(auto);
+    info!("generating open api schemas from rust types");
+
+    match ApiDoc::openapi().to_pretty_json() {
+        Ok(json) => {
+            println!("{json}");
+            let output_file_path = openapi_file_path();
+            fs::write(&output_file_path, json).expect("todo: error handling");
+            success!("successfully saved open api to: {output_file_path:?}");
+        }
+        Err(e) => {
+            error!("failed to write open api spec: {e}");
+            todo!("bubble up error")
+        }
     }
 
     Ok(())

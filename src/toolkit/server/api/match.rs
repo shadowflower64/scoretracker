@@ -6,7 +6,7 @@ use scoretracker::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
 use scoretracker::util::{filelocked::FileLockableData, uuid::UuidString};
 use scoretracker::{info, log_fn_name};
 
-#[get("/api/match")]
+#[get("/match")]
 #[named]
 pub async fn get_match_list(req: HttpRequest) -> impl Responder {
     log_fn_name!(auto);
@@ -18,7 +18,7 @@ pub async fn get_match_list(req: HttpRequest) -> impl Responder {
     make_get_list_response_ok(match_db.matches)
 }
 
-#[get("/api/match/{uuid}")]
+#[get("/match/{uuid}")]
 #[named]
 pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> impl Responder {
     log_fn_name!(auto);
@@ -33,7 +33,7 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> impl Re
     respond_as_json(ResponseGet::Ok(match_data))
 }
 
-#[put("/api/match/{uuid}")]
+#[put("/match/{uuid}")]
 #[named]
 pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web::Json<AnyMatch>) -> impl Responder {
     log_fn_name!(auto);
