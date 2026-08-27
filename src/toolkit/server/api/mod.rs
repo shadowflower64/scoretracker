@@ -33,14 +33,27 @@ fn respond_as_json_with_status(data: impl Serialize, status: StatusCode) -> Http
 
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
-enum ResponseGetList<T: Serialize> {
-    Ok { items: Vec<T> },
-    _Error,
+pub enum ResponseGetList<T: Serialize> {
+    Ok {
+        items: Vec<T>,
+    },
+    Error {
+        #[serde(skip)]
+        status_code: StatusCode,
+    },
 }
 
-fn make_get_list_response_ok<T: Serialize>(items: Vec<T>) -> HttpResponse {
-    let response = ResponseGetList::Ok { items };
-    HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
+impl<T: Serialize> Responder for ResponseGetList<T> {
+    fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
+        match &self {
+            Self::Ok { .. } => HttpResponse::Ok().body(serde_json::to_string(&self).expect("could not convert response to json")),
+            Self::Error { status_code } => HttpResponse::with_body(
+                *status_code,
+                BoxBody::new(serde_json::to_string(&self).expect("could not convert response to json")),
+            ),
+        }
+    }
+    type Body = BoxBody;
 }
 
 #[derive(Serialize)]
@@ -81,5 +94,5 @@ pub async fn resolve_stpl_url(req: HttpRequest, q: web::Query<ResolveStplUrlRequ
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(resolve_stpl_url))]
+#[openapi(paths(resolve_stpl_url, r#match::get_match, r#match::get_match_list, r#match::put_match))]
 pub struct ApiDoc;
