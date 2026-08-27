@@ -33,6 +33,9 @@ impl ByteCount {
     pub const fn terabytes(tb: f64) -> Self {
         Self::bytes(tb * 1_000_000_000_000f64)
     }
+    pub const fn as_usize(self) -> usize {
+        self.0 as usize
+    }
 }
 
 impl fmt::Display for ByteCount {

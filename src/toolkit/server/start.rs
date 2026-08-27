@@ -271,9 +271,10 @@ pub async fn server_main() -> Result<(), ServerStartError> {
             .service(static_handler)
             .service(testing_area::echo)
             .service(testing_area::hey)
-            .service(api::get_match_list)
-            .service(api::get_match)
-            .service(api::put_match)
+            .service(api::r#match::get_match_list)
+            .service(api::r#match::get_match)
+            .service(api::r#match::put_match)
+            .service(api::worker_connect::worker_connect)
     })
     .bind((HOST, PORT))?
     .run()

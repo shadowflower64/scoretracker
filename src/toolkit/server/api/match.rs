@@ -1,43 +1,10 @@
-use super::start::{AppData, UserAuth};
-use actix_web::{HttpRequest, HttpResponse, Responder, get, put, web};
+use super::super::start::AppData;
+use super::{ResponseGet, ResponsePut, make_get_list_response_ok, respond_as_json};
+use actix_web::{HttpRequest, Responder, get, put, web};
 use function_name::named;
-use scoretracker::data::library::stpl_url::StplUrl;
 use scoretracker::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
-use scoretracker::info;
-use scoretracker::log_fn_name;
-use scoretracker::util::filelocked::FileLockableData;
-use scoretracker::util::uuid::UuidString;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-enum ResponseGet<T: Serialize> {
-    Ok(T),
-    _Error,
-}
-
-fn respond_as_json(data: impl Serialize) -> HttpResponse {
-    HttpResponse::Ok().body(serde_json::to_string(&data).expect("could not convert response to json"))
-}
-
-#[derive(Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-enum ResponseGetList<T: Serialize> {
-    Ok { items: Vec<T> },
-    _Error,
-}
-
-fn make_get_list_response_ok<T: Serialize>(items: Vec<T>) -> HttpResponse {
-    let response = ResponseGetList::Ok { items };
-    HttpResponse::Ok().body(serde_json::to_string(&response).expect("could not convert response to json"))
-}
-
-#[derive(Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-enum ResponsePut<T: Serialize> {
-    Ok { item: T },
-    _Error,
-}
+use scoretracker::util::{filelocked::FileLockableData, uuid::UuidString};
+use scoretracker::{info, log_fn_name};
 
 #[get("/api/match")]
 #[named]
@@ -85,26 +52,4 @@ pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web:
     match_db.insert(match_data).expect("could not insert match into database");
     match_db.save_and_close().expect("could not save match database");
     response
-}
-
-#[derive(Deserialize)]
-pub struct ResolveStplUrlRequest {
-    stpl_url: StplUrl,
-}
-
-#[get("/api/resolve_stpl_url")]
-#[named]
-pub async fn resolve_stpl_url(req: HttpRequest, q: web::Query<ResolveStplUrlRequest>) -> impl Responder {
-    let stpl_url = &q.stpl_url;
-    log_fn_name!(auto);
-    info!("resolving url: {stpl_url}");
-
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
-    let resolved = app_data
-        .resolve_domain(&stpl_url.domain, UserAuth::guest())
-        .with_path_opt(stpl_url.path.as_deref());
-
-    //let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
-    //make_get_list_response_ok(match_db.matches)
-    respond_as_json(resolved)
 }
