@@ -43,10 +43,10 @@ makeTaskBtn.addEventListener("click", async () => {
 
 function testWebsocket() {
     // Create WebSocket connection.
-    var socket = new WebSocket("ws://localhost:8080/api/worker_connect");
+    var socket = new WebSocket("ws://localhost:8080/api/worker_connect?communication_type=json");
 
     // Connection opened
-    socket.addEventListener("open", (event) => {
+    socket.addEventListener("open", (_event) => {
         console.log("WebSocket connection opened");
 
         const msg = { type: "testing_hello", message: "Hello Server!" };
@@ -71,11 +71,11 @@ function testWebsocket() {
     });
 
     socket.addEventListener("close", () => {
-        console.log('Disconnected from the server');
+        console.log("Disconnected from the server");
     });
 
     socket.addEventListener("error", (error) => {
-        console.error('WebSocket error:', error);
+        console.error("WebSocket error:", error);
     });
 }
 testWebsocket();
