@@ -39,3 +39,43 @@ makeTaskBtn.addEventListener("click", async () => {
     });
     console.log(result);
 });
+
+
+function testWebsocket() {
+    // Create WebSocket connection.
+    var socket = new WebSocket("ws://localhost:8080/api/worker_connect");
+
+    // Connection opened
+    socket.addEventListener("open", (event) => {
+        console.log("WebSocket connection opened");
+
+        const msg = { type: "testing_hello", message: "Hello Server!" };
+        socket.send(JSON.stringify(msg));
+        console.log("Message to server ", msg, "(hello message)");
+    });
+
+    // Listen for messages
+    socket.addEventListener("message", (event) => {
+
+        // console.log("Message from server raw ", event.data);
+        const msg = JSON.parse(event.data);
+        console.log("Message from server ", msg);
+
+        if (msg.type === "testing_automated") {
+            setTimeout(() => {
+                const msg = { type: "testing_gotcha", message: `gotcha: ${event.data}` };
+                console.log("Message to server ", msg);
+                socket.send(JSON.stringify(msg));
+            }, 500);
+        }
+    });
+
+    socket.addEventListener("close", () => {
+        console.log('Disconnected from the server');
+    });
+
+    socket.addEventListener("error", (error) => {
+        console.error('WebSocket error:', error);
+    });
+}
+testWebsocket();

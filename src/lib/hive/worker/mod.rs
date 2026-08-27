@@ -3,6 +3,7 @@ pub mod data;
 pub mod ipc;
 pub mod names;
 pub mod status;
+pub mod ws;
 
 use crate::config::Config;
 use crate::data::library::database::LibraryDatabase;
