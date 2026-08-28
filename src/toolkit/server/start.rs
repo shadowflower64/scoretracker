@@ -8,7 +8,8 @@ use actix_web::{App, HttpServer, Scope, get};
 use actix_web::{Error, HttpRequest};
 use function_name::named;
 use relative_path::{Component, RelativePathBuf};
-use scoretracker::config::libraries::LibraryTable;
+use scoretracker::config::library_tab::InternalLibraryConnection;
+use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::filelocked::FileLockableData;
@@ -91,32 +92,6 @@ mod testing_area {
     #[get("/test/hey")]
     pub async fn hey() -> impl Responder {
         HttpResponse::Ok().body("Hey there!")
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-pub enum Status {
-    Available,
-    Unavailable,
-}
-
-#[derive(Debug, Clone)]
-pub struct InternalLibraryConnection {
-    all_paths: Vec<(PathBuf, Status)>,
-}
-
-impl InternalLibraryConnection {
-    pub fn new(mut all_paths: Vec<(PathBuf, Status)>) -> Self {
-        all_paths.sort_by_key(|x| x.1);
-        Self { all_paths }
-    }
-
-    /// Return the first path to the library that was actually available for use when it was loaded.
-    pub fn main_path(&self) -> Option<&Path> {
-        self.all_paths
-            .first()
-            .filter(|(_, status)| *status == Status::Available)
-            .map(|(path, _)| path.as_ref())
     }
 }
 
@@ -298,7 +273,7 @@ pub async fn server_main() -> Result<(), ServerStartError> {
     info!("starting server on: http://{HOST}:{PORT}");
 
     let server_config = Arc::new(ServerConfig::load()?);
-    let library_table = LibraryTable::load().expect("todo: error handling");
+    let library_table = LibraryTab::load().expect("todo: error handling");
     let internal_library_connections = Arc::new(RwLock::new(connect_internal_libraries(&library_table.internal_libraries)));
     {
         let map = internal_library_connections.read().unwrap();

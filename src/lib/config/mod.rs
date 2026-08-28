@@ -1,4 +1,4 @@
-pub mod libraries;
+pub mod library_tab;
 pub mod toml;
 
 use crate::data::library::aux_data::LibraryAuxData;

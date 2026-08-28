@@ -7,8 +7,12 @@ pub mod queue_connection;
 pub mod status;
 pub mod ws;
 
+use crate::config::library_tab::{InternalLibraryConnections, LibraryAccessPath, LibraryTab};
+use crate::config::toml::TomlConfig;
+use crate::data::library::database::LibraryEntry;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
+use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
 use crate::hive::job::{self, Fail, Job, Success};
 use crate::hive::queue::TaskNotFound;
 use crate::hive::task::{Task, TaskResult};
@@ -25,11 +29,12 @@ use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success, warn};
 use crossbeam_channel::Sender;
 use function_name::named;
+use smol::fs::{File, OpenOptions};
 use smol::lock::Mutex;
 use std::borrow::Cow;
 use std::net::TcpListener;
 use std::panic::AssertUnwindSafe;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{io, panic, process, thread};
@@ -89,6 +94,7 @@ pub struct Worker {
     config: WorkerConfig,
     data: Arc<WorkerData>,
     queue_connection: UnwindSafeMutex<QueueConnection>,
+    internal_libraries: InternalLibraryConnections,
     worker_status_tx: Sender<WorkerStatus>,
     task_progress_tx: Sender<TaskProgress>,
 }
@@ -170,45 +176,6 @@ impl Worker {
         format!("{}-{pid}.scoretracker-worker.local", short_name.to_lowercase())
     }
 
-    #[named]
-    fn main_loop(self) {
-        log_fn_name!(auto);
-
-        // Main part
-        match self.config.mode {
-            WorkerMode::Single => info!("created single worker, now taking on a task..."),
-            WorkerMode::Volatile => info!("created volatile worker, now taking on tasks..."),
-            WorkerMode::Persistent => info!("created persistent worker, now taking on tasks..."),
-        }
-
-        let worker = Arc::new(self);
-
-        smol::block_on(async move {
-            loop {
-                if let Some(task_to_do) = worker.take_task().await.expect("todo error handling") {
-                    worker.clone().execute_task(task_to_do).await;
-                } else {
-                    info!("no tasks to do!");
-                    if worker.config.mode.quit_when_no_tasks() {
-                        break;
-                    }
-                }
-
-                // Do not jump back up if the mode does not have looping enabled
-                if !worker.config.mode.enable_loop() {
-                    break;
-                }
-
-                // let the worker rest a little bit...
-                let seconds = worker.config.sleep_duration_seconds;
-                info!("worker sleeping for {seconds} seconds...");
-                thread::sleep(Duration::from_secs_f64(seconds));
-            }
-        });
-
-        info!("exiting");
-    }
-
     /// Initialize a new worker structure, connect to the queue, start ipc threads, and start the worker.
     #[named]
     pub fn start(short_name: String, config: WorkerConfig, persistent: bool) -> Result<(), WorkerStartError> {
@@ -249,6 +216,7 @@ impl Worker {
             worker_status_tx,
             task_progress_tx,
             queue_connection,
+            internal_libraries: LibraryTab::load().expect("todo error handling").scan(),
         };
 
         // Start a local TCP listener for IPC
@@ -265,6 +233,87 @@ impl Worker {
         // Start main loop
         worker.main_loop();
         Ok(())
+    }
+
+    #[named]
+    fn main_loop(self) {
+        log_fn_name!(auto);
+
+        // Main part
+        match self.config.mode {
+            WorkerMode::Single => info!("created single worker, now taking on a task..."),
+            WorkerMode::Volatile => info!("created volatile worker, now taking on tasks..."),
+            WorkerMode::Persistent => info!("created persistent worker, now taking on tasks..."),
+        }
+
+        let worker = Arc::new(self);
+
+        smol::block_on(async move {
+            loop {
+                if let Some(task_to_do) = worker.take_task().await.expect("todo error handling") {
+                    worker.clone().execute_task(task_to_do).await;
+                } else {
+                    info!("no tasks to do!");
+                    if worker.config.mode.quit_when_no_tasks() {
+                        break;
+                    }
+                }
+
+                // Do not jump back up if the mode does not have looping enabled
+                if !worker.config.mode.enable_loop() {
+                    break;
+                }
+
+                // let the worker rest a little bit...
+                let seconds = worker.config.sleep_duration_seconds;
+                info!("worker sleeping for {seconds} seconds...");
+                thread::sleep(Duration::from_secs_f64(seconds));
+            }
+        });
+
+        info!("exiting");
+    }
+
+    /// Execute a task from the queue in the current thread.
+    ///
+    /// Please note that executing a task may take a long time.
+    ///
+    /// This function will mark the task as being worked on and write to the [`TaskQueue`] file using [`lockfile`];
+    /// only after marking the task in the queue will the task start being executed.
+    /// After the task finishes, the results of the task are written automatically to the queue file.
+    #[named]
+    pub async fn execute_task(self: Arc<Self>, task: Task) {
+        log_fn_name!("worker" : auto);
+        info!("taking on task with uuid: {}", task.uuid.0);
+        info!("starting task: {:?}", task);
+
+        // Update worker state
+        {
+            let mut status = self.data.status.lock().await;
+            status.state = WorkerState::Working;
+            status.current_task = Some(task.uuid);
+        }
+
+        // Do the task
+        let result = self.clone().execute_task_body(&task).await;
+        let finish_timestamp = NsTimestamp::now();
+
+        // Send an update about the state of the task to the queue file/server
+        match result {
+            Ok(success) => {
+                self.update_task_state(task.uuid.0, TaskResult::Success(success), finish_timestamp);
+            }
+            Err(fail) => {
+                self.update_task_state(task.uuid.0, TaskResult::Error(fail), finish_timestamp);
+            }
+        }
+
+        // Update worker state
+        {
+            let mut status = self.data.status.lock().await;
+            status.state = WorkerState::Finished;
+            status.current_task = None;
+        }
     }
 
     /// Execute a task in the current thread.
@@ -306,54 +355,6 @@ impl Worker {
         }
     }
 
-    /// Execute a task from the queue in the current thread.
-    ///
-    /// Please note that executing a task may take a long time.
-    ///
-    /// This function will mark the task as being worked on and write to the [`TaskQueue`] file using [`lockfile`];
-    /// only after marking the task in the queue will the task start being executed.
-    /// After the task finishes, the results of the task are written automatically to the queue file.
-    #[named]
-    pub async fn execute_task(self: Arc<Self>, task: Task) {
-        log_fn_name!("worker" : auto);
-        info!("taking on task with uuid: {}", task.uuid.0);
-        info!("starting task: {:?}", task);
-
-        // Update worker state
-        {
-            let mut status = self.data.status.lock().await;
-            status.state = WorkerState::Working;
-            status.current_task = Some(task.uuid);
-        }
-
-        // Do the task
-        let result = self.clone().execute_task_body(&task).await;
-        let finish_timestamp = NsTimestamp::now();
-
-        // Send an update about the state of the task to the queue file/server
-        match result {
-            Ok(success) => {
-                self.update_task_state(task.uuid.0, TaskResult::Success(success), finish_timestamp);
-                // task.state = TaskState::Done;
-                // task.result = Some(TaskResult::Success(success));
-                // task.finish_timestamp = Some(NsTimestamp::now());
-            }
-            Err(fail) => {
-                self.update_task_state(task.uuid.0, TaskResult::Error(fail), finish_timestamp);
-                // task.state = TaskState::Failed;
-                // task.result = Some(TaskResult::Error(fail));
-                // task.finish_timestamp = Some(NsTimestamp::now());
-            }
-        }
-
-        // Update worker state
-        {
-            let mut status = self.data.status.lock().await;
-            status.state = WorkerState::Finished;
-            status.current_task = None;
-        }
-    }
-
     /// Fetch a task from the queue and mark it as being worked on.
     ///
     /// This function will either connect to the server or use the local queue file. In both cases, the task will be marked as being worked on by this function.
@@ -378,5 +379,41 @@ impl Worker {
             .await
             .update_task_state(task_uuid, result, finish_timestamp, Cow::Borrowed(self.info()))
             .await
+    }
+
+    /// Fetches information about a library entry from the server.
+    pub async fn fetch_library_entry_by_uuid(&self, proof_uuid: Uuid) -> Result<Option<LibraryEntry>, WorkerError> {
+        todo!()
+    }
+
+    /// Returns a file path to the root of the specified library, if it is locally available (defined in the [`LibraryTable`] file).
+    pub async fn library_local_dir(&self, domain: LibraryDomain) -> Option<&LibraryAccessPath> {
+        let internal_library_connections = &self.internal_libraries;
+        internal_library_connections.get_main_path(&domain)
+    }
+
+    /// Fetches a proof from a proof library using the provided URL.
+    ///
+    /// This function may take a long time to finish as the file may need to be downloaded from an external server.
+    /// For local libraries, the file is opened directly in read only mode; it is not copied.
+    pub async fn download_proof_file(&self, url: StplUrl) -> Result<File, WorkerError> {
+        if let Some(library_local_dir) = self.library_local_dir(url.domain).await {
+            let resource_path = url.path.expect("todo error handling: stpl url has to have a resource path");
+            let file_path = library_local_dir.path.join(resource_path);
+            let file = OpenOptions::new().read(true).open(file_path).await.expect("todo error handling");
+            Ok(file)
+        } else {
+            todo!()
+        }
+    }
+
+    /// Creates a new random file path for temporary files or files generated by the worker.
+    pub fn create_temp_path(&self) -> PathBuf {
+        todo!()
+    }
+
+    /// Uploads a specified file into the specified library location.
+    pub fn upload_file_to_library(&self, file_to_upload: &Path, target_location: StplUrl) -> Result<(), WorkerError> {
+        todo!()
     }
 }

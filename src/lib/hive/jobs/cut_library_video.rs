@@ -61,12 +61,10 @@ impl Job for CutLibraryVideoJob {
         }
 
         // Get source proof entry from the database
-        let library_db = worker.read_library_db()?;
-        let proof_entry = library_db
-            .find_entry_by_uuid(source_proof_uuid.0)
-            .ok_or(Fail::EntryNotFound(*source_proof_uuid))?
-            .to_owned();
-        drop(library_db);
+        let proof_entry = worker
+            .fetch_library_entry_by_uuid(source_proof_uuid)
+            .await?
+            .ok_or(Fail::EntryNotFound(source_proof_uuid.into()))?;
 
         // Sanity check - proof entry with the given UUID should contain the given URL.
         // If it doesn't, that means the library needs to be rescanned or the request was invalid.
@@ -80,10 +78,11 @@ impl Job for CutLibraryVideoJob {
         }
 
         // Launch ffmpeg to cut the video losslessly
+        let output_path = worker.create_temp_path();
         let worker2 = Arc::clone(&worker);
         ffmpeg_cut_video_streamcopy(
             &self.source_path,
-            &self.destination_path,
+            &output_path,
             self.cut_start_point.map(|x| x.as_secs_f64()),
             self.cut_end_point.map(|x| x.as_secs_f64()),
             move |progress| {

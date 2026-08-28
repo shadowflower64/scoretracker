@@ -162,12 +162,10 @@ impl Job for ProcessLibraryVideoJob {
         }
 
         // Get source proof entry from the database
-        let library_db = worker.read_library_db()?;
-        let proof_entry = library_db
-            .find_entry_by_uuid(source_proof_uuid)
-            .ok_or(Fail::EntryNotFound(source_proof_uuid.into()))?
-            .to_owned();
-        drop(library_db);
+        let proof_entry = worker
+            .fetch_library_entry_by_uuid(source_proof_uuid)
+            .await?
+            .ok_or(Fail::EntryNotFound(source_proof_uuid.into()))?;
 
         // Sanity check - proof entry with the given UUID should contain the given URL.
         // If it doesn't, that means the library needs to be rescanned or the request was invalid.
@@ -181,8 +179,9 @@ impl Job for ProcessLibraryVideoJob {
         }
 
         // Launch ffmpeg to cut the video losslessly
+        let output_path = worker.create_temp_path();
         let worker2 = Arc::clone(&worker);
-        ffmpeg_process_video(&self.source_path, &self.destination_path, self.operation, move |progress| {
+        ffmpeg_process_video(&self.source_path, &output_path, self.operation, move |progress| {
             worker2.update_task_progress_very_simple(format!("{progress:?}"));
         })
         .await?;
@@ -190,6 +189,8 @@ impl Job for ProcessLibraryVideoJob {
         // Get library info of the destination file
         let wet = if let Some(destination_library_dir) = get_library_dir_of_path(&self.source_path) {
             // Register new file to index and to database
+            worker.upload_file_to_library(self.destination_path);
+
             let (_rel_path, uuid) = scan_register_added_file(
                 &destination_library_dir,
                 &config.library_database_path(),

@@ -4,7 +4,7 @@ use crate::cmd::CmdError::NoCommandProvided;
 use crate::cmd::library::LibraryIdentifier;
 use crate::error::CmdError;
 use scoretracker::config::Config;
-use scoretracker::config::libraries::LibraryTable;
+use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
@@ -265,8 +265,8 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             }
             "table" => match ctx.cmd()? {
                 "init" => {
-                    let path = LibraryTable::default_path();
-                    LibraryTable::default().write_new(&path)?;
+                    let path = LibraryTab::default_path();
+                    LibraryTab::default().write_new(&path)?;
                     success_npr!("empty library table successfully written to: {path:?}");
                     Ok(())
                 }

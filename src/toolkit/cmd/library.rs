@@ -1,7 +1,7 @@
 use crate::cmd::CmdError;
 use function_name::named;
 use scoretracker::config::Config;
-use scoretracker::config::libraries::{LibraryTable, LibraryTableError};
+use scoretracker::config::library_tab::{LibraryTab, LibraryTableError};
 use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::data::library::{remove_library_domain_from_db, scan_full};
@@ -53,7 +53,7 @@ impl LibraryIdentifier {
         type E = LibraryIdentifierError;
         match self {
             LibraryIdentifier::DomainName(domain) => Ok(Cow::Owned(
-                LibraryTable::load() // TODO: load this only once, like a config file
+                LibraryTab::load() // TODO: load this only once, like a config file
                     .map_err(E::CannotLoadLibraryTable)?
                     .internal_libraries
                     .get(domain)
@@ -95,7 +95,7 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
     let info =
         LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(CmdError::LibraryInfoReadError)?;
 
-    let source_toml = LibraryTable::load_raw()?;
+    let source_toml = LibraryTab::load_raw()?;
     let mut document: DocumentMut = source_toml.parse().expect("todo: invalid library table");
 
     let internal_libraries_tab = document["internal_libraries"].as_table_mut().expect("todo: invalid library table");
@@ -117,7 +117,7 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
     }
 
     let modified_toml = document.to_string();
-    LibraryTable::write_raw(LibraryTable::default_path(), &modified_toml).expect("todo: write error");
+    LibraryTab::write_raw(LibraryTab::default_path(), &modified_toml).expect("todo: write error");
 
     success_npr!("installed library with domain '{}'", info.domain);
     Ok(())

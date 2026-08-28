@@ -1,4 +1,4 @@
-use scoretracker::config::libraries::LibraryTableError;
+use scoretracker::config::library_tab::LibraryTableError;
 use scoretracker::util::{command_line::AskError, file_ex, lockfile};
 use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerStartError, spreadsheet::SpreadsheetImportError};
 use std::path::PathBuf;
