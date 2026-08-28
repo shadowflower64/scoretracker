@@ -19,37 +19,7 @@ use std::time::{Duration, SystemTime};
 #[named]
 pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
     log_fn_name!("cmd" : auto);
-
-    let worker = Arc::new(Worker::new_default()?);
-    if persistent {
-        info!("created persistent worker, now taking on tasks...");
-    } else {
-        info!("created volatile worker, now taking on a task...");
-    }
-
-    smol::block_on(async {
-        loop {
-            match worker.clone().take_on_task().await {
-                Ok(_) => {
-                    success!("worker task finished successfully");
-                }
-                Err(e) => {
-                    error!("worker task returned error: {e}");
-                    break; // TODO: detect  if there are no tasks, and wait for new tasks in that case (for persistent workers only)
-                }
-            }
-
-            if !persistent {
-                break;
-            }
-
-            // let the worker rest a little bit...
-            info!("worker sleeping for 5 seconds...");
-            thread::sleep(Duration::from_secs(5));
-        }
-    });
-
-    info!("exiting");
+    Worker::start_default(persistent)?;
     Ok(())
 }
 

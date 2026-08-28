@@ -308,8 +308,8 @@ fn start_connection_thread(
 pub fn start_listener_thread(
     listener: TcpListener,
     worker_data: Arc<Mutex<WorkerData>>,
-    worker_status_rx: Receiver<WorkerStatus>,
-    task_progress_rx: Receiver<TaskProgress>,
+    worker_status_rx: Arc<Receiver<WorkerStatus>>,
+    task_progress_rx: Arc<Receiver<TaskProgress>>,
 ) {
     log_fn_name!(auto);
 
@@ -320,9 +320,6 @@ pub fn start_listener_thread(
             return;
         }
     };
-
-    let worker_status_rx = Arc::new(worker_status_rx);
-    let task_progress_rx = Arc::new(task_progress_rx);
 
     if let Err(e) = thread::Builder::new().name("worker:tcp_listener".to_string()).spawn(move || {
         info!("start listening on {local_address}");

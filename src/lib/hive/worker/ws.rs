@@ -1,4 +1,10 @@
+use std::sync::Arc;
+
+use crossbeam_channel::Receiver;
+use function_name::named;
 use serde::{Deserialize, Serialize};
+
+use crate::hive::worker::data::{TaskProgress, WorkerStatus};
 
 /// Capabilities of this worker
 ///
@@ -39,4 +45,10 @@ pub enum ClientboundMessage {
     TestingLater { message: String },
     TestingIHeard { message: String },
     TestingAutomated { message: String },
+}
+
+#[named]
+pub fn start_server_connection_thread(worker_status_rx: Arc<Receiver<WorkerStatus>>, task_progress_rx: Arc<Receiver<TaskProgress>>) {
+    const API_SERVER: &str = "127.0.0.1:8080";
+    tungstenite::connect(format!("wss://{API_SERVER}/api/worker_connect")).expect("todo");
 }

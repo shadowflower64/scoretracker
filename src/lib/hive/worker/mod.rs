@@ -15,18 +15,21 @@ use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
 use crate::hive::worker::ipc::start_listener_thread;
 use crate::hive::worker::names::random_name;
+use crate::hive::worker::ws::start_server_connection_thread;
 use crate::util::dirs::log_dir;
 use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault, FileLocked};
 use crate::util::log::{LogError, open_log_file};
 use crate::util::timestamp::NsTimestamp;
 use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success, warn};
+use actix_web::dev::Url;
 use crossbeam_channel::Sender;
 use function_name::named;
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::{io, panic, process};
+use std::time::Duration;
+use std::{io, panic, process, thread};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -169,13 +172,14 @@ impl Worker {
 
     /// Create a new worker structure and start the TCP listener thread.
     #[named]
-    pub fn new_with_listener(short_name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
+    pub fn start(short_name: String, config: Config, persistent: bool) -> Result<(), WorkerCreateError> {
         log_fn_name!("worker" : auto);
 
         let pid = process::id();
         let full_name = Self::make_full_name(&short_name, pid);
         info!("creating worker with name: '{full_name}'");
 
+        let listener = TcpListener::bind("127.0.0.1:0").map_err(WorkerCreateError::TcpListenerBindError)?;
         let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
         let info = WorkerInfo {
             full_name,
@@ -198,14 +202,54 @@ impl Worker {
             worker_status_tx,
             task_progress_tx,
         };
-        start_listener_thread(listener, Arc::clone(worker.data()), worker_status_rx, task_progress_rx);
-        Ok(worker)
-    }
 
-    /// Create a new worker structure and a TCP listener.
-    pub fn new(short_name: String, config: Config) -> Result<Self, WorkerCreateError> {
-        let listener = TcpListener::bind("127.0.0.1:0").map_err(WorkerCreateError::TcpListenerBindError)?;
-        Self::new_with_listener(short_name, config, listener)
+        let worker_status_rx = Arc::new(worker_status_rx);
+        let task_progress_rx = Arc::new(task_progress_rx);
+
+        // Start a local TCP listener for IPC
+        start_listener_thread(
+            listener,
+            Arc::clone(worker.data()),
+            Arc::clone(&worker_status_rx),
+            Arc::clone(&task_progress_rx),
+        );
+
+        // Connect to the central server
+        start_server_connection_thread(Arc::clone(&worker_status_rx), Arc::clone(&task_progress_rx));
+
+        // Main part
+        if persistent {
+            info!("created persistent worker, now taking on tasks...");
+        } else {
+            info!("created volatile worker, now taking on a task...");
+        }
+
+        let worker = Arc::new(worker);
+        smol::block_on(async {
+            loop {
+                match worker.clone().take_on_task().await {
+                    Ok(_) => {
+                        success!("worker task finished successfully");
+                    }
+                    Err(e) => {
+                        error!("worker task returned error: {e}");
+                        break; // TODO: detect  if there are no tasks, and wait for new tasks in that case (for persistent workers only)
+                    }
+                }
+
+                if !persistent {
+                    break;
+                }
+
+                // let the worker rest a little bit...
+                info!("worker sleeping for 5 seconds...");
+                thread::sleep(Duration::from_secs(5));
+            }
+        });
+
+        info!("exiting");
+
+        Ok(())
     }
 
     /// Create a full worker name from a short name (usually chosen randomly from [`names`]) and a process ID (pid) number.
@@ -214,9 +258,9 @@ impl Worker {
     }
 
     /// Create a new worker structure and a TCP listener with a randomly chosen name and a default config.
-    pub fn new_default() -> Result<Self, WorkerCreateError> {
+    pub fn start_default(persistent: bool) -> Result<(), WorkerCreateError> {
         let config = Config::load()?;
-        Self::new(random_name().to_owned(), config.clone())
+        Self::start(random_name().to_owned(), config.clone(), persistent)
     }
 
     /// Execute a task in the current thread.
