@@ -2001,6 +2001,7 @@ dependencies = [
  "crossbeam-channel",
  "ctrlc",
  "directories",
+ "dyn-clone",
  "fs_extra",
  "function_name",
  "indexmap",

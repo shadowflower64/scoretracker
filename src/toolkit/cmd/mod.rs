@@ -3,8 +3,6 @@ use crate::cmd;
 use crate::cmd::CmdError::NoCommandProvided;
 use crate::cmd::library::LibraryIdentifier;
 use crate::error::CmdError;
-use crate::server::config::ServerConfig;
-use crate::server::start::server_main;
 use scoretracker::config::Config;
 use scoretracker::config::libraries::LibraryTable;
 use scoretracker::data::library::stpl_url::LibraryDomain;
@@ -303,21 +301,37 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "gen" => cmd::schema::gen_full(),
             "gen-json" => cmd::schema::gen_json(),
             "gen-types" => cmd::schema::gen_types(),
+
+            #[cfg(feature = "toolkit-server")]
             "gen-api" => cmd::schema::gen_api(),
+
             "clean" => cmd::schema::clean(),
             _ => ctx.unknown_cmd(),
         },
         "server" => match ctx.cmd()? {
             "init" => {
-                let path = ServerConfig::default_path();
-                ServerConfig::default().write_new(&path)?;
-                success_npr!("config successfully written to: {path:?}");
-                Ok(())
+                #[cfg(feature = "toolkit-server")]
+                {
+                    use crate::server::config::ServerConfig;
+                    let path = ServerConfig::default_path();
+                    ServerConfig::default().write_new(&path)?;
+                    success_npr!("config successfully written to: {path:?}");
+                    Ok(())
+                }
+
+                #[cfg(not(feature = "toolkit-server"))]
+                Err(CmdError::ServerNotIncluded)
             }
             "start" => {
-                // info_npr!("starting web application");
-                server_main()?;
-                Ok(())
+                #[cfg(feature = "toolkit-server")]
+                {
+                    use crate::server::start::server_main;
+                    server_main()?;
+                    Ok(())
+                }
+
+                #[cfg(not(feature = "toolkit-server"))]
+                Err(CmdError::ServerNotIncluded)
             }
             _ => ctx.unknown_cmd(),
         },

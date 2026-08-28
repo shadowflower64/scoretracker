@@ -1,5 +1,4 @@
 use crate::error::CmdError;
-use crate::server::api::ApiDoc;
 use fs_extra::file::write_all;
 use function_name::named;
 use scoretracker::data::games::registered_games;
@@ -9,7 +8,6 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::Command;
-use utoipa::OpenApi;
 
 pub const SCHEMAS_DIR: &[&str] = &["gen", "schemas"];
 pub fn schemas_dir_path() -> PathBuf {
@@ -30,6 +28,7 @@ pub fn openapi_file_path() -> PathBuf {
 pub fn gen_full() -> Result<(), CmdError> {
     gen_json()?;
     gen_types()?;
+    #[cfg(feature = "toolkit-server")]
     gen_api()?;
     Ok(())
 }
@@ -107,7 +106,11 @@ pub fn gen_types() -> Result<(), CmdError> {
 }
 
 #[named]
+#[cfg(feature = "toolkit-server")]
 pub fn gen_api() -> Result<(), CmdError> {
+    use crate::server::api::ApiDoc;
+    use utoipa::OpenApi;
+
     log_fn_name!(auto);
     info!("generating open api schemas from rust types");
 

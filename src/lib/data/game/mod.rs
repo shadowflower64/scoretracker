@@ -18,7 +18,7 @@ pub trait Game: Debug {
     fn pretty_name(&self) -> &'static str;
     fn url_shortname(&self) -> &'static str;
 
-    fn ask_for_performance_new(&self) -> Result<AnyPerformance, AskError> {
+    fn ask_for_performance_new(&self) -> Result<Box<AnyPerformance>, AskError> {
         unimplemented!("not implemented for game '{}'", self.identifier())
     }
 

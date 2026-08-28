@@ -7,6 +7,7 @@ use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
 use crate::util::timestamp::{NsDuration, NsTimestamp};
 use crate::util::{command_line::AskError, uuid::UuidString};
+use dyn_clone::{DynClone, clone_trait_object};
 use indexmap::IndexMap;
 use relative_path::{RelativePath, RelativePathBuf};
 use schemars::JsonSchema;
@@ -41,7 +42,7 @@ pub struct CommonMatchInfo {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait MatchTrait: Debug {
+pub trait MatchTrait: Debug + DynClone {
     fn common(&self) -> &CommonMatchInfo;
     fn game_id(&self) -> &'static str {
         self.typetag_name()
@@ -79,11 +80,13 @@ pub trait MatchTrait: Debug {
     }
 }
 
-pub type AnyMatch = Box<dyn MatchTrait>;
+clone_trait_object! {MatchTrait}
+
+pub type AnyMatch = dyn MatchTrait + 'static;
 
 #[derive(Debug, Default)]
 pub struct MatchDatabase {
-    pub matches: Vec<AnyMatch>,
+    pub matches: Vec<Box<AnyMatch>>,
 }
 
 #[derive(Debug, Error)]
@@ -103,7 +106,11 @@ impl MatchDatabase {
         &CACHE
     }
 
-    pub fn find_other_close_matches(&self, req_m: &dyn MatchTrait, threshold: NsDuration) -> Vec<(&dyn MatchTrait, NsDuration)> {
+    pub fn find_other_close_matches(
+        &self,
+        req_m: &dyn MatchTrait,
+        threshold: NsDuration,
+    ) -> Vec<(&(dyn MatchTrait + 'static), NsDuration)> {
         let mut search_results = self
             .matches
             .iter()
@@ -116,15 +123,15 @@ impl MatchDatabase {
         search_results
     }
 
-    pub fn find_match_by_uuid(&self, uuid: UuidString) -> Option<&dyn MatchTrait> {
+    pub fn find_match_by_uuid(&self, uuid: UuidString) -> Option<&AnyMatch> {
         self.matches.iter().find(|x| x.uuid() == uuid).map(|x| x.as_ref())
     }
 
     pub fn find_match_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut AnyMatch> {
-        self.matches.iter_mut().find(|x| x.uuid() == uuid)
+        self.matches.iter_mut().find(|x| x.uuid() == uuid).map(|x| x.as_mut())
     }
 
-    pub fn insert(&mut self, match_data: AnyMatch) -> Result<Uuid, InsertError> {
+    pub fn insert(&mut self, match_data: Box<AnyMatch>) -> Result<Uuid, InsertError> {
         let threshold = NsDuration::from_secs_f64(Self::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
         if let Some((close_match, how_close)) = self.find_other_close_matches(match_data.as_ref(), threshold).first() {
             return Err(InsertError::TooClose(close_match.uuid().0, *how_close));

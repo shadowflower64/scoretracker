@@ -1,5 +1,3 @@
-use crate::server::config::ServerConfigError;
-use crate::server::start::ServerStartError;
 use scoretracker::config::libraries::LibraryTableError;
 use scoretracker::util::{command_line::AskError, file_ex, lockfile};
 use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerCreateError, spreadsheet::SpreadsheetImportError};
@@ -7,6 +5,9 @@ use std::path::PathBuf;
 use std::{io, process::ExitCode};
 use thiserror::Error;
 use uuid::Uuid;
+
+#[cfg(feature = "toolkit-server")]
+use crate::server::{config::ServerConfigError, start::ServerStartError};
 
 #[derive(Debug, Error)]
 pub enum CmdError {
@@ -91,10 +92,14 @@ pub enum CmdError {
     WorkerCreateError(#[from] WorkerCreateError),
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
+
+    #[cfg(feature = "toolkit-server")]
     #[error("server start error: {0}")]
     ServerStartError(#[from] ServerStartError),
+    #[cfg(feature = "toolkit-server")]
     #[error("server config error: {0}")]
     ServerConfigError(#[from] ServerConfigError),
+
     #[error("library table error: {0}")]
     LibraryTableError(#[from] LibraryTableError),
     // ---
@@ -109,6 +114,11 @@ pub enum CmdError {
     // ---
     #[error("library needs to be rescanned: uuid not found in library database: {0}")]
     LibraryRescanNeeded(Uuid),
+    // ---
+    #[error(
+        "the server is not included in this build of scoretracker-toolkit; please compile the project with the `server` feature enabled to start the server from this binary."
+    )]
+    ServerNotIncluded,
 }
 
 impl CmdError {
@@ -150,11 +160,17 @@ impl CmdError {
             Self::PlayerAlreadyInDatabase(..) => 35,
             Self::ConfigSerializationError(..) => 36,
             Self::CreateDirAllError(..) => 37,
+
+            #[cfg(feature = "toolkit-server")]
             Self::ServerStartError(..) => 38,
+            #[cfg(feature = "toolkit-server")]
             Self::ServerConfigError(..) => 39,
+
             Self::LibraryTableError(..) => 40,
             // ---
             Self::LibraryRescanNeeded(..) => 51,
+            // ---
+            Self::ServerNotIncluded => 61,
         }
         .into()
     }

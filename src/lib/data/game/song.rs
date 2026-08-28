@@ -43,7 +43,7 @@ pub trait SongTrait: Debug {
     }
 }
 
-pub type AnySong = Box<dyn SongTrait>;
+pub type AnySong = dyn SongTrait + 'static;
 
 #[derive(Deserialize, Serialize)]
 pub struct GameSongList<Song: SongTrait> {

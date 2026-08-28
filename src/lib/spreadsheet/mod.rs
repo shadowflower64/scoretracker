@@ -32,8 +32,6 @@ use std::path::Path;
 use std::{fmt, fs};
 use thiserror::Error;
 
-pub type SongList = Vec<AnySong>;
-
 pub enum ContinueOrQuit<E> {
     Continue(E),
     Quit(E),
@@ -60,8 +58,8 @@ impl From<BadRecordError> for ContinueOrQuit<BadRecordError> {
     }
 }
 
-pub type ParseMatchRecordResult = ParseRecordResult<(AnyMatch, Vec<AnyPerformance>)>;
-pub type ParseSongRecordResult = ParseRecordResult<AnySong>;
+pub type ParseMatchRecordResult = ParseRecordResult<(Box<AnyMatch>, Vec<Box<AnyPerformance>>)>;
+pub type ParseSongRecordResult = ParseRecordResult<Box<AnySong>>;
 
 #[derive(Debug, Error)]
 pub enum BadRecordError {
@@ -262,8 +260,8 @@ fn import_org_spreadsheet_matches(
     game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
-    matches: &mut Vec<AnyMatch>,
-    performances: &mut Vec<AnyPerformance>,
+    matches: &mut Vec<Box<AnyMatch>>,
+    performances: &mut Vec<Box<AnyPerformance>>,
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
     import_org_spreadsheet_page(
@@ -288,11 +286,13 @@ fn import_org_spreadsheet_matches(
     )
 }
 
+type SongList = Vec<Box<AnySong>>;
+
 fn import_org_spreadsheet_songs(
     game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
-    song_lists: &mut Vec<Vec<AnySong>>,
+    song_lists: &mut Vec<SongList>,
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
     let mut song_list = Vec::new();

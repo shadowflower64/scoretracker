@@ -5,6 +5,8 @@ use std::{env::args, process::ExitCode};
 pub mod arg;
 pub mod cmd;
 pub mod error;
+
+#[cfg(feature = "toolkit-server")]
 pub mod server;
 
 fn main() -> ExitCode {

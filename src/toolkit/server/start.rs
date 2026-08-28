@@ -1,5 +1,6 @@
 use super::api;
 use super::api::ApiDoc;
+use super::api::ApiError;
 use super::config::{ServerConfig, ServerConfigError};
 use actix_files::NamedFile;
 use actix_web::http::StatusCode;
@@ -180,37 +181,23 @@ impl DomainResolved {
     }
 }
 
-#[derive(Serialize, ToSchema)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum DomainResolveResult {
-    /// Resolved successfully
-    Ok { resolved: DomainResolved },
-    /// Authorization required to access this domain.
+#[derive(Serialize, ToSchema, Debug, Error)]
+#[serde(tag = "error_kind", rename_all = "snake_case")]
+pub enum DomainResolveError {
+    #[error("authorization required to access this domain")]
     Unauthorized,
-    /// No permission to access this domain.
+    #[error("no permission to access this domain")]
     Forbidden,
-    /// Domain name not known.
+    #[error("domain name not known")]
     NotKnown,
 }
 
-impl DomainResolveResult {
-    /// Get HTTP status code for this result.
-    pub fn status_code(&self) -> StatusCode {
+impl ApiError for DomainResolveError {
+    fn status_code(&self) -> StatusCode {
         match self {
-            Self::Ok { .. } => StatusCode::OK,
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotKnown => StatusCode::NOT_FOUND,
-        }
-    }
-
-    /// Append to the end of URL.
-    pub fn with_path_opt(self, path: Option<&str>) -> Self {
-        match self {
-            Self::Ok { resolved } => Self::Ok {
-                resolved: resolved.with_path_opt(path),
-            },
-            other => other,
         }
     }
 }
@@ -220,25 +207,23 @@ pub struct UserAuth {}
 impl UserAuth {}
 
 impl AppData {
-    pub fn resolve_domain(&self, domain: &LibraryDomain, auth_opt: Option<UserAuth>) -> DomainResolveResult {
+    pub fn resolve_domain(&self, domain: &LibraryDomain, auth_opt: Option<UserAuth>) -> Result<DomainResolved, DomainResolveError> {
         let lock = self.connected_libraries.read().unwrap();
         let Some(connection_info) = lock.get(domain) else {
-            return DomainResolveResult::NotKnown;
+            return Err(DomainResolveError::NotKnown);
         };
 
         if connection_info.auth_required() {
             let Some(auth) = auth_opt else {
-                return DomainResolveResult::Unauthorized;
+                return Err(DomainResolveError::Unauthorized);
             };
             if !connection_info.does_user_have_access(auth) {
-                return DomainResolveResult::Forbidden;
+                return Err(DomainResolveError::Forbidden);
             }
         }
 
         match &connection_info.connection {
-            LibraryConnection::External { url } => DomainResolveResult::Ok {
-                resolved: DomainResolved::External { url: url.clone() },
-            },
+            LibraryConnection::External { url } => Ok(DomainResolved::External { url: url.clone() }),
             LibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
         }
     }

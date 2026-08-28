@@ -104,18 +104,18 @@ pub trait PerformanceTrait: Debug {
     }
 }
 
-pub type AnyPerformance = Box<dyn PerformanceTrait>;
+pub type AnyPerformance = dyn PerformanceTrait + 'static;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct PerformanceEntry {
-    pub perf: AnyPerformance,
+    pub perf: Box<AnyPerformance>,
     #[serde(skip)]
     pub cached_timestamp: Cell<Option<NsTimestamp>>,
 }
 
 impl Deref for PerformanceEntry {
-    type Target = AnyPerformance;
+    type Target = Box<AnyPerformance>;
     fn deref(&self) -> &Self::Target {
         &self.perf
     }
@@ -183,15 +183,15 @@ impl PerformanceDatabase {
         Ok(search_results)
     }
 
-    pub fn find_performance_by_uuid(&self, uuid: UuidString) -> Option<&dyn PerformanceTrait> {
+    pub fn find_performance_by_uuid(&self, uuid: UuidString) -> Option<&AnyPerformance> {
         self.performances.iter().find(|x| x.uuid() == uuid).map(|x| x.as_ref())
     }
 
     pub fn find_performance_by_uuid_mut(&mut self, uuid: UuidString) -> Option<&mut AnyPerformance> {
-        self.performances.iter_mut().find(|x| x.uuid() == uuid).map(|x| x.deref_mut())
+        self.performances.iter_mut().find(|x| x.uuid() == uuid).map(|x| x.as_mut())
     }
 
-    pub fn insert(&mut self, performance: AnyPerformance, match_db: &MatchDatabase) -> Result<Uuid, InsertError> {
+    pub fn insert(&mut self, performance: Box<AnyPerformance>, match_db: &MatchDatabase) -> Result<Uuid, InsertError> {
         let threshold = NsDuration::from_secs_f64(MatchDatabase::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
         if let Some((close_performance, how_close)) = self
             .find_close_performances_from_diff_match(performance.as_ref(), threshold, match_db)

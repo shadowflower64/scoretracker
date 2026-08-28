@@ -2,65 +2,75 @@ pub mod r#match;
 pub mod worker_connect;
 
 use super::start::AppData;
-use super::start::DomainResolveResult;
-use actix_web::body::BoxBody;
+use super::start::DomainResolveError;
+use super::start::DomainResolved;
+use actix_web::body::EitherBody;
 use actix_web::http::StatusCode;
-use actix_web::{HttpRequest, HttpResponse, Responder, get, web};
+use actix_web::web::Data;
+use actix_web::web::Json;
+use actix_web::web::Query;
+use actix_web::{HttpRequest, HttpResponse, Responder, get};
 use function_name::named;
 use scoretracker::data::library::stpl_url::StplUrl;
 use scoretracker::info;
 use scoretracker::log_fn_name;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use utoipa::OpenApi;
+use utoipa::ToSchema;
 
-#[derive(Serialize)]
+pub trait ApiError: fmt::Display + Serialize {
+    /// Get HTTP status code for this result.
+    fn status_code(&self) -> StatusCode;
+}
+
+#[derive(Serialize, ToSchema)]
 #[serde(tag = "status", rename_all = "snake_case")]
-enum ResponseGet<T: Serialize> {
-    Ok(T),
-    _Error,
-}
-
-fn respond_as_json(data: impl Serialize) -> HttpResponse {
-    HttpResponse::Ok().body(serde_json::to_string(&data).expect("could not convert response to json"))
-}
-
-fn respond_as_json_with_status(data: impl Serialize, status: StatusCode) -> HttpResponse {
-    HttpResponse::with_body(
-        status,
-        BoxBody::new(serde_json::to_string(&data).expect("could not convert response to json")),
-    )
-}
-
-#[derive(Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum ResponseGetList<T: Serialize> {
+pub enum ApiResult<T: Serialize, E: Serialize> {
     Ok {
-        items: Vec<T>,
+        result: T,
+    },
+    OkWithStatus {
+        #[serde(skip)]
+        status_code: StatusCode,
+        result: T,
     },
     Error {
         #[serde(skip)]
         status_code: StatusCode,
+        message: String,
+        #[serde(flatten)]
+        error: E,
     },
 }
 
-impl<T: Serialize> Responder for ResponseGetList<T> {
-    fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
-        match &self {
-            Self::Ok { .. } => HttpResponse::Ok().body(serde_json::to_string(&self).expect("could not convert response to json")),
-            Self::Error { status_code } => HttpResponse::with_body(
-                *status_code,
-                BoxBody::new(serde_json::to_string(&self).expect("could not convert response to json")),
-            ),
+impl<T: Serialize, E: ApiError> From<Result<T, E>> for ApiResult<T, E> {
+    fn from(value: Result<T, E>) -> Self {
+        match value {
+            Ok(ok_data) => ApiResult::Ok { result: ok_data },
+            Err(e) => {
+                let status_code = e.status_code();
+                let message = e.to_string();
+                ApiResult::Error {
+                    status_code,
+                    message,
+                    error: e,
+                }
+            }
         }
     }
-    type Body = BoxBody;
 }
 
-#[derive(Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-enum ResponsePut<T: Serialize> {
-    Ok { item: T },
-    _Error,
+impl<T: Serialize, E: Serialize> Responder for ApiResult<T, E> {
+    fn respond_to(self, req: &HttpRequest) -> HttpResponse<Self::Body> {
+        match &self {
+            Self::Ok { .. } => Json(&self).customize().with_status(StatusCode::OK).respond_to(req),
+            Self::OkWithStatus { status_code, .. } | Self::Error { status_code, .. } => {
+                Json(&self).customize().with_status(*status_code).respond_to(req)
+            }
+        }
+    }
+    type Body = EitherBody<EitherBody<String>>;
 }
 
 #[derive(Deserialize)]
@@ -68,29 +78,37 @@ pub struct ResolveStplUrlRequest {
     stpl_url: StplUrl,
 }
 
+pub type DomainResolveResult = ApiResult<DomainResolved, DomainResolveError>;
+
 #[utoipa::path(
     responses(
         (status = OK, description = "Domain resolved successfully", body = DomainResolveResult),
         (status = UNAUTHORIZED, description = "The requested domain exists but it requires authorization", body = DomainResolveResult),
-        (status = FORBIDDEN, description = "The requested domain exists but the requester has insufficient permissions", body = DomainResolveResult),
-        (status = NOT_FOUND, description = "The requested domain is not known to the server", body = DomainResolveResult)
+        (status = FORBIDDEN, description = "The requested domain exists but the requester has insufficient permissions", body = DomainResolveResult, example = json!({
+            "status": "error",
+            "message": "no permission to access this domain",
+            "error_kind": "forbidden"
+        })),
+        (status = NOT_FOUND, description = "The requested domain is not known to the server", body = DomainResolveResult, example = json!({
+            "status": "error",
+            "message": "domain name not known",
+            "error_kind": "not_known"
+        }))
     )
 )]
 #[get("/api/resolve_stpl_url")]
 #[named]
-pub async fn resolve_stpl_url(req: HttpRequest, q: web::Query<ResolveStplUrlRequest>) -> impl Responder {
-    let stpl_url = &q.stpl_url;
+pub async fn resolve_stpl_url(
+    app_data: Data<AppData>,
+    Query(ResolveStplUrlRequest { stpl_url }): Query<ResolveStplUrlRequest>,
+) -> DomainResolveResult {
     log_fn_name!(auto);
     info!("resolving url: {stpl_url}");
 
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
-    let res = app_data
+    app_data
         .resolve_domain(&stpl_url.domain, None)
-        .with_path_opt(stpl_url.path.as_deref());
-
-    //let match_db = MatchDatabase::read_without_locking(app_data.config.match_database_path()).expect("could not read match database");
-    //make_get_list_response_ok(match_db.matches)
-    respond_as_json_with_status(&res, res.status_code())
+        .map(|x| x.with_path_opt(stpl_url.path.as_deref()))
+        .into()
 }
 
 #[derive(OpenApi)]
