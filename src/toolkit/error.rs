@@ -1,6 +1,6 @@
 use scoretracker::config::libraries::LibraryTableError;
 use scoretracker::util::{command_line::AskError, file_ex, lockfile};
-use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerCreateError, spreadsheet::SpreadsheetImportError};
+use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerStartError, spreadsheet::SpreadsheetImportError};
 use std::path::PathBuf;
 use std::{io, process::ExitCode};
 use thiserror::Error;
@@ -89,7 +89,7 @@ pub enum CmdError {
     #[error("library scan error: {0}")]
     LibraryScanError(#[from] LibraryScanError),
     #[error("could not create worker: {0}")]
-    WorkerCreateError(#[from] WorkerCreateError),
+    WorkerCreateError(#[from] WorkerStartError),
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
 

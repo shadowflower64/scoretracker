@@ -148,7 +148,7 @@ fn handle_incoming_message(
     tcp_stream: &mut TcpStream,
     message: IncomingMessage,
     conn: &Arc<Mutex<ConnectionInfo>>,
-    worker_data: &Arc<Mutex<WorkerData>>,
+    worker_data: &Arc<WorkerData>,
     make_worker_status_rx: impl Fn() -> Receiver<WorkerStatus>,
     _make_task_progress_rx: impl Fn() -> Receiver<TaskProgress>,
 ) -> Result<(), Error> {
@@ -158,7 +158,7 @@ fn handle_incoming_message(
     match message {
         IncomingMessage::WhoAreYou => {
             debug!("responding to 'who are you' message");
-            let worker_info = worker_data.lock().unwrap().info.clone();
+            let worker_info = worker_data.info.clone();
             let message = OutgoingMessage::WhoAreYouResponse { worker_info };
             let _ = send_message(tcp_stream, &message).inspect_err(|e| error!("failed to send message: {e}; continuing"));
         }
@@ -210,7 +210,7 @@ fn handle_incoming_message(
 fn recv_connection_loop(
     tcp_stream: &mut TcpStream,
     connection_info: &Arc<Mutex<ConnectionInfo>>,
-    worker_data: &Arc<Mutex<WorkerData>>,
+    worker_data: &Arc<WorkerData>,
     make_worker_status_rx: impl Fn() -> Receiver<WorkerStatus>,
     make_task_progress_rx: impl Fn() -> Receiver<TaskProgress>,
 ) -> Result<(), Error> {
@@ -266,7 +266,7 @@ fn start_subscription_thread(
 fn start_connection_thread(
     mut tcp_stream: TcpStream,
     peer_addr: SocketAddr,
-    worker_data: Arc<Mutex<WorkerData>>,
+    worker_data: Arc<WorkerData>,
     worker_status_rx: Arc<Receiver<WorkerStatus>>,
     task_progress_rx: Arc<Receiver<TaskProgress>>,
 ) {
@@ -307,7 +307,7 @@ fn start_connection_thread(
 #[named]
 pub fn start_listener_thread(
     listener: TcpListener,
-    worker_data: Arc<Mutex<WorkerData>>,
+    worker_data: Arc<WorkerData>,
     worker_status_rx: Arc<Receiver<WorkerStatus>>,
     task_progress_rx: Arc<Receiver<TaskProgress>>,
 ) {

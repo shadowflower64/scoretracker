@@ -2,8 +2,6 @@ use function_name::named;
 use scoretracker::{error, info, log_fn_name, util::log};
 use std::process::ExitCode;
 
-mod api;
-mod config;
 mod start;
 
 #[named]
@@ -12,11 +10,11 @@ fn main() -> ExitCode {
     log::open_default_log_file().expect("could not open log file");
     log_fn_name!(auto);
 
-    info!("starting server");
-    match start::server_main() {
+    info!("starting worker");
+    match start::worker_main() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            error!("critical server error: {}", error);
+            error!("critical worker error: {}", error);
             ExitCode::FAILURE
         }
     }

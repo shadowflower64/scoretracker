@@ -126,7 +126,7 @@ impl Job for ProcessLibraryVideoJob {
         let ffmpeg_version = get_version().await;
         info!("ffmpeg version: {:?}", ffmpeg_version);
 
-        let worker_info = Some(&worker.info_cloned());
+        let worker_info = Some(worker.info());
         let config = worker.config();
 
         // Find library directory of the source proof file

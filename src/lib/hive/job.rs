@@ -83,19 +83,20 @@ impl From<FFmpegError> for Fail {
     }
 }
 
-impl From<worker::Error> for Fail {
-    fn from(value: worker::Error) -> Self {
+impl From<worker::WorkerError> for Fail {
+    fn from(value: worker::WorkerError) -> Self {
         match value {
-            worker::Error::CannotOpenLibraryDatabase(e) => Self::CannotOpenLibraryDatabase(e.to_string()),
-            worker::Error::CannotReadLibraryDatabase(e) => Self::CannotReadLibraryDatabase(e.to_string()),
-            worker::Error::CannotReadLibraryInfo(e) => Self::CannotReadLibraryInfo(e.to_string()),
-            worker::Error::CannotReadLibraryIndex(e) => Self::CannotReadLibraryIndex(e.to_string()),
-            worker::Error::CannotOpenQueue(_)
-            | worker::Error::CannotReopenQueue(_)
-            | worker::Error::CannotUpdateTask(_)
-            | worker::Error::CannotWriteQueue(_)
-            | worker::Error::NoTopQueuedTask
-            | worker::Error::TaskNotFound(_) => unimplemented!(),
+            worker::WorkerError::CannotOpenLibraryDatabase(e) => Self::CannotOpenLibraryDatabase(e.to_string()),
+            worker::WorkerError::CannotReadLibraryDatabase(e) => Self::CannotReadLibraryDatabase(e.to_string()),
+            worker::WorkerError::CannotReadLibraryInfo(e) => Self::CannotReadLibraryInfo(e.to_string()),
+            worker::WorkerError::CannotReadLibraryIndex(e) => Self::CannotReadLibraryIndex(e.to_string()),
+            worker::WorkerError::CannotOpenQueueFile(_)
+            | worker::WorkerError::CannotReopenQueueFile(_)
+            | worker::WorkerError::CannotCloseQueueFile(_)
+            | worker::WorkerError::CannotUpdateTask(_)
+            | worker::WorkerError::CannotWriteQueueFile(_)
+            | worker::WorkerError::NoTopQueuedTask
+            | worker::WorkerError::TaskNotFound(_) => unimplemented!(),
         }
     }
 }
@@ -114,6 +115,7 @@ pub enum AnyJob {
 
 /// Trait implemented by structures representing jobs.
 pub trait Job {
+    // Note to self: this is an Arc<Worker> because tasks may run separate threads and they may need to be able to share the worker pointer between threads.
     fn run(&self, worker: Arc<Worker>) -> impl Future<Output = Result<Success, Fail>>;
     fn into_any(self) -> AnyJob;
 }

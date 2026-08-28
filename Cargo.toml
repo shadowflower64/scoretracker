@@ -21,6 +21,10 @@ name = "scoretracker-server"
 path = "src/toolkit/server/main.rs"
 
 [[bin]]
+name = "scoretracker-worker"
+path = "src/toolkit/worker/main.rs"
+
+[[bin]]
 name = "scoretracker-playground"
 path = "src/playground/main.rs"
 

@@ -1,33 +1,36 @@
 //! Module containing code for hive worker processes.
+pub mod config;
 pub mod data;
 pub mod ipc;
 pub mod names;
+pub mod queue_connection;
 pub mod status;
 pub mod ws;
 
-use crate::config::Config;
-use crate::data::library::database::LibraryDatabase;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
-use crate::hive::job::{self, Job};
-use crate::hive::queue::{TaskNotFound, TaskQueue};
-use crate::hive::task::{Task, TaskResult, TaskState};
-use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerStatus};
+use crate::hive::job::{self, Fail, Job, Success};
+use crate::hive::queue::TaskNotFound;
+use crate::hive::task::{Task, TaskResult};
+use crate::hive::worker::config::{WorkerConfig, WorkerMode};
+use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerState, WorkerStatus};
 use crate::hive::worker::ipc::start_listener_thread;
-use crate::hive::worker::names::random_name;
+use crate::hive::worker::queue_connection::QueueConnection;
 use crate::hive::worker::ws::start_server_connection_thread;
 use crate::util::dirs::log_dir;
-use crate::util::filelocked::{ClosedFileLocked, FileLockableData, FileLockableDataDefault, FileLocked};
+use crate::util::filelocked::FileLockableData;
 use crate::util::log::{LogError, open_log_file};
 use crate::util::timestamp::NsTimestamp;
 use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success, warn};
-use actix_web::dev::Url;
 use crossbeam_channel::Sender;
 use function_name::named;
+use smol::lock::Mutex;
+use std::borrow::Cow;
 use std::net::TcpListener;
+use std::panic::AssertUnwindSafe;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use std::{io, panic, process, thread};
 use thiserror::Error;
@@ -35,13 +38,15 @@ use uuid::Uuid;
 
 /// Error while performing worker functions.
 #[derive(Debug, Error)]
-pub enum Error {
-    #[error("cannot read lock from queue: {0}")]
-    CannotOpenQueue(lockfile::Error),
-    #[error("cannot reopen queue: {0}")]
-    CannotReopenQueue(lockfile::Error),
-    #[error("cannot write to queue: {0}")]
-    CannotWriteQueue(lockfile::Error),
+pub enum WorkerError {
+    #[error("cannot acquire lock for queue file: {0}")]
+    CannotOpenQueueFile(lockfile::Error),
+    #[error("cannot close lock for queue file: {0}")]
+    CannotCloseQueueFile(lockfile::Error),
+    #[error("cannot reopen queue file: {0}")]
+    CannotReopenQueueFile(lockfile::Error),
+    #[error("cannot write to queue file: {0}")]
+    CannotWriteQueueFile(lockfile::Error),
     #[error("cannot update task in queue: {0}")]
     CannotUpdateTask(TaskNotFound),
     #[error("task not found: {0}")]
@@ -60,7 +65,7 @@ pub enum Error {
 
 /// Error while starting a worker process.
 #[derive(Debug, Error)]
-pub enum WorkerCreateError {
+pub enum WorkerStartError {
     #[error("configuration error: {0}")]
     ConfigError(#[from] &'static file_ex::Error),
     #[error("cannot open log file: {0}")]
@@ -69,13 +74,21 @@ pub enum WorkerCreateError {
     TcpListenerBindError(io::Error),
     #[error("could not get local address of tcp listener: {0}")]
     TcpListenerLocalAddrError(io::Error),
+    #[error("could not open queue file: {0}")]
+    CannotOpenQueueFile(lockfile::Error),
+    #[error("could not close queue file: {0}")]
+    CannotCloseQueueFile(lockfile::Error),
 }
+
+// TODO: safety LOL!
+type UnwindSafeMutex<T> = AssertUnwindSafe<Mutex<T>>;
 
 /// Worker data structure, containing a config, some mutable data, and channels for sending updates to clients connected via TCP.
 #[derive(Debug)]
 pub struct Worker {
-    config: Config,
-    data: Arc<Mutex<WorkerData>>,
+    config: WorkerConfig,
+    data: Arc<WorkerData>,
+    queue_connection: UnwindSafeMutex<QueueConnection>,
     worker_status_tx: Sender<WorkerStatus>,
     task_progress_tx: Sender<TaskProgress>,
 }
@@ -88,55 +101,37 @@ impl Worker {
     /// * [`WorkerInfo`], an immutable structure containing basic info about the worker;
     /// * [`WorkerStatus`], which holds the current state of the worker (is it paused, running, etc.);
     /// * [`TaskProgress`], which contains information about progress on the current task.
-    pub fn data(&self) -> &Arc<Mutex<WorkerData>> {
+    pub fn data(&self) -> &Arc<WorkerData> {
         &self.data
     }
 
     /// A short way of cloning the [`WorkerInfo`] structure living inside the mutex-locked data.
-    pub fn info_cloned(&self) -> WorkerInfo {
-        self.data().lock().unwrap().info.clone()
+    pub fn info(&self) -> &WorkerInfo {
+        &self.data().info
     }
 
-    /// Global scoretracker configuration
-    // TODO: this doesn't really make sense right? [`Config`] already has a global instance thing
-    pub fn config(&self) -> &Config {
+    /// Worker configuration
+    pub fn config(&self) -> &WorkerConfig {
         &self.config
     }
 
-    pub fn open_queue(&self) -> Result<FileLocked<TaskQueue>, Error> {
-        TaskQueue::lock_and_read_or_default(self.config.task_queue_path(), Some(&self.info_cloned())).map_err(Error::CannotOpenQueue)
+    pub fn read_library_info(&self, library_dir: &Path) -> Result<LibraryInfo, WorkerError> {
+        LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(WorkerError::CannotReadLibraryInfo)
     }
 
-    pub fn open_library_db(&self) -> Result<FileLocked<LibraryDatabase>, Error> {
-        LibraryDatabase::lock_and_read_or_default(self.config.library_database_path(), Some(&self.info_cloned()))
-            .map_err(Error::CannotOpenLibraryDatabase)
+    pub fn read_library_index(&self, library_dir: &Path) -> Result<LibraryIndex, WorkerError> {
+        LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(WorkerError::CannotReadLibraryIndex)
     }
 
-    pub fn read_library_db(&self) -> Result<LibraryDatabase, Error> {
-        LibraryDatabase::read_without_locking_or_default(self.config.library_database_path()).map_err(Error::CannotReadLibraryDatabase)
-    }
-
-    pub fn reopen_library_db(&self, library_db: ClosedFileLocked<LibraryDatabase>) -> Result<FileLocked<LibraryDatabase>, Error> {
-        library_db.reopen().map_err(Error::CannotOpenLibraryDatabase)
-    }
-
-    pub fn read_library_info(&self, library_dir: &Path) -> Result<LibraryInfo, Error> {
-        LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(Error::CannotReadLibraryInfo)
-    }
-
-    pub fn read_library_index(&self, library_dir: &Path) -> Result<LibraryIndex, Error> {
-        LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(Error::CannotReadLibraryIndex)
-    }
-
-    pub fn fetch_progress(&self) -> Option<TaskProgress> {
-        self.data.lock().unwrap().task_progress.clone()
+    pub async fn fetch_progress(&self) -> Option<TaskProgress> {
+        self.data.task_progress.lock().await.clone()
     }
 
     /// Save the status to internal data and also send a worker status update message to clients connected via TCP.
     #[named]
-    pub fn update_worker_status(&self, status: WorkerStatus) {
+    pub async fn update_worker_status(&self, status: WorkerStatus) {
         log_fn_name!(auto);
-        self.data.lock().unwrap().status = status.clone();
+        *self.data.status.lock().await = status.clone();
         let _ = self
             .worker_status_tx
             .send(status)
@@ -145,9 +140,9 @@ impl Worker {
 
     /// Save the progress to internal data and also send a task progress update message to clients connected via TCP.
     #[named]
-    pub fn update_task_progress(&self, task_progress: TaskProgress) {
+    pub async fn update_task_progress(&self, task_progress: TaskProgress) {
         log_fn_name!(auto);
-        self.data.lock().unwrap().task_progress = Some(task_progress.clone());
+        *self.data.task_progress.lock().await = Some(task_progress.clone());
         let _ = self
             .task_progress_tx
             .send(task_progress)
@@ -157,7 +152,7 @@ impl Worker {
     /// A very over-simplified way of updating task progress using just a string.
     // TODO: this shouldn't really be used in final code
     // #[deprecated]
-    pub fn update_task_progress_very_simple(&self, message: String) {
+    pub async fn update_task_progress_very_simple(&self, message: String) {
         let task_progress = TaskProgress {
             done: false,
             current_stage_number: 1,
@@ -167,20 +162,64 @@ impl Worker {
             current_stage_progress_max: 1,
             current_stage_progress_msg: message,
         };
-        self.update_task_progress(task_progress);
+        self.update_task_progress(task_progress).await
     }
 
-    /// Create a new worker structure and start the TCP listener thread.
+    /// Create a full worker name from a short name (usually chosen randomly from [`names`]) and a process ID (pid) number.
+    pub fn make_full_name(short_name: &str, pid: u32) -> String {
+        format!("{}-{pid}.scoretracker-worker.local", short_name.to_lowercase())
+    }
+
     #[named]
-    pub fn start(short_name: String, config: Config, persistent: bool) -> Result<(), WorkerCreateError> {
+    fn main_loop(self) {
+        log_fn_name!(auto);
+
+        // Main part
+        match self.config.mode {
+            WorkerMode::Single => info!("created single worker, now taking on a task..."),
+            WorkerMode::Volatile => info!("created volatile worker, now taking on tasks..."),
+            WorkerMode::Persistent => info!("created persistent worker, now taking on tasks..."),
+        }
+
+        let worker = Arc::new(self);
+
+        smol::block_on(async move {
+            loop {
+                if let Some(task_to_do) = worker.take_task().await.expect("todo error handling") {
+                    worker.clone().execute_task(task_to_do).await;
+                } else {
+                    info!("no tasks to do!");
+                    if worker.config.mode.quit_when_no_tasks() {
+                        break;
+                    }
+                }
+
+                // Do not jump back up if the mode does not have looping enabled
+                if !worker.config.mode.enable_loop() {
+                    break;
+                }
+
+                // let the worker rest a little bit...
+                let seconds = worker.config.sleep_duration_seconds;
+                info!("worker sleeping for {seconds} seconds...");
+                thread::sleep(Duration::from_secs_f64(seconds));
+            }
+        });
+
+        info!("exiting");
+    }
+
+    /// Initialize a new worker structure, connect to the queue, start ipc threads, and start the worker.
+    #[named]
+    pub fn start(short_name: String, config: WorkerConfig, persistent: bool) -> Result<(), WorkerStartError> {
         log_fn_name!("worker" : auto);
 
         let pid = process::id();
-        let full_name = Self::make_full_name(&short_name, pid);
+        let full_name = Worker::make_full_name(&short_name, pid);
         info!("creating worker with name: '{full_name}'");
 
-        let listener = TcpListener::bind("127.0.0.1:0").map_err(WorkerCreateError::TcpListenerBindError)?;
-        let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
+        let listener = TcpListener::bind("127.0.0.1:0").map_err(WorkerStartError::TcpListenerBindError)?;
+        let address = listener.local_addr().map_err(WorkerStartError::TcpListenerLocalAddrError)?;
         let info = WorkerInfo {
             full_name,
             short_name,
@@ -188,23 +227,29 @@ impl Worker {
             birth_timestamp: NsTimestamp::now(),
             address,
         };
-        open_log_file(&log_dir().join(info.log_filename())).map_err(WorkerCreateError::LogError)?;
+        open_log_file(&log_dir().join(info.log_filename())).map_err(WorkerStartError::LogError)?;
 
+        // Connect to queue server/file
+        let queue_connection = AssertUnwindSafe(Mutex::new(config.create_queue_connection(&info)?));
+
+        // Create thread communication channels for updating worker status and task progress
         let (worker_status_tx, worker_status_rx) = crossbeam_channel::unbounded();
         let (task_progress_tx, task_progress_rx) = crossbeam_channel::unbounded();
-        let worker = Worker {
-            config,
-            data: Arc::new(Mutex::new(WorkerData {
-                info,
-                task_progress: None,
-                status: WorkerStatus::default(),
-            })),
-            worker_status_tx,
-            task_progress_tx,
-        };
-
         let worker_status_rx = Arc::new(worker_status_rx);
         let task_progress_rx = Arc::new(task_progress_rx);
+
+        // Create worker structure
+        let worker = Worker {
+            config,
+            data: Arc::new(WorkerData {
+                info,
+                task_progress: AssertUnwindSafe(Mutex::new(None)),
+                status: AssertUnwindSafe(Mutex::new(WorkerStatus::default())),
+            }),
+            worker_status_tx,
+            task_progress_tx,
+            queue_connection,
+        };
 
         // Start a local TCP listener for IPC
         start_listener_thread(
@@ -217,50 +262,9 @@ impl Worker {
         // Connect to the central server
         start_server_connection_thread(Arc::clone(&worker_status_rx), Arc::clone(&task_progress_rx));
 
-        // Main part
-        if persistent {
-            info!("created persistent worker, now taking on tasks...");
-        } else {
-            info!("created volatile worker, now taking on a task...");
-        }
-
-        let worker = Arc::new(worker);
-        smol::block_on(async {
-            loop {
-                match worker.clone().take_on_task().await {
-                    Ok(_) => {
-                        success!("worker task finished successfully");
-                    }
-                    Err(e) => {
-                        error!("worker task returned error: {e}");
-                        break; // TODO: detect  if there are no tasks, and wait for new tasks in that case (for persistent workers only)
-                    }
-                }
-
-                if !persistent {
-                    break;
-                }
-
-                // let the worker rest a little bit...
-                info!("worker sleeping for 5 seconds...");
-                thread::sleep(Duration::from_secs(5));
-            }
-        });
-
-        info!("exiting");
-
+        // Start main loop
+        worker.main_loop();
         Ok(())
-    }
-
-    /// Create a full worker name from a short name (usually chosen randomly from [`names`]) and a process ID (pid) number.
-    pub fn make_full_name(short_name: &str, pid: u32) -> String {
-        format!("{}-{pid}.scoretracker-worker.local", short_name.to_lowercase())
-    }
-
-    /// Create a new worker structure and a TCP listener with a randomly chosen name and a default config.
-    pub fn start_default(persistent: bool) -> Result<(), WorkerCreateError> {
-        let config = Config::load()?;
-        Self::start(random_name().to_owned(), config.clone(), persistent)
     }
 
     /// Execute a task in the current thread.
@@ -272,21 +276,19 @@ impl Worker {
     ///
     /// The result of the task should also be saved to the queue after this method finishes, so that no data is lost and the task is not done twice.
     #[named]
-    async fn execute_task_body(self: Arc<Self>, task: &mut Task) {
+    async fn execute_task_body(self: Arc<Self>, task: &Task) -> Result<Success, Fail> {
         log_fn_name!("worker" : auto);
 
-        let result = panic::catch_unwind(|| smol::block_on(task.job.run(self)));
+        let result = panic::catch_unwind(move || smol::block_on(task.job.run(self)));
         match result {
             Ok(no_panic) => match no_panic {
                 Ok(success) => {
                     success!("task finished successfully: uuid: {}, results: {:#?}", task.uuid.0, success);
-                    task.state = TaskState::Done;
-                    task.result = Some(TaskResult::Success(success));
+                    return Ok(success);
                 }
-                Err(error) => {
-                    error!("task failed: uuid: {}, reason: {} ({:?})", task.uuid.0, error, error);
-                    task.state = TaskState::Failed;
-                    task.result = Some(TaskResult::Error(error));
+                Err(fail) => {
+                    error!("task failed: uuid: {}, reason: {} ({:?})", task.uuid.0, fail, fail);
+                    return Err(fail);
                 }
             },
             Err(panic) => {
@@ -298,12 +300,10 @@ impl Worker {
                     "<unknown>".to_string()
                 };
                 error!("task panicked: uuid: {}, reason: {disp_panic}", task.uuid.0);
-                task.state = TaskState::Failed;
-                task.result = Some(TaskResult::Error(job::Fail::Panic(disp_panic)));
-                panic::resume_unwind(panic)
+                return Err(job::Fail::Panic(disp_panic));
+                // panic::resume_unwind(panic)
             }
         }
-        task.finish_timestamp = Some(NsTimestamp::now());
     }
 
     /// Execute a task from the queue in the current thread.
@@ -314,68 +314,69 @@ impl Worker {
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
     #[named]
-    pub async fn execute_task(
-        self: Arc<Self>,
-        mut queue: FileLocked<TaskQueue>,
-        task_getter: impl Fn(&mut FileLocked<TaskQueue>) -> Result<&mut Task, Error>,
-    ) -> Result<FileLocked<TaskQueue>, Error> {
+    pub async fn execute_task(self: Arc<Self>, task: Task) {
         log_fn_name!("worker" : auto);
-
-        // Take on a task
-        let task_to_do = task_getter(&mut queue)?;
-        task_to_do.state = TaskState::Working;
-        task_to_do.start_timestamp = Some(NsTimestamp::now());
-        task_to_do.worker_info = Some(self.data().lock().unwrap().info.clone());
-        // task_to_do.comment = Some(String::from("this job was started by scoretracker"));
-
-        let mut task = task_to_do.clone();
         info!("taking on task with uuid: {}", task.uuid.0);
-
-        // Drop file lock here to and let other processes access the queue
-        let queue = queue.save_and_close().map_err(Error::CannotWriteQueue)?;
-
-        // Do some task if there is something to do
         info!("starting task: {:?}", task);
+
+        // Update worker state
         {
-            let mut data = self.data().lock().unwrap();
-            data.status.working = true;
-            data.status.current_task = Some(task.uuid);
-        }
-        self.clone().execute_task_body(&mut task).await;
-        {
-            let mut data = self.data().lock().unwrap();
-            data.status.working = false;
-            data.status.current_task = None;
+            let mut status = self.data.status.lock().await;
+            status.state = WorkerState::Working;
+            status.current_task = Some(task.uuid);
         }
 
-        // Update the queue file again to update the state of the task
-        let mut queue = queue.reopen().map_err(Error::CannotReopenQueue)?;
-        queue.update_task(task).map_err(Error::CannotUpdateTask)?;
-        queue.save_to_file().map_err(Error::CannotWriteQueue)?;
-        Ok(queue)
+        // Do the task
+        let result = self.clone().execute_task_body(&task).await;
+        let finish_timestamp = NsTimestamp::now();
+
+        // Send an update about the state of the task to the queue file/server
+        match result {
+            Ok(success) => {
+                self.update_task_state(task.uuid.0, TaskResult::Success(success), finish_timestamp);
+                // task.state = TaskState::Done;
+                // task.result = Some(TaskResult::Success(success));
+                // task.finish_timestamp = Some(NsTimestamp::now());
+            }
+            Err(fail) => {
+                self.update_task_state(task.uuid.0, TaskResult::Error(fail), finish_timestamp);
+                // task.state = TaskState::Failed;
+                // task.result = Some(TaskResult::Error(fail));
+                // task.finish_timestamp = Some(NsTimestamp::now());
+            }
+        }
+
+        // Update worker state
+        {
+            let mut status = self.data.status.lock().await;
+            status.state = WorkerState::Finished;
+            status.current_task = None;
+        }
     }
 
-    /// Execute a task from the queue in the current thread.
+    /// Fetch a task from the queue and mark it as being worked on.
     ///
-    /// Please note that executing a task may take a long time.
-    ///
-    /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
-    pub async fn execute_task_with_uuid(self: Arc<Self>, task_uuid: Uuid) -> Result<(), Error> {
-        let queue = self.open_queue()?;
-        self.execute_task(queue, |q| q.get_task_mut(task_uuid).ok_or(Error::TaskNotFound(task_uuid)))
-            .await?;
-        Ok(())
+    /// This function will either connect to the server or use the local queue file. In both cases, the task will be marked as being worked on by this function.
+    pub async fn take_task(&self) -> Result<Option<Task>, WorkerError> {
+        self.queue_connection.lock().await.take_task(Cow::Borrowed(self.info())).await
     }
 
-    /// Take on the first task from the queue and execute it in the current thread.
+    /// Fetch a task with a given UUID and mark it as being worked on.
     ///
-    /// Please note that executing a task may take a long time.
-    ///
-    /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
-    pub async fn take_on_task(self: Arc<Self>) -> Result<(), Error> {
-        let queue = self.open_queue()?;
-        self.execute_task(queue, |q| q.top_queued_task_mut().ok_or(Error::NoTopQueuedTask))
-            .await?;
-        Ok(())
+    /// This function will either connect to the server or use the local queue file. In both cases, the task will be marked as being worked on by this function.
+    pub async fn take_task_with_uuid(&self, task_uuid: Uuid) -> Result<Option<Task>, WorkerError> {
+        self.queue_connection
+            .lock()
+            .await
+            .take_task_with_uuid(task_uuid, Cow::Borrowed(self.info()))
+            .await
+    }
+
+    pub async fn update_task_state(&self, task_uuid: Uuid, result: TaskResult, finish_timestamp: NsTimestamp) -> Result<(), WorkerError> {
+        self.queue_connection
+            .lock()
+            .await
+            .update_task_state(task_uuid, result, finish_timestamp, Cow::Borrowed(self.info()))
+            .await
     }
 }

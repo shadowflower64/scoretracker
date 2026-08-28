@@ -8,6 +8,7 @@ pub mod error;
 
 #[cfg(feature = "toolkit-server")]
 pub mod server;
+pub mod worker;
 
 fn main() -> ExitCode {
     let args: Vec<_> = args().collect();
