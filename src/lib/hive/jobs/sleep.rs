@@ -16,7 +16,7 @@ impl Job for SleepJob {
     async fn run(&self, _worker: Arc<Worker>) -> Result<Success, Fail> {
         log_fn_name!("job:sleep");
         info!("sleeping for {}", self.duration);
-        Timer::after(self.duration.as_duration()).await;
+        Timer::after(self.duration.as_std_duration()).await;
         Ok(Success::Void)
     }
     fn into_any(self) -> AnyJob {

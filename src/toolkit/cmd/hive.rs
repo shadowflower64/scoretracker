@@ -1,6 +1,7 @@
 use crate::cmd::{self, CmdError};
 use chrono::{DateTime, Local};
 use function_name::named;
+use scoretracker::data::library::stpl_url::{LibraryRoot, StplUrl};
 use scoretracker::hive::job::Job;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
@@ -10,16 +11,13 @@ use scoretracker::info_npr;
 use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::util::lossless_cut_project::LlcProj;
 use scoretracker::util::timestamp::NsLocalTimestamp;
-use scoretracker::{config::Config, error, info, log_fn_name, success};
+use scoretracker::{config::Config, info, log_fn_name};
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 #[named]
-pub fn spawn_worker(persistent: bool) -> Result<(), CmdError> {
-    log_fn_name!("cmd" : auto);
-    Worker::start_default(persistent)?;
+pub fn spawn_worker() -> Result<(), CmdError> {
+    Worker::start_default()?;
     Ok(())
 }
 
@@ -45,6 +43,8 @@ pub fn add_task(job: impl Job) -> Result<(), CmdError> {
 pub fn add_task_execute_llc(source_path: PathBuf) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
+    let root = LibraryRoot::of(&source_path).expect("todo: invalid source path");
+    let source = root.url_to(&source_path).expect("todo: invalid source path");
     let file_stem = source_path.file_stem().expect("todo: invalid file name").to_string_lossy();
 
     let llc_proj_filename = format!("{file_stem}-proj.llc");
@@ -66,13 +66,14 @@ pub fn add_task_execute_llc(source_path: PathBuf) -> Result<(), CmdError> {
             cut_end_point.to_string_within_filename()
         );
         let destination_path: PathBuf = source_path.with_file_name(file_name);
+        let destination = root.url_to(&destination_path).expect("todo: invalid destination path");
 
         cmd::hive::add_task(CutLibraryVideoJob {
-            source_path: source_path.to_path_buf(),
+            source: source.clone(),
             source_proof_uuid_precondition_check: None,
             cut_start_point: Some(cut_start_point),
             cut_end_point: Some(cut_end_point),
-            destination_path,
+            destination,
         })?;
     }
     Ok(())
@@ -80,11 +81,12 @@ pub fn add_task_execute_llc(source_path: PathBuf) -> Result<(), CmdError> {
 
 #[named]
 pub fn add_task_fold_video(source_path: PathBuf) -> Result<(), CmdError> {
-    let file_name = format!(
-        "{}-stfolded.mkv",
-        source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
-    );
-    let destination_path: PathBuf = source_path.with_file_name(file_name);
+    let root = LibraryRoot::of(&source_path).expect("todo: invalid source path");
+    let source = root.url_to(&source_path).expect("todo: invalid source path");
+    let file_stem = source_path.file_stem().expect("todo: invalid file name").to_string_lossy();
+    let destination_path = source_path.with_file_name(format!("{file_stem}-stfolded.mkv"));
+    let destination = root.url_to(&destination_path).expect("todo: invalid destination path");
+
     cmd::hive::add_task(ProcessLibraryVideoJob {
         source,
         source_proof_uuid_precondition_check: None,
@@ -95,11 +97,12 @@ pub fn add_task_fold_video(source_path: PathBuf) -> Result<(), CmdError> {
 
 #[named]
 pub fn add_task_mess_up_video(source_path: PathBuf) -> Result<(), CmdError> {
-    let file_name = format!(
-        "{}-stmessy.mkv",
-        source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
-    );
-    let destination_path: PathBuf = source_path.with_file_name(file_name);
+    let root = LibraryRoot::of(&source_path).expect("todo: invalid source path");
+    let source = root.url_to(&source_path).expect("todo: invalid source path");
+    let file_stem = source_path.file_stem().expect("todo: invalid file name").to_string_lossy();
+    let destination_path = source_path.with_file_name(format!("{file_stem}-stmessy.mkv"));
+    let destination = root.url_to(&destination_path).expect("todo: invalid destination path");
+
     cmd::hive::add_task(ProcessLibraryVideoJob {
         source,
         source_proof_uuid_precondition_check: None,
@@ -110,11 +113,12 @@ pub fn add_task_mess_up_video(source_path: PathBuf) -> Result<(), CmdError> {
 
 #[named]
 pub fn add_task_crumple_video(source_path: PathBuf) -> Result<(), CmdError> {
-    let file_name = format!(
-        "{}-stcrumpled.mkv",
-        source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
-    );
-    let destination_path: PathBuf = source_path.with_file_name(file_name);
+    let root = LibraryRoot::of(&source_path).expect("todo: invalid source path");
+    let source = root.url_to(&source_path).expect("todo: invalid source path");
+    let file_stem = source_path.file_stem().expect("todo: invalid file name").to_string_lossy();
+    let destination_path = source_path.with_file_name(format!("{file_stem}-stcrumpled.mkv"));
+    let destination = root.url_to(&destination_path).expect("todo: invalid destination path");
+
     cmd::hive::add_task(ProcessLibraryVideoJob {
         source,
         source_proof_uuid_precondition_check: None,
@@ -125,11 +129,12 @@ pub fn add_task_crumple_video(source_path: PathBuf) -> Result<(), CmdError> {
 
 #[named]
 pub fn add_task_shred_video(source_path: PathBuf) -> Result<(), CmdError> {
-    let file_name = format!(
-        "{}-stshredded.mkv",
-        source_path.file_stem().expect("todo: invalid file name").to_string_lossy()
-    );
-    let destination_path: PathBuf = source_path.with_file_name(file_name);
+    let root = LibraryRoot::of(&source_path).expect("todo: invalid source path");
+    let source = root.url_to(&source_path).expect("todo: invalid source path");
+    let file_stem = source_path.file_stem().expect("todo: invalid file name").to_string_lossy();
+    let destination_path = source_path.with_file_name(format!("{file_stem}-stshredded.mkv"));
+    let destination = root.url_to(&destination_path).expect("todo: invalid destination path");
+
     cmd::hive::add_task(ProcessLibraryVideoJob {
         source,
         source_proof_uuid_precondition_check: None,

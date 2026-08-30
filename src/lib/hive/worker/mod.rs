@@ -8,7 +8,7 @@ pub mod status;
 pub mod ws;
 
 use crate::config::library_tab::{InternalLibraryConnections, LibraryAccessPath, LibraryTab};
-use crate::config::toml::TomlConfig;
+use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::database::LibraryEntry;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
@@ -71,9 +71,9 @@ pub enum WorkerError {
 #[derive(Debug, Error)]
 pub enum WorkerStartError {
     #[error("configuration error: {0}")]
-    ConfigError(#[from] &'static file_ex::Error),
+    ConfigError(#[from] TomlConfigError),
     #[error("cannot open log file: {0}")]
-    LogError(LogError),
+    LogError(#[from] LogError),
     #[error("could not bind tcp listener: {0}")]
     TcpListenerBindError(io::Error),
     #[error("could not get local address of tcp listener: {0}")]
@@ -110,7 +110,7 @@ impl Worker {
         &self.data
     }
 
-    /// A short way of cloning the [`WorkerInfo`] structure living inside the mutex-locked data.
+    /// A short way of fetching the [`WorkerInfo`] structure living inside the worker data.
     pub fn info(&self) -> &WorkerInfo {
         &self.data().info
     }
@@ -175,9 +175,14 @@ impl Worker {
         format!("{}-{pid}.scoretracker-worker.local", short_name.to_lowercase())
     }
 
+    /// Initialize a new worker structure with a default config and a random name.
+    pub fn start_default() -> Result<(), WorkerStartError> {
+        Self::start(names::random_name().to_owned(), WorkerConfig::load()?)
+    }
+
     /// Initialize a new worker structure, connect to the queue, start ipc threads, and start the worker.
     #[named]
-    pub fn start(short_name: String, config: WorkerConfig, persistent: bool) -> Result<(), WorkerStartError> {
+    pub fn start(short_name: String, config: WorkerConfig) -> Result<(), WorkerStartError> {
         log_fn_name!("worker" : auto);
 
         let pid = process::id();

@@ -45,7 +45,7 @@ use walkdir::{DirEntry, WalkDir};
 /// The function returns the path of the directory that the "library_info.json" file is located in.
 ///
 /// Returns [`None`] if the file was not found in any parent directory.
-pub fn get_library_dir_of_path(path: &Path) -> Option<PathBuf> {
+pub fn library_dir_of_path(path: &Path) -> Option<PathBuf> {
     let mut current_path = path.to_path_buf();
     while let Some(parent_path) = current_path.parent() {
         if current_path.join(LibraryInfo::STANDARD_FILENAME).is_file() {

@@ -5,7 +5,7 @@ use serde::de::{self, MapAccess};
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::borrow::Cow;
 use std::fmt;
-use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
+use std::ops::{Add, Deref, DerefMut, Div, Mul, Neg, Rem, Sub};
 use std::time::SystemTimeError;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -65,26 +65,6 @@ impl NsTimestamp {
         Self(Nanoseconds::now())
     }
 
-    pub fn as_secs(self) -> i128 {
-        self.0.as_secs()
-    }
-
-    pub fn frac(self) -> u32 {
-        self.0.frac()
-    }
-
-    pub fn as_millis(self) -> i128 {
-        self.0.as_millis()
-    }
-
-    pub fn as_micros(self) -> i128 {
-        self.0.as_micros()
-    }
-
-    pub fn as_nanos(self) -> i128 {
-        self.0.as_nanos()
-    }
-
     pub fn since_epoch(self) -> NsDuration {
         NsDuration(self.0)
     }
@@ -125,14 +105,6 @@ impl NsTimestamp {
         Self(duration.into().0)
     }
 
-    pub fn to_date_time_string_utc(self) -> String {
-        self.0.to_date_time_string_utc()
-    }
-
-    pub fn to_date_time_string_local(self) -> String {
-        self.0.to_date_time_string_local()
-    }
-
     pub fn invert_with_origin(self, origin: Self) -> Self {
         Self(self.0.invert_with_origin(origin.0))
     }
@@ -142,6 +114,19 @@ impl NsTimestamp {
             seconds: self.as_secs() as i64,
             frac: self.frac(),
         }
+    }
+}
+
+impl Deref for NsTimestamp {
+    type Target = Nanoseconds;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for NsTimestamp {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -304,36 +289,14 @@ impl NsDuration {
         self.0
     }
 
-    pub fn as_secs(self) -> i128 {
-        self.0.as_secs()
-    }
-
-    pub fn frac(self) -> u32 {
-        self.0.frac()
-    }
-
-    pub fn as_secs_f64(self) -> f64 {
-        self.0.as_secs_f64()
-    }
-
-    pub fn as_millis(self) -> i128 {
-        self.0.as_millis()
-    }
-
-    pub fn as_micros(self) -> i128 {
-        self.0.as_micros()
-    }
-
-    pub fn as_nanos(self) -> i128 {
-        self.0.as_nanos()
-    }
-
     pub fn as_timestamp(self) -> NsTimestamp {
         NsTimestamp(self.0)
     }
 
-    pub fn as_duration(self) -> Duration {
-        let (negative, duration) = self.try_as_std_duration().expect("msg");
+    pub fn as_std_duration(self) -> Duration {
+        let (_negative, duration) = self
+            .try_as_std_duration()
+            .expect("NsDuration should fit inside a std::time::Duration");
         duration
     }
 
@@ -412,6 +375,19 @@ impl NsDuration {
             seconds: self.as_secs() as i64,
             frac: self.frac(),
         }
+    }
+}
+
+impl Deref for NsDuration {
+    type Target = Nanoseconds;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for NsDuration {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -499,6 +475,7 @@ impl TryFrom<u128> for NsDuration {
         Nanoseconds::try_from(value).map(Self)
     }
 }
+
 impl From<Duration> for NsDuration {
     fn from(value: Duration) -> Self {
         Self(Nanoseconds::from(value))
