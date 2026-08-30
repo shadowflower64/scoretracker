@@ -1,4 +1,5 @@
 use crate::cmd::{self, CmdError};
+use crate::worker::start::worker_main;
 use chrono::{DateTime, Local};
 use function_name::named;
 use scoretracker::data::library::stpl_url::{LibraryRoot, StplUrl};
@@ -16,9 +17,8 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 #[named]
-pub fn spawn_worker() -> Result<(), CmdError> {
-    Worker::start_default()?;
-    Ok(())
+pub fn start_worker() -> Result<(), CmdError> {
+    worker_main()
 }
 
 #[named]

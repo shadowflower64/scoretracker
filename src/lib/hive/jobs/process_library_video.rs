@@ -1,6 +1,6 @@
 //! Process (compress) a video from the library and save result to library
 use crate::data::library::database::QualityState;
-use crate::data::library::stpl_url::StplUrl;
+use crate::data::library::stpl_url::{LibraryRoot, StplUrl};
 use crate::ffmpeg::audio_settings::{AudioEncoder, AudioSettings, Bitrate};
 use crate::ffmpeg::video_settings::{CpuPreset, VideoEncoder, VideoSettings};
 use crate::ffmpeg::{ffmpeg_process_video, get_version};
@@ -128,38 +128,39 @@ impl Job for ProcessLibraryVideoJob {
         info!("ffmpeg version: {:?}", ffmpeg_version);
 
         // Get source proof file
-        let (source_path, dry_entry) = worker.find_or_download_proof_file(&self.source).await?;
+        let dry = worker.find_or_download_proof_file(&self.source).await?;
 
         // Check if it matches the precondition (if it doesn't, that means that the input request was incorrect or has become invalid)
         if let Some(precondition_uuid) = self.source_proof_uuid_precondition_check
-            && dry_entry.uuid != precondition_uuid
+            && dry.uuid() != precondition_uuid
         {
             return Err(Fail::PreconditionUuidDoesNotMatch {
                 stpl_url: self.source.clone(),
-                read_proof_uuid: dry_entry.uuid,
+                read_proof_uuid: dry.uuid(),
                 precondition_uuid,
             });
         }
 
         // Launch ffmpeg to cut the video losslessly
-        let destination_path = worker.create_temp_path_for(&self.destination);
+        let source_path = dry.read_only_path();
+        let destination_path = worker.create_temp_path_for(&self.destination).await;
         let worker2 = Arc::clone(&worker);
-        ffmpeg_process_video(&source_path, &destination_path, self.operation, async move |progress| {
+        ffmpeg_process_video(source_path, &destination_path, self.operation, async move |progress| {
             worker2.update_task_progress_very_simple(format!("{progress:?}")).await;
         })
         .await?;
 
         // Register new file into library
-        let wet_entry = worker
+        let wet = worker
             .move_or_upload_proof_file(&destination_path, &self.destination, |entry| {
-                entry.dry = Some(dry_entry.uuid);
+                entry.dry = Some(dry.uuid());
                 entry.quality = self.operation.resulting_quality_state()
             })
             .await?;
 
         Ok(Success::ProcessedVideo {
-            dry: dry_entry.uuid,
-            wet: wet_entry.uuid,
+            dry: dry.uuid(),
+            wet: wet.uuid(),
         })
     }
 

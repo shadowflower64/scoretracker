@@ -3,6 +3,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::borrow::Cow;
 use std::fmt::{self, Display};
+use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -28,6 +29,19 @@ use uuid::Uuid;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UuidString(pub Uuid);
+
+impl Deref for UuidString {
+    type Target = Uuid;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for UuidString {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 impl From<Uuid> for UuidString {
     fn from(value: Uuid) -> Self {

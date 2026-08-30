@@ -1,30 +1,35 @@
 //! Module containing code for hive worker processes.
 pub mod config;
 pub mod data;
+pub mod get;
 pub mod ipc;
 pub mod names;
+pub mod put;
 pub mod queue_connection;
 pub mod status;
 pub mod ws;
 
-use crate::config::library_tab::{InternalLibraryConnections, LibraryAccessPath, LibraryTab};
+use crate::config::library_tab::{InternalLibraryAccessPath, InternalLibraryConnections, LibraryTab};
 use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::database::LibraryEntry;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
-use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
+use crate::data::library::stpl_url::{LibraryDomain, LibraryRoot, StplUrl};
 use crate::hive::job::{self, Fail, Job, Success};
 use crate::hive::queue::TaskNotFound;
 use crate::hive::task::{Task, TaskResult};
 use crate::hive::worker::config::{WorkerConfig, WorkerMode};
 use crate::hive::worker::data::{TaskProgress, WorkerData, WorkerInfo, WorkerState, WorkerStatus};
+use crate::hive::worker::get::Get;
 use crate::hive::worker::ipc::start_listener_thread;
+use crate::hive::worker::put::Put;
 use crate::hive::worker::queue_connection::QueueConnection;
 use crate::hive::worker::ws::start_server_connection_thread;
 use crate::util::dirs::log_dir;
 use crate::util::filelocked::FileLockableData;
 use crate::util::log::{LogError, open_log_file};
 use crate::util::timestamp::NsTimestamp;
+use crate::util::uuid::UuidString;
 use crate::util::{file_ex, lockfile};
 use crate::{error, info, log_fn_name, success, warn};
 use crossbeam_channel::Sender;
@@ -36,9 +41,11 @@ use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use std::{io, panic, process, thread};
+use std::{fs, io, panic, process, thread};
 use thiserror::Error;
 use uuid::Uuid;
+
+pub const DEBUG_WORKER_TEMP_FILE_CLEANUP: bool = true;
 
 /// Error while performing worker functions.
 #[derive(Debug, Error)]
@@ -78,11 +85,16 @@ pub enum WorkerStartError {
     TcpListenerBindError(io::Error),
     #[error("could not get local address of tcp listener: {0}")]
     TcpListenerLocalAddrError(io::Error),
-    #[error("could not open queue file: {0}")]
+    #[error("could not connect to local queue: cannot open queue file: {0}")]
     CannotOpenQueueFile(lockfile::Error),
-    #[error("could not close queue file: {0}")]
+    #[error("could not connect to local queue: cannot close queue file: {0}")]
     CannotCloseQueueFile(lockfile::Error),
+    #[error("while worker was running: {0}")]
+    RunError(#[from] WorkerRunError),
 }
+
+#[derive(Debug, Error)]
+pub enum WorkerRunError {}
 
 // TODO: safety LOL!
 type UnwindSafeMutex<T> = AssertUnwindSafe<Mutex<T>>;
@@ -235,22 +247,20 @@ impl Worker {
         start_server_connection_thread(Arc::clone(&worker_status_rx), Arc::clone(&task_progress_rx));
 
         // Start main loop
-        worker.main_loop();
-        Ok(())
+        Ok(worker.run()?)
     }
 
+    /// Main loop of the worker.
     #[named]
-    fn main_loop(self) {
+    fn run(self) -> Result<(), WorkerRunError> {
         log_fn_name!(auto);
 
-        // Main part
-        match self.config.mode {
+        let worker = Arc::new(self);
+        match worker.config.mode {
             WorkerMode::Single => info!("created single worker, now taking on a task..."),
             WorkerMode::Volatile => info!("created volatile worker, now taking on tasks..."),
             WorkerMode::Persistent => info!("created persistent worker, now taking on tasks..."),
         }
-
-        let worker = Arc::new(self);
 
         smol::block_on(async move {
             loop {
@@ -276,6 +286,19 @@ impl Worker {
         });
 
         info!("exiting");
+        Ok(())
+    }
+
+    async fn set_status_task_started(self: &Arc<Self>, task_uuid: UuidString) {
+        let mut status = self.data.status.lock().await;
+        status.state = WorkerState::Working;
+        status.current_task = Some(task_uuid);
+    }
+
+    async fn set_status_task_finished(self: &Arc<Self>) {
+        let mut status = self.data.status.lock().await;
+        status.state = WorkerState::Finished;
+        status.current_task = None;
     }
 
     /// Execute a task from the queue in the current thread.
@@ -286,17 +309,13 @@ impl Worker {
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
     #[named]
-    pub async fn execute_task(self: Arc<Self>, task: Task) {
+    pub async fn execute_task(self: &Arc<Self>, task: Task) {
         log_fn_name!("worker" : auto);
         info!("taking on task with uuid: {}", task.uuid.0);
         info!("starting task: {:?}", task);
 
         // Update worker state
-        {
-            let mut status = self.data.status.lock().await;
-            status.state = WorkerState::Working;
-            status.current_task = Some(task.uuid);
-        }
+        self.set_status_task_started(task.uuid).await;
 
         // Do the task
         let result = self.clone().execute_task_body(&task).await;
@@ -313,11 +332,7 @@ impl Worker {
         }
 
         // Update worker state
-        {
-            let mut status = self.data.status.lock().await;
-            status.state = WorkerState::Finished;
-            status.current_task = None;
-        }
+        self.set_status_task_finished().await;
     }
 
     /// Execute a task in the current thread.
@@ -391,7 +406,7 @@ impl Worker {
     }
 
     /// Returns a file path to the root of the specified library, if it is locally available (defined in the [`LibraryTable`] file).
-    pub async fn library_local_dir(&self, domain: &LibraryDomain) -> Option<&LibraryAccessPath> {
+    pub async fn local_library_dir(&self, domain: &LibraryDomain) -> Option<&InternalLibraryAccessPath> {
         let internal_library_connections = &self.internal_libraries;
         internal_library_connections.get_main_path(&domain)
     }
@@ -401,14 +416,14 @@ impl Worker {
     /// This function may take a long time to finish as the file may need to be downloaded from an external server.
     /// For local libraries, the file path is passed directly; it is not copied. Please use with care - do not write to the file.
     /// The returned library entry should always contain the provided URL.
-    pub async fn find_or_download_proof_file(&self, url: &StplUrl) -> Result<(PathBuf, LibraryEntry), WorkerError> {
-        if let Some(library_local_dir) = self.library_local_dir(&url.domain).await {
-            let resource_path = url
+    pub async fn find_or_download_proof_file(&self, url: &StplUrl) -> Result<Get, WorkerError> {
+        if let Some(library_dir) = self.local_library_dir(&url.domain).await {
+            let url_path = url
                 .path
                 .as_ref()
                 .expect("todo error handling: stpl url has to have a resource path");
-            let file_path = library_local_dir.path.join(resource_path);
-            Ok((file_path, todo!()))
+            let referenced_file_path = library_dir.path.join(url_path);
+            Ok(Get::new_referenced(todo!(), referenced_file_path))
         } else {
             todo!()
         }
@@ -424,18 +439,22 @@ impl Worker {
         file_to_upload: &Path,
         target_location: &StplUrl,
         entry_mutator: impl Fn(&mut LibraryEntry),
-    ) -> Result<LibraryEntry, WorkerError> {
+    ) -> Result<Put, WorkerError> {
         todo!()
     }
 
     /// Creates a new unique file path for temporary files or files generated by the worker.
-    pub fn create_temp_path(&self) -> PathBuf {
+    pub fn create_temp_path_global(&self) -> PathBuf {
         todo!()
     }
 
     /// Creates a new unique file path for temporary files or files generated by the worker.
     /// If the provided URL points to a internal library, the returned path will be on the same filesystem as the library if possible, so that it can be moved effortlessly later.
-    pub fn create_temp_path_for(&self, url: &StplUrl) -> PathBuf {
-        todo!()
+    pub async fn create_temp_path_for(&self, url: &StplUrl) -> PathBuf {
+        let local_temp = self.local_library_dir(&url.domain).await.and_then(|library_access| {
+            let root = LibraryRoot::of(&library_access.path).expect("todo: error handling");
+            root.create_temp_path()
+        });
+        local_temp.unwrap_or_else(|| self.create_temp_path_global())
     }
 }

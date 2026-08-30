@@ -51,7 +51,7 @@ impl Status {
 }
 
 #[derive(Debug, Clone)]
-pub struct LibraryAccessPath {
+pub struct InternalLibraryAccessPath {
     /// Lowest number = biggest priority/most often used.
     pub priority: i32,
 
@@ -62,7 +62,7 @@ pub struct LibraryAccessPath {
 #[derive(Debug, Clone)]
 pub struct LibraryAccessPathWithStatus {
     /// Main part of the structure.
-    body: LibraryAccessPath,
+    body: InternalLibraryAccessPath,
 
     /// Whether this path is currently available.
     status: Status,
@@ -70,7 +70,7 @@ pub struct LibraryAccessPathWithStatus {
 
 impl LibraryAccessPathWithStatus {
     /// Returns `Some(LibraryAccessPath)` if the status of this path entry is [`Status::Available`]. Returns `None` if the path is unavailable.
-    pub fn available_path(&self) -> Option<&LibraryAccessPath> {
+    pub fn available_path(&self) -> Option<&InternalLibraryAccessPath> {
         match self.status {
             Status::Available => Some(&self.body),
             Status::Bad(_) => None,
@@ -106,7 +106,7 @@ impl InternalLibraryConnection {
         for path in paths {
             let status = Self::check_path_availability(&path, expected_domain);
             paths_with_status.push(LibraryAccessPathWithStatus {
-                body: LibraryAccessPath { priority, path },
+                body: InternalLibraryAccessPath { priority, path },
                 status,
             });
             priority += 1;
@@ -115,7 +115,7 @@ impl InternalLibraryConnection {
     }
 
     /// Return the first path to the library that is actually available for use.
-    pub fn main_path(&self) -> Option<&LibraryAccessPath> {
+    pub fn main_path(&self) -> Option<&InternalLibraryAccessPath> {
         self.access_paths.first().and_then(|x| x.available_path())
     }
 
@@ -184,7 +184,7 @@ impl InternalLibraryConnections {
         InternalLibraryConnections { connections }
     }
 
-    pub fn get_main_path(&self, domain: &LibraryDomain) -> Option<&LibraryAccessPath> {
+    pub fn get_main_path(&self, domain: &LibraryDomain) -> Option<&InternalLibraryAccessPath> {
         self.connections.get(domain).and_then(|x| x.main_path())
     }
 

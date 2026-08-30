@@ -161,7 +161,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "worker" => match ctx.cmd()? {
                 "spawn" => {
                     let persistent: bool = ctx.pull_arg("persistent", "should the worker stay alive after finishing a task?")?;
-                    cmd::hive::spawn_worker(persistent)
+                    cmd::hive::start_worker(persistent)
                 }
                 _ => ctx.unknown_cmd(),
             },
