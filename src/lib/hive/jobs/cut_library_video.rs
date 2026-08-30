@@ -28,37 +28,37 @@ impl Job for CutLibraryVideoJob {
         info!("ffmpeg version: {:?}", ffmpeg_version);
 
         // Get source proof file
-        let (source_path, cloth_entry) = worker.find_or_download_proof_file(&self.source).await?;
+        let cloth = worker.find_or_download_proof_file(&self.source).await?;
+        let cloth_info = ClothInfo {
+            uuid: cloth.uuid(),
+            start_point: self.cut_start_point,
+            end_point: self.cut_end_point,
+        };
 
         // Check if it matches the precondition (if it doesn't, that means that the input request was incorrect or has become invalid)
         if let Some(precondition_uuid) = self.source_proof_uuid_precondition_check
-            && cloth_entry.uuid != precondition_uuid
+            && cloth.uuid() != precondition_uuid
         {
             return Err(Fail::PreconditionUuidDoesNotMatch {
                 stpl_url: self.source.clone(),
-                read_proof_uuid: cloth_entry.uuid,
+                read_proof_uuid: cloth.uuid(),
                 precondition_uuid,
             });
         }
 
         // Launch ffmpeg to cut the video losslessly
+        let source_path = cloth.read_only_path();
+        let destination_path = worker.create_temp_path_for(&self.destination).await;
         let start = self.cut_start_point.map(|x| x.as_secs_f64());
         let end = self.cut_end_point.map(|x| x.as_secs_f64());
-        let destination_path = worker.create_temp_path_for(&self.destination);
         let worker2 = Arc::clone(&worker);
         ffmpeg_cut_video_streamcopy(&source_path, &destination_path, start, end, async move |progress| {
             worker2.update_task_progress_very_simple(format!("{progress:?}")).await;
         })
         .await?;
 
-        let cloth_info = ClothInfo {
-            uuid: cloth_entry.uuid,
-            start_point: self.cut_start_point,
-            end_point: self.cut_end_point,
-        };
-
         // Register new file into library
-        let fragment_entry = worker
+        let fragment = worker
             .move_or_upload_proof_file(&destination_path, &self.destination, |entry| {
                 entry.cloth = Some(cloth_info.clone());
                 entry.cut = Some(true);
@@ -67,7 +67,7 @@ impl Job for CutLibraryVideoJob {
 
         Ok(Success::CutVideo {
             cloth: cloth_info,
-            fragment: fragment_entry.uuid,
+            fragment: fragment.uuid(),
         })
     }
 
