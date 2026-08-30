@@ -332,6 +332,11 @@ impl NsDuration {
         NsTimestamp(self.0)
     }
 
+    pub fn as_duration(self) -> Duration {
+        let (negative, duration) = self.try_as_std_duration().expect("msg");
+        duration
+    }
+
     pub fn try_as_std_duration(self) -> Result<(bool, Duration), Error> {
         self.0.try_into()
     }

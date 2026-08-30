@@ -186,10 +186,10 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                         let processing_type: Operation =
                             ctx.pull_arg("processing_type", "type/quality preset of video compression to do")?;
                         cmd::hive::add_task(ProcessLibraryVideoJob {
-                            source_path,
+                            source: source_path,
                             source_proof_uuid_precondition_check: None,
                             operation: processing_type,
-                            destination_path,
+                            destination: destination_path,
                         })
                     }
                     "execute-llc" => {

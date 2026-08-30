@@ -22,7 +22,7 @@ pub enum FFmpegError {
 }
 
 #[named]
-pub async fn spawn_ffmpeg(args: &[String], _on_progress: impl Fn(Progress) + Send + Sync + 'static) -> process::Output {
+pub async fn spawn_ffmpeg(args: &[String], _on_progress: impl AsyncFn(Progress) + Send + Sync + 'static) -> process::Output {
     log_fn_name!(auto);
     info!("running ffmpeg with arguments: {args:?}");
     let child = process::Command::new("ffmpeg").args(args).spawn().expect("todo"); //TODO: implement on_progress
@@ -61,7 +61,7 @@ pub async fn ffmpeg_cut_video_streamcopy(
     destination_path: &Path,
     start_time_sec: Option<f64>,
     end_time_sec: Option<f64>,
-    on_progress: impl Fn(Progress) + Send + Sync + 'static,
+    on_progress: impl AsyncFn(Progress) + Send + Sync + 'static,
 ) -> Result<(), FFmpegError> {
     log_fn_name!(auto);
 
@@ -99,7 +99,7 @@ pub async fn ffmpeg_process_video(
     source_path: &Path,
     destination_path: &Path,
     operation: Operation,
-    on_progress: impl Fn(Progress) + Send + Sync + 'static,
+    on_progress: impl AsyncFn(Progress) + Send + Sync + 'static,
 ) -> Result<(), FFmpegError> {
     log_fn_name!(auto);
 

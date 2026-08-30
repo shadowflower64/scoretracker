@@ -1,6 +1,6 @@
 //! Process (compress) a video from the library and save result to library
 use crate::data::library::database::QualityState;
-use crate::data::library::{create_stpl_url_to_relfile, get_library_dir_of_path, path_within_library_dir, scan_register_added_file};
+use crate::data::library::stpl_url::StplUrl;
 use crate::ffmpeg::audio_settings::{AudioEncoder, AudioSettings, Bitrate};
 use crate::ffmpeg::video_settings::{CpuPreset, VideoEncoder, VideoSettings};
 use crate::ffmpeg::{ffmpeg_process_video, get_version};
@@ -10,7 +10,17 @@ use crate::util::uuid::UuidString;
 use crate::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessLibraryVideoJob {
+    pub source: StplUrl,
+    pub source_proof_uuid_precondition_check: Option<UuidString>,
+    pub destination: StplUrl,
+
+    #[serde(alias = "processing_type")]
+    pub operation: Operation,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -110,15 +120,6 @@ impl FromStr for Operation {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ProcessLibraryVideoJob {
-    pub source_path: PathBuf,
-    pub source_proof_uuid_precondition_check: Option<UuidString>,
-    #[serde(alias = "processing_type")]
-    pub operation: Operation,
-    pub destination_path: PathBuf,
-}
-
 impl Job for ProcessLibraryVideoJob {
     async fn run(&self, worker: Arc<Worker>) -> Result<Success, Fail> {
         log_fn_name!("job:process_library_video");
@@ -126,95 +127,42 @@ impl Job for ProcessLibraryVideoJob {
         let ffmpeg_version = get_version().await;
         info!("ffmpeg version: {:?}", ffmpeg_version);
 
-        let worker_info = Some(worker.info());
-        let config = worker.config();
+        // Get source proof file
+        let (source_path, dry_entry) = worker.find_or_download_proof_file(&self.source).await?;
 
-        // Find library directory of the source proof file
-        let source_library_dir = get_library_dir_of_path(&self.source_path).ok_or_else(|| Fail::PathNotInLibraryRepo {
-            path: self.source_path.clone(),
-        })?;
-        let source_relpath =
-            path_within_library_dir(&source_library_dir, &self.source_path).ok_or_else(|| Fail::CannotFindPathWithinLibraryDir {
-                library_dir: source_library_dir.clone(),
-                target_file_path: self.source_path.clone(),
-            })?;
-
-        // Fetch the source proof UUID from the local index
-        let source_library_index = worker.read_library_index(&source_library_dir)?;
-        let source_proof_uuid = source_library_index
-            .files
-            .get(&source_relpath)
-            .ok_or_else(|| Fail::FileNotInIndex {
-                library_dir: source_library_dir.clone(),
-                target_relpath: source_relpath.clone(),
-            })?
-            .0;
-
-        // Check if it matches the precondition (if it doesn't, that means that the input request was incorrect!)
+        // Check if it matches the precondition (if it doesn't, that means that the input request was incorrect or has become invalid)
         if let Some(precondition_uuid) = self.source_proof_uuid_precondition_check
-            && source_proof_uuid != precondition_uuid.0
+            && dry_entry.uuid != precondition_uuid
         {
-            Err(Fail::PreconditionUuidDoesNotMatch {
-                file_path: self.source_path.clone(),
-                read_proof_uuid: source_proof_uuid.into(),
+            return Err(Fail::PreconditionUuidDoesNotMatch {
+                stpl_url: self.source.clone(),
+                read_proof_uuid: dry_entry.uuid,
                 precondition_uuid,
-            })?
-        }
-
-        // Get source proof entry from the database
-        let proof_entry = worker
-            .fetch_library_entry_by_uuid(source_proof_uuid)
-            .await?
-            .ok_or(Fail::EntryNotFound(source_proof_uuid.into()))?;
-
-        // Sanity check - proof entry with the given UUID should contain the given URL.
-        // If it doesn't, that means the library needs to be rescanned or the request was invalid.
-        let source_library_info = worker.read_library_info(&source_library_dir)?;
-        let file_url = create_stpl_url_to_relfile(source_library_info, source_relpath);
-        if !proof_entry.library_urls.contains(&file_url) {
-            Err(Fail::FileUrlNotFoundInLibraryEntry {
-                expected_url: file_url,
-                entry: Box::new(proof_entry.to_owned()),
-            })?
+            });
         }
 
         // Launch ffmpeg to cut the video losslessly
-        let output_path = worker.create_temp_path();
+        let destination_path = worker.create_temp_path_for(&self.destination);
         let worker2 = Arc::clone(&worker);
-        ffmpeg_process_video(&self.source_path, &output_path, self.operation, move |progress| {
-            worker2.update_task_progress_very_simple(format!("{progress:?}"));
+        ffmpeg_process_video(&source_path, &destination_path, self.operation, async move |progress| {
+            worker2.update_task_progress_very_simple(format!("{progress:?}")).await;
         })
         .await?;
 
-        // Get library info of the destination file
-        let wet = if let Some(destination_library_dir) = get_library_dir_of_path(&self.source_path) {
-            // Register new file to index and to database
-            worker.upload_file_to_library(self.destination_path);
-
-            let (_rel_path, uuid) = scan_register_added_file(
-                &destination_library_dir,
-                &config.library_database_path(),
-                &self.destination_path,
-                |entry| {
-                    entry.dry = Some(source_proof_uuid.into());
-                    entry.quality = self.operation.resulting_quality_state()
-                },
-                worker_info,
-            )
-            .map_err(|e| Fail::CannotRegisterFileIntoLibrary {
-                file_path: self.destination_path.to_owned(),
-                reason: e.to_string(),
-            })?;
-            Some(uuid.into())
-        } else {
-            None
-        };
+        // Register new file into library
+        let wet_entry = worker
+            .move_or_upload_proof_file(&destination_path, &self.destination, |entry| {
+                entry.dry = Some(dry_entry.uuid);
+                entry.quality = self.operation.resulting_quality_state()
+            })
+            .await?;
 
         Ok(Success::ProcessedVideo {
-            dry: source_proof_uuid.into(),
-            wet,
+            dry: dry_entry.uuid,
+            wet: wet_entry.uuid,
         })
     }
+
     fn into_any(self) -> AnyJob {
         AnyJob::ProcessLibraryVideo(self)
     }

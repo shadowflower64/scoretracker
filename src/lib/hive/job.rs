@@ -23,8 +23,8 @@ use thiserror::Error;
 #[serde(tag = "type", content = "details")]
 pub enum Success {
     Void,
-    ProcessedVideo { dry: UuidString, wet: Option<UuidString> },
-    CutVideo { cloth: ClothInfo, fragment: Option<UuidString> },
+    ProcessedVideo { dry: UuidString, wet: UuidString },
+    CutVideo { cloth: ClothInfo, fragment: UuidString },
 }
 
 /// Failed result of a job.
@@ -64,10 +64,10 @@ pub enum Fail {
     #[error("cannot register file at {file_path:?} into library: {reason}")]
     CannotRegisterFileIntoLibrary { file_path: PathBuf, reason: String },
     #[error(
-        "precondition check failed: uuid detected from path does not match precondition uuid ({read_proof_uuid} != {precondition_uuid}); path: {file_path:?}"
+        "precondition check failed: uuid detected from path does not match precondition uuid ({read_proof_uuid} != {precondition_uuid}); url: {stpl_url}"
     )]
     PreconditionUuidDoesNotMatch {
-        file_path: PathBuf,
+        stpl_url: StplUrl,
         read_proof_uuid: UuidString,
         precondition_uuid: UuidString,
     },
