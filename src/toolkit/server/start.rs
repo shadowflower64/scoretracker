@@ -1,27 +1,24 @@
+use super::access_rules::AuthenticatedUser;
 use super::api;
 use super::api::ApiDoc;
 use super::api::ApiError;
-use super::config::{ServerConfig, ServerConfigError};
+use super::config::ServerConfig;
+use super::library_hall::LibraryConnections;
 use actix_files::NamedFile;
 use actix_web::http::StatusCode;
 use actix_web::{App, HttpServer, Scope, get};
 use actix_web::{Error, HttpRequest};
 use function_name::named;
 use relative_path::{Component, RelativePathBuf};
-use scoretracker::config::library_tab::InternalLibraryAccessPath;
-use scoretracker::config::library_tab::InternalLibraryAccessPathWithStatus;
-use scoretracker::config::library_tab::InternalLibraryConnection;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::TomlConfig;
-use scoretracker::data::library::info::LibraryInfo;
+use scoretracker::config::toml::TomlConfigError;
 use scoretracker::data::library::stpl_url::LibraryDomain;
-use scoretracker::util::filelocked::FileLockableData;
 use scoretracker::util::relative_path_from_segments;
-use scoretracker::{debug, error, info, log_fn_name, log_should_print_debug, success, warn};
+use scoretracker::{debug, info, log_fn_name, log_should_print_debug, success, warn};
 use serde::Serialize;
-use std::collections::HashMap;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use utoipa::{OpenApi, ToSchema};
@@ -98,38 +95,6 @@ mod testing_area {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ServerLibraryConnection {
-    /// This library is on the same system as the server, and the files of the library can be directly accessed by the server process.
-    Internal(InternalLibraryConnection),
-
-    /// This library is on a different server, and direct filesystem access is not available.
-    //External { address: IpAddr, port: u16 },
-    External { url: String },
-}
-
-#[derive(Debug, Clone)]
-pub enum AccessRules {
-    DenyByDefault { allowlist: Vec<String> }, // TODO: implement authorization
-    AllowByDefault { denylist: Vec<String> }, // TODO: implement authorization
-}
-
-#[derive(Debug, Clone)]
-pub struct LibraryConnectionInfo {
-    pub connection: ServerLibraryConnection,
-    pub library_info: LibraryInfo,
-    pub permissions: AccessRules,
-}
-
-impl LibraryConnectionInfo {
-    pub fn auth_required(&self) -> bool {
-        todo!()
-    }
-    pub fn does_user_have_access(&self, _auth: UserAuth) -> bool {
-        todo!()
-    }
-}
-
 pub struct AppData {
     pub server_config: Arc<ServerConfig>,
     pub connected_libraries: Arc<RwLock<LibraryConnections>>,
@@ -180,98 +145,46 @@ impl ApiError for DomainResolveError {
     }
 }
 
-pub struct UserAuth {}
-
-impl UserAuth {}
-
 impl AppData {
-    pub fn resolve_domain(&self, domain: &LibraryDomain, auth_opt: Option<UserAuth>) -> Result<DomainResolved, DomainResolveError> {
+    pub fn resolve_domain(
+        &self,
+        domain: &LibraryDomain,
+        auth_opt: Option<AuthenticatedUser>,
+    ) -> Result<DomainResolved, DomainResolveError> {
         let lock = self.connected_libraries.read().unwrap();
-        let Some(connection_info) = lock.get(domain) else {
+        let Some(hall) = lock.get(domain) else {
             return Err(DomainResolveError::NotKnown);
         };
 
-        if connection_info.auth_required() {
+        if hall.access_rules.auth_required() {
             let Some(auth) = auth_opt else {
                 return Err(DomainResolveError::Unauthorized);
             };
-            if !connection_info.does_user_have_access(auth) {
+            if !hall.access_rules.does_user_have_access(auth) {
                 return Err(DomainResolveError::Forbidden);
             }
         }
 
-        match &connection_info.connection {
-            ServerLibraryConnection::External { url } => Ok(DomainResolved::External { url: url.clone() }),
-            ServerLibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
-        }
+        todo!("find best mirror and return it.. alternatively, return all mirrors and let the caller deal with it")
+        // match &hall {
+        //     AnyLibraryConnection::External { url } => Ok(DomainResolved::External { url: url.clone() }),
+        //     AnyLibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
+        // }
     }
 }
 
-type LibraryConnections = HashMap<LibraryDomain, LibraryConnectionInfo>;
-
 #[named]
-fn connect_internal_libraries(internal_libraries: &HashMap<LibraryDomain, Vec<PathBuf>>) -> LibraryConnections {
-    // TODO: majority of this is now handled within the LibraryTab module; merge these two together
-    log_fn_name!(auto);
-
+fn connect_internal_libraries() -> LibraryConnections {
     let tab = LibraryTab::load().expect("todo: error handling");
-    let connections = tab.scan();
-
-    let mut connections = HashMap::new();
-    for (domain, paths) in internal_libraries {
-        info!("connecting internal library with domain: {domain}");
-
-        let mut loaded_library_info = None;
-        let paths: Vec<_> = paths.iter().map(|library_dir| {
-            let Ok(library_info) = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)) else {
-                warn!("{domain}: library directory offline: {library_dir:?}, skipping");
-                return InternalLibraryAccessPathWithStatus {
-                    body: InternalLibraryAccessPath {
-                        path: library_dir.to_owned(),
-
-                    }
-                } (library_dir.to_owned(), Status::Unavailable);
-            };
-
-            let domain_from_info = library_info.domain.clone();
-            if *domain != domain_from_info {
-                error!(
-                    "{domain}: installed domain name and library info domain name ({domain_from_info}) do not match; please reinstall the library"
-                );
-                return (library_dir.to_owned(), Status::Unavailable);
-            }
-
-            if loaded_library_info.is_none() {
-                loaded_library_info = Some(library_info);
-            }
-            (library_dir.to_owned(), Status::Available)
-        }).collect();
-
-        let Some(library_info) = loaded_library_info else {
-            error!("{domain}: no paths are available");
-            continue;
-        };
-
-        let conn_info = LibraryConnectionInfo {
-            connection: ServerLibraryConnection::Internal(InternalLibraryConnection::new(paths)),
-            library_info: library_info,
-            permissions: AccessRules::AllowByDefault { denylist: Vec::new() },
-        };
-        let prev_conn_info = connections.insert(domain.clone(), conn_info.clone());
-        if let Some(prev_conn_info) = prev_conn_info {
-            error!(
-                "{domain}: library domain name collision: trying to insert {:?} but {:?} was already inserted",
-                prev_conn_info, conn_info
-            )
-        }
-    }
+    let mut connections = LibraryConnections::new();
+    connections.add_internal_mirrors(tab.scan());
     connections
 }
 
 #[derive(Debug, Error)]
 pub enum ServerStartError {
     #[error("configuration error: {0}")]
-    ServerConfigError(#[from] ServerConfigError),
+    ServerConfigError(#[from] TomlConfigError),
     #[error("http server error: {0}")]
     HttpServerError(#[from] io::Error),
 }
@@ -285,14 +198,14 @@ pub async fn server_main() -> Result<(), ServerStartError> {
     info!("starting server on: http://{HOST}:{PORT}");
 
     let server_config = Arc::new(ServerConfig::load()?);
-    let library_table = LibraryTab::load().expect("todo: error handling");
-    let internal_library_connections = Arc::new(RwLock::new(connect_internal_libraries(&library_table.internal_libraries)));
+    let internal_library_connections = Arc::new(RwLock::new(connect_internal_libraries()));
     {
-        let map = internal_library_connections.read().unwrap();
-        if map.len() == 0 {
+        let connections = internal_library_connections.read().unwrap();
+        let count = connections.len();
+        if count == 0 {
             warn!("no library connections established!")
         } else {
-            success!("{} library connections established: {:?}", map.len(), map);
+            success!("{count} library connections established: {connections:?}");
         }
     }
 

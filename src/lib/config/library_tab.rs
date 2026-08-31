@@ -6,6 +6,7 @@ use crate::config::toml::TomlConfig;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::LibraryDomain;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -33,16 +34,16 @@ pub enum BadLibraryError {
 }
 
 #[derive(Debug, Clone)]
-pub enum Status {
-    Available,
+pub enum MirrorStatus {
+    Available(LibraryInfo),
     Bad(Arc<BadLibraryError>),
     Unavailable,
 }
 
-impl Status {
+impl MirrorStatus {
     pub fn sort_key(&self) -> u8 {
         match self {
-            Self::Available => 0,
+            Self::Available(_) => 0,
             Self::Bad(_) => 1,
             Self::Unavailable => 2,
         }
@@ -58,39 +59,58 @@ pub struct InternalLibraryAccessPath {
     pub path: PathBuf,
 }
 
-#[derive(Debug, Clone)]
-pub struct InternalLibraryAccessPathWithStatus {
-    /// Main part of the structure.
-    pub body: InternalLibraryAccessPath,
-
-    /// Whether this path is currently available.
-    pub status: Status,
+impl InternalLibraryAccessPath {
+    pub fn unique_key(&self) -> Cow<'_, str> {
+        self.path.to_string_lossy()
+    }
 }
 
-impl InternalLibraryAccessPathWithStatus {
+#[derive(Debug, Clone)]
+pub struct InternalLibraryMirror {
+    /// Main part of the structure.
+    pub access_path: InternalLibraryAccessPath,
+
+    /// Whether this path is currently available.
+    pub status: MirrorStatus,
+}
+
+impl InternalLibraryMirror {
     /// Returns `Some(LibraryAccessPath)` if the status of this path entry is [`Status::Available`]. Returns `None` if the path is unavailable.
     pub fn available_path(&self) -> Option<&InternalLibraryAccessPath> {
         match self.status {
-            Status::Available => Some(&self.body),
-            Status::Bad(_) => None,
-            Status::Unavailable => None,
+            MirrorStatus::Available(_) => Some(&self.access_path),
+            MirrorStatus::Bad(_) => None,
+            MirrorStatus::Unavailable => None,
+        }
+    }
+
+    /// Returns `Some(LibraryInfo)` if the status of this path entry is [`Status::Available`]. Returns `None` if the path is unavailable.
+    pub fn library_info(&self) -> Option<&LibraryInfo> {
+        match &self.status {
+            MirrorStatus::Available(info) => Some(info),
+            MirrorStatus::Bad(_) => None,
+            MirrorStatus::Unavailable => None,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct InternalLibraryConnection {
+pub struct InternalLibraryHall {
     /// Invariant: this vec is always sorted so that the accessible path is always first.
     /// You can get the most useful path in O(1) time by using [`Vec::first`] (and checking whether it's available).
-    access_paths: Vec<InternalLibraryAccessPathWithStatus>,
+    mirrors: Vec<InternalLibraryMirror>,
 }
 
-impl InternalLibraryConnection {
+impl InternalLibraryHall {
+    pub fn mirrors(self) -> Vec<InternalLibraryMirror> {
+        self.mirrors
+    }
+
     /// Create a connection from a set of paths with their status.
-    pub fn new(mut access_paths: Vec<InternalLibraryAccessPathWithStatus>) -> Self {
-        access_paths.sort_by_key(|x| x.body.priority);
-        access_paths.sort_by_key(|x| x.status.sort_key());
-        Self { access_paths }
+    pub fn new(mut mirrors: Vec<InternalLibraryMirror>) -> Self {
+        mirrors.sort_by_key(|x| x.access_path.priority);
+        mirrors.sort_by_key(|x| x.status.sort_key());
+        Self { mirrors }
     }
 
     /// Create a connection from a given set of paths to the library.
@@ -100,42 +120,42 @@ impl InternalLibraryConnection {
     ///
     /// The path may be checked again using the `redetect` function.
     pub fn scan_paths(paths: Vec<PathBuf>, expected_domain: &LibraryDomain) -> Self {
-        let mut paths_with_status = Vec::with_capacity(paths.len());
+        let mut mirrors = Vec::with_capacity(paths.len());
         let mut priority = 0;
         for path in paths {
             let status = Self::check_path_availability(&path, expected_domain);
-            paths_with_status.push(InternalLibraryAccessPathWithStatus {
-                body: InternalLibraryAccessPath { priority, path },
+            mirrors.push(InternalLibraryMirror {
+                access_path: InternalLibraryAccessPath { priority, path },
                 status,
             });
             priority += 1;
         }
-        Self::new(paths_with_status)
+        Self::new(mirrors)
     }
 
     /// Return the first path to the library that is actually available for use.
     pub fn main_path(&self) -> Option<&InternalLibraryAccessPath> {
-        self.access_paths.first().and_then(|x| x.available_path())
+        self.mirrors.first().and_then(|x| x.available_path())
     }
 
-    fn check_path_availability(path: &Path, expected_domain: &LibraryDomain) -> Status {
+    fn check_path_availability(path: &Path, expected_domain: &LibraryDomain) -> MirrorStatus {
         let library_info_path = path.join(LibraryInfo::STANDARD_FILENAME);
         if !library_info_path.is_file() {
-            return Status::Unavailable;
+            return MirrorStatus::Unavailable;
         }
         match LibraryInfo::load_from_file(&library_info_path) {
             Ok(library_info) => {
                 if &library_info.domain != expected_domain {
-                    return Status::Bad(Arc::new(BadLibraryError::WrongDomain {
+                    return MirrorStatus::Bad(Arc::new(BadLibraryError::WrongDomain {
                         expected: expected_domain.clone(),
                         actual: library_info.domain,
                     }));
                 }
 
-                return Status::Available;
+                return MirrorStatus::Available(library_info);
             }
             Err(error) => {
-                return Status::Bad(Arc::new(BadLibraryError::FileExError {
+                return MirrorStatus::Bad(Arc::new(BadLibraryError::FileExError {
                     library_info_path,
                     error_message: error.to_string(),
                 }));
@@ -145,8 +165,8 @@ impl InternalLibraryConnection {
 
     /// Refresh all paths' availability status.
     pub fn redetect(&mut self, expected_domain: &LibraryDomain) {
-        for access_path in &mut self.access_paths {
-            let fresh_status = Self::check_path_availability(&access_path.body.path, expected_domain);
+        for access_path in &mut self.mirrors {
+            let fresh_status = Self::check_path_availability(&access_path.access_path.path, expected_domain);
             access_path.status = fresh_status;
         }
     }
@@ -155,10 +175,10 @@ impl InternalLibraryConnection {
     ///
     /// Returns `Some(status)` if the path exists within the connection and has been redetected.
     /// Returns `None` if the path doesn't exist within the connection and the function did nothing.
-    pub fn redetect_path(&mut self, requested_path: &Path, expected_domain: &LibraryDomain) -> Option<Status> {
+    pub fn redetect_path(&mut self, requested_path: &Path, expected_domain: &LibraryDomain) -> Option<MirrorStatus> {
         let mut fresh_status = None;
-        for access_path in &mut self.access_paths {
-            if access_path.body.path == requested_path {
+        for access_path in &mut self.mirrors {
+            if access_path.access_path.path == requested_path {
                 access_path.status = fresh_status
                     .get_or_insert_with(|| Self::check_path_availability(&requested_path, expected_domain))
                     .clone();
@@ -170,14 +190,18 @@ impl InternalLibraryConnection {
 
 #[derive(Debug)]
 pub struct InternalLibraryConnections {
-    connections: HashMap<LibraryDomain, InternalLibraryConnection>,
+    connections: HashMap<LibraryDomain, InternalLibraryHall>,
 }
 
 impl InternalLibraryConnections {
+    pub fn connections(self) -> HashMap<LibraryDomain, InternalLibraryHall> {
+        self.connections
+    }
+
     pub fn scan_domains(map: HashMap<LibraryDomain, Vec<PathBuf>>) -> Self {
         let mut connections = HashMap::with_capacity(map.len());
         for (domain, paths) in map {
-            let connection = InternalLibraryConnection::scan_paths(paths, &domain);
+            let connection = InternalLibraryHall::scan_paths(paths, &domain);
             connections.insert(domain, connection);
         }
         InternalLibraryConnections { connections }
@@ -208,7 +232,7 @@ impl InternalLibraryConnections {
 }
 
 impl Deref for InternalLibraryConnections {
-    type Target = HashMap<LibraryDomain, InternalLibraryConnection>;
+    type Target = HashMap<LibraryDomain, InternalLibraryHall>;
     fn deref(&self) -> &Self::Target {
         &self.connections
     }

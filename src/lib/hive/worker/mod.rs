@@ -6,6 +6,7 @@ pub mod ipc;
 pub mod names;
 pub mod put;
 pub mod queue_connection;
+pub mod server_connection;
 pub mod status;
 pub mod ws;
 
@@ -25,6 +26,7 @@ use crate::hive::worker::get::Get;
 use crate::hive::worker::ipc::start_listener_thread;
 use crate::hive::worker::put::Put;
 use crate::hive::worker::queue_connection::QueueConnection;
+use crate::hive::worker::server_connection::{ServerConnection, ServerError};
 use crate::hive::worker::ws::start_server_connection_thread;
 use crate::util::dirs::log_dir;
 use crate::util::filelocked::FileLockableData;
@@ -73,6 +75,8 @@ pub enum WorkerError {
     CannotReadLibraryInfo(TomlConfigError),
     #[error("cannot read library index: {0}")]
     CannotReadLibraryIndex(file_ex::Error),
+    #[error("server error: {0}")]
+    ServerError(#[from] ServerError),
 }
 
 /// Error while starting a worker process.
@@ -92,6 +96,8 @@ pub enum WorkerStartError {
     CannotCloseQueueFile(lockfile::Error),
     #[error("while worker was running: {0}")]
     RunError(#[from] WorkerRunError),
+    #[error("server error: {0}")]
+    ServerError(#[from] ServerError),
 }
 
 #[derive(Debug, Error)]
@@ -106,6 +112,7 @@ pub struct Worker {
     config: WorkerConfig,
     data: Arc<WorkerData>,
     queue_connection: UnwindSafeMutex<QueueConnection>,
+    server_connection: Arc<ServerConnection>,
     internal_libraries: InternalLibraryConnections,
     worker_status_tx: Sender<WorkerStatus>,
     task_progress_tx: Sender<TaskProgress>,
@@ -189,13 +196,13 @@ impl Worker {
     }
 
     /// Initialize a new worker structure with a default config and a random name.
-    pub fn start_default() -> Result<(), WorkerStartError> {
-        Self::start(names::random_name().to_owned(), WorkerConfig::load()?)
+    pub async fn start_default() -> Result<(), WorkerStartError> {
+        Self::start(names::random_name().to_owned(), WorkerConfig::load()?).await
     }
 
     /// Initialize a new worker structure, connect to the queue, start ipc threads, and start the worker.
     #[named]
-    pub fn start(short_name: String, config: WorkerConfig) -> Result<(), WorkerStartError> {
+    pub async fn start(short_name: String, config: WorkerConfig) -> Result<(), WorkerStartError> {
         log_fn_name!("worker" : auto);
 
         let pid = process::id();
@@ -233,6 +240,7 @@ impl Worker {
             worker_status_tx,
             task_progress_tx,
             queue_connection,
+            server_connection: Arc::new(ServerConnection::connect().await?),
             internal_libraries: LibraryTab::load().expect("todo error handling").scan(),
         };
 
@@ -248,12 +256,12 @@ impl Worker {
         start_server_connection_thread(Arc::clone(&worker_status_rx), Arc::clone(&task_progress_rx));
 
         // Start main loop
-        Ok(worker.run()?)
+        Ok(worker.run().await?)
     }
 
     /// Main loop of the worker.
     #[named]
-    fn run(self) -> Result<(), WorkerRunError> {
+    async fn run(self) -> Result<(), WorkerRunError> {
         log_fn_name!(auto);
 
         let worker = Arc::new(self);
@@ -263,28 +271,26 @@ impl Worker {
             WorkerMode::Persistent => info!("created persistent worker, now taking on tasks..."),
         }
 
-        smol::block_on(async move {
-            loop {
-                if let Some(task_to_do) = worker.take_task().await.expect("todo error handling") {
-                    worker.clone().execute_task(task_to_do).await;
-                } else {
-                    info!("no tasks to do!");
-                    if worker.config.mode.quit_when_no_tasks() {
-                        break;
-                    }
-                }
-
-                // Do not jump back up if the mode does not have looping enabled
-                if !worker.config.mode.enable_loop() {
+        loop {
+            if let Some(task_to_do) = worker.take_task().await.expect("todo error handling") {
+                worker.clone().execute_task(task_to_do).await;
+            } else {
+                info!("no tasks to do!");
+                if worker.config.mode.quit_when_no_tasks() {
                     break;
                 }
-
-                // let the worker rest a little bit...
-                let seconds = worker.config.sleep_duration_seconds;
-                info!("worker sleeping for {seconds} seconds...");
-                thread::sleep(Duration::from_secs_f64(seconds));
             }
-        });
+
+            // Do not jump back up if the mode does not have looping enabled
+            if !worker.config.mode.enable_loop() {
+                break;
+            }
+
+            // let the worker rest a little bit...
+            let seconds = worker.config.sleep_duration_seconds;
+            info!("worker sleeping for {seconds} seconds...");
+            thread::sleep(Duration::from_secs_f64(seconds));
+        }
 
         info!("exiting");
         Ok(())
@@ -424,6 +430,9 @@ impl Worker {
                 .as_ref()
                 .expect("todo error handling: stpl url has to have a resource path");
             let referenced_file_path = library_dir.path.join(url_path);
+
+            let library_entry = self.server_connection.get_library_entry_by_url(url).await?;
+
             Ok(Get::new_referenced(todo!(), referenced_file_path))
         } else {
             todo!()

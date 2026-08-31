@@ -7,7 +7,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 #[cfg(feature = "toolkit-server")]
-use crate::server::{config::ServerConfigError, start::ServerStartError};
+use crate::server::start::ServerStartError;
 
 #[derive(Debug, Error)]
 pub enum CmdError {
@@ -98,7 +98,7 @@ pub enum CmdError {
     ServerStartError(#[from] ServerStartError),
     #[cfg(feature = "toolkit-server")]
     #[error("server config error: {0}")]
-    ServerConfigError(#[from] ServerConfigError),
+    ServerConfigError(TomlConfigError),
 
     #[error("library table error: {0}")]
     LibraryTableError(TomlConfigError),

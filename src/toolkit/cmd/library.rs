@@ -96,7 +96,7 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
 
     let info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(CmdError::LibraryInfoReadError)?;
 
-    let source_toml = LibraryTab::load_raw()?;
+    let source_toml = LibraryTab::load_raw().map_err(CmdError::LibraryTableError)?;
     let mut document: DocumentMut = source_toml.parse().expect("todo: invalid library table");
 
     let internal_libraries_tab = document["internal_libraries"].as_table_mut().expect("todo: invalid library table");

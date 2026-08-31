@@ -2,45 +2,17 @@ use crate::hive::queue::TaskQueue;
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::hive::worker::WorkerError;
 use crate::hive::worker::data::WorkerInfo;
+use crate::hive::worker::server_connection::ServerConnection;
 use crate::util::filelocked::ClosedOrOpen;
 use crate::util::timestamp::NsTimestamp;
 use std::borrow::Cow;
+use std::sync::Arc;
 use uuid::Uuid;
-
-// TODO
-#[derive(Debug)]
-pub enum ServerConnection {}
-
-impl ServerConnection {
-    // GET /api/hive/take_task
-    // This endpoint should have authentication.
-    // `worker_info` should be sent to the server beforehand, during the initial worker authentication, with websockets.
-    // Here, we only really need to send the auth token.
-    pub async fn take_task(&self) -> Result<Option<Task>, WorkerError> {
-        todo!()
-    }
-
-    // GET /api/hive/take_task/{uuid}
-    // This endpoint should have authentication.
-    // `worker_info` should be sent to the server beforehand, during the initial worker authentication, with websockets.
-    // Here, we only really need to send the auth token.
-    pub async fn take_task_with_uuid(&self, uuid: Uuid) -> Result<Option<Task>, WorkerError> {
-        todo!()
-    }
-
-    // PUT /api/hive/finish_task/{uuid}
-    // This endpoint should have authentication.
-    // `worker_info` should be sent to the server beforehand, during the initial worker authentication, with websockets.
-    // Here, we only really need to send the auth token.
-    pub async fn update_task_state(&self, uuid: Uuid, result: TaskResult, finish_timestamp: NsTimestamp) -> Result<(), WorkerError> {
-        todo!()
-    }
-}
 
 #[derive(Debug)]
 pub enum QueueConnection {
     QueueFile(ClosedOrOpen<TaskQueue>),
-    ServerConnection(ServerConnection),
+    RemoteServer(Arc<ServerConnection>),
 }
 
 impl QueueConnection {
@@ -64,9 +36,9 @@ impl QueueConnection {
 
                 Ok(Some(ret))
             }
-            Self::ServerConnection(conn) => {
+            Self::RemoteServer(conn) => {
                 // If task is Some, the server modifies the task state to TaskState::Working, we don't have to do much
-                conn.take_task().await
+                Ok(conn.take_task().await?)
             }
         }
     }
@@ -91,9 +63,9 @@ impl QueueConnection {
 
                 Ok(Some(ret))
             }
-            Self::ServerConnection(conn) => {
+            Self::RemoteServer(conn) => {
                 // If task is Some, the server modifies the task state to TaskState::Working, we don't have to do much
-                conn.take_task_with_uuid(task_uuid).await
+                Ok(conn.take_task_with_uuid(task_uuid).await?)
             }
         }
     }
@@ -117,9 +89,10 @@ impl QueueConnection {
                 file.save_and_close().map_err(WorkerError::CannotWriteQueueFile)?;
                 Ok(())
             }
-            QueueConnection::ServerConnection(conn) => {
+            QueueConnection::RemoteServer(conn) => {
                 // The server should take care of everything from here really
-                conn.update_task_state(task_uuid, result, finish_timestamp).await
+                conn.update_task_state(task_uuid, result, finish_timestamp).await?;
+                Ok(())
             }
         }
     }

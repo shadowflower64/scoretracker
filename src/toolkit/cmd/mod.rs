@@ -266,7 +266,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             "table" => match ctx.cmd()? {
                 "init" => {
                     let path = LibraryTab::default_path();
-                    LibraryTab::default().write_new(&path)?;
+                    LibraryTab::default().write_new(&path).map_err(CmdError::LibraryTableError)?;
                     success_npr!("empty library table successfully written to: {path:?}");
                     Ok(())
                 }
@@ -314,7 +314,7 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 {
                     use crate::server::config::ServerConfig;
                     let path = ServerConfig::default_path();
-                    ServerConfig::default().write_new(&path)?;
+                    ServerConfig::default().write_new(&path).map_err(CmdError::ServerConfigError)?;
                     success_npr!("config successfully written to: {path:?}");
                     Ok(())
                 }

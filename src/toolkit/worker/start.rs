@@ -1,5 +1,5 @@
 use scoretracker::hive::worker::{Worker, WorkerStartError};
 
 pub fn worker_main() -> Result<(), WorkerStartError> {
-    Worker::start_default()
+    smol::block_on(async move { Worker::start_default().await })
 }

@@ -2,8 +2,10 @@ use function_name::named;
 use scoretracker::{error, info, log_fn_name, util::log};
 use std::process::ExitCode;
 
+pub mod access_rules;
 mod api;
 mod config;
+pub mod library_hall;
 mod start;
 
 #[named]
