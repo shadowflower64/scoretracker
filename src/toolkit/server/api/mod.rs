@@ -1,4 +1,5 @@
 pub mod r#match;
+pub mod performance;
 pub mod worker_connect;
 
 use super::start::AppData;
@@ -112,5 +113,5 @@ pub async fn resolve_stpl_url(
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(resolve_stpl_url, r#match::get_match, r#match::get_match_list, r#match::put_match))]
+#[openapi(paths(resolve_stpl_url, r#match::get_match, r#match::list_matches, r#match::put_match))]
 pub struct ApiDoc;

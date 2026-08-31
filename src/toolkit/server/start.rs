@@ -323,7 +323,7 @@ pub async fn server_main() -> Result<(), ServerStartError> {
             .service(testing_area::hey)
             .service(
                 Scope::new("/api")
-                    .service(api::r#match::get_match_list)
+                    .service(api::r#match::list_matches)
                     .service(api::r#match::get_match)
                     .service(api::r#match::put_match)
                     .service(api::resolve_stpl_url)

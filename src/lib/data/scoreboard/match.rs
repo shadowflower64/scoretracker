@@ -131,7 +131,7 @@ impl MatchDatabase {
         self.matches.iter_mut().find(|x| x.uuid() == uuid).map(|x| x.as_mut())
     }
 
-    pub fn insert(&mut self, match_data: Box<AnyMatch>) -> Result<Uuid, InsertError> {
+    pub fn insert_new(&mut self, match_data: Box<AnyMatch>) -> Result<Uuid, InsertError> {
         let threshold = NsDuration::from_secs_f64(Self::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
         if let Some((close_match, how_close)) = self.find_other_close_matches(match_data.as_ref(), threshold).first() {
             return Err(InsertError::TooClose(close_match.uuid().0, *how_close));

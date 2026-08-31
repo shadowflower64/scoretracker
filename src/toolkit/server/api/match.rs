@@ -8,6 +8,15 @@ use scoretracker::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// `ToSchema`-compatible wrapper for [`AnyMatch`].
+// TODO: make this generate an actually useful schema
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AnyMatchWrapper {
+    #[serde(flatten)]
+    #[schema(ignore = true)]
+    inner: Box<AnyMatch>,
+}
+
 #[derive(Serialize)]
 pub struct ListRes {
     items: Vec<Box<AnyMatch>>,
@@ -20,7 +29,7 @@ pub struct ListRes {
 )]
 #[get("/match")]
 #[named]
-pub async fn get_match_list(req: HttpRequest) -> ApiResult<ListRes, ()> {
+pub async fn list_matches(req: HttpRequest) -> ApiResult<ListRes, ()> {
     log_fn_name!(auto);
     info!("received get request for match list");
 
@@ -54,15 +63,6 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> ApiResu
     res
 }
 
-/// `ToSchema`-compatible wrapper for [`AnyMatch`].
-// TODO: make this generate an actually useful schema
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct AnyMatchWrapper {
-    #[serde(flatten)]
-    #[schema(ignore = true)]
-    inner: Box<AnyMatch>,
-}
-
 #[utoipa::path(
     responses(
         (status = OK, description = "TODO")
@@ -86,7 +86,7 @@ pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web:
     let response = ApiResult::Ok {
         result: match_data.clone(),
     };
-    match_db.insert(match_data).expect("could not insert match into database");
+    match_db.insert_new(match_data).expect("could not insert match into database");
     match_db.save_and_close().expect("could not save match database");
     response
 }

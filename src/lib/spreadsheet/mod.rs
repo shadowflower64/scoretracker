@@ -426,13 +426,13 @@ pub fn import_org_spreadsheet_generic(
     for match_data in matches {
         info!("inserting match: {match_data:?}");
         let _ = match_db
-            .insert(match_data)
+            .insert_new(match_data)
             .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
     }
     for performance in performances {
         info!("inserting performance: {performance:?}");
         let _ = performance_db
-            .insert(performance, &match_db)
+            .insert_new(performance, &match_db)
             .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
     }
     for proof in ctx.proofs_to_insert {

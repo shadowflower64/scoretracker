@@ -7,6 +7,7 @@ use crate::util::filelocked::FileLockableData;
 use crate::util::relative_path_from_segments;
 use crate::util::timestamp::{NsDuration, NsTimestamp};
 use crate::util::{command_line::AskError, uuid::UuidString};
+use dyn_clone::{DynClone, clone_trait_object};
 use indexmap::IndexMap;
 use relative_path::{RelativePath, RelativePathBuf};
 use schemars::JsonSchema;
@@ -66,7 +67,7 @@ pub struct CommonPerformanceInfo {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait PerformanceTrait: Debug {
+pub trait PerformanceTrait: Debug + DynClone {
     fn common(&self) -> &CommonPerformanceInfo;
     fn game_id(&self) -> &'static str {
         self.typetag_name()
@@ -103,6 +104,8 @@ pub trait PerformanceTrait: Debug {
         Ok(())
     }
 }
+
+clone_trait_object! {PerformanceTrait}
 
 pub type AnyPerformance = dyn PerformanceTrait + 'static;
 
@@ -191,7 +194,7 @@ impl PerformanceDatabase {
         self.performances.iter_mut().find(|x| x.uuid() == uuid).map(|x| x.as_mut())
     }
 
-    pub fn insert(&mut self, performance: Box<AnyPerformance>, match_db: &MatchDatabase) -> Result<Uuid, InsertError> {
+    pub fn insert_new(&mut self, performance: Box<AnyPerformance>, match_db: &MatchDatabase) -> Result<Uuid, InsertError> {
         let threshold = NsDuration::from_secs_f64(MatchDatabase::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
         if let Some((close_performance, how_close)) = self
             .find_close_performances_from_diff_match(performance.as_ref(), threshold, match_db)
