@@ -97,7 +97,7 @@ impl Drop for Put {
         log_should_print_debug!(DEBUG_WORKER_TEMP_FILE_CLEANUP);
         if self.should_be_deleted() {
             debug!("removing uploaded copied file: {self:?}");
-            trash::delete(self.valid_path()).inspect_err(|e| {
+            let _ = trash::delete(self.valid_path()).inspect_err(|e| {
                 warn!("could not move uploaded file to trash: {e}");
             });
         }

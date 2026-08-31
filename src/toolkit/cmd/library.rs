@@ -7,7 +7,6 @@ use scoretracker::config::toml::{TomlConfig, TomlConfigError};
 use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::data::library::{remove_library_domain_from_db, scan_full};
-use scoretracker::util::file_ex::FileEx;
 use scoretracker::{log_fn_name, success_npr};
 use std::borrow::Cow;
 use std::convert::Infallible;

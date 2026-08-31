@@ -152,26 +152,76 @@ impl Worker {
         self.data.task_progress.lock().await.clone()
     }
 
-    /// Save the status to internal data and also send a worker status update message to clients connected via TCP.
+    /// Send a worker status update message to clients connected via TCP.
     #[named]
-    pub async fn update_worker_status(&self, status: WorkerStatus) {
+    fn send_worker_status_update(&self, status: WorkerStatus) {
         log_fn_name!(auto);
-        *self.data.status.lock().await = status.clone();
         let _ = self
             .worker_status_tx
             .send(status)
             .inspect_err(|e| warn!("worker_status_tx channel disconnected: {e:?}"));
     }
 
-    /// Save the progress to internal data and also send a task progress update message to clients connected via TCP.
+    /// Save the status to internal data and also send a worker status update message to clients connected via TCP.
+    pub async fn set_worker_status(&self, status: WorkerStatus) {
+        *self.data.status.lock().await = status.clone();
+        self.send_worker_status_update(status);
+    }
+
+    /// Modify the status stored in internal data and also send a worker status update message to clients connected via TCP.
+    pub async fn modify_worker_status(&self, modifier: impl Fn(&mut WorkerStatus)) {
+        let new_status = {
+            let mut worker_status = self.data.status.lock().await;
+            modifier(&mut worker_status);
+            worker_status.clone()
+        };
+        self.send_worker_status_update(new_status);
+    }
+
+    async fn set_worker_status_task_started(self: &Arc<Self>, task_uuid: UuidString) {
+        self.modify_worker_status(|status| {
+            status.state = WorkerState::Working;
+            status.current_task = Some(task_uuid);
+        })
+        .await;
+    }
+
+    async fn set_worker_status_task_finished(self: &Arc<Self>) {
+        self.modify_worker_status(|status| {
+            status.state = WorkerState::Finished;
+            status.current_task = None;
+        })
+        .await;
+    }
+
+    /// Send a task progress update message to clients connected via TCP.
     #[named]
-    pub async fn update_task_progress(&self, task_progress: TaskProgress) {
+    fn send_task_progress_update(&self, task_progress: TaskProgress) {
         log_fn_name!(auto);
-        *self.data.task_progress.lock().await = Some(task_progress.clone());
         let _ = self
             .task_progress_tx
             .send(task_progress)
             .inspect_err(|e| warn!("task_progress_tx channel disconnected: {e:?}"));
+    }
+
+    /// Save the progress to internal data and also send a task progress update message to clients connected via TCP.
+    pub async fn set_task_progress(&self, task_progress: Option<TaskProgress>) {
+        *self.data.task_progress.lock().await = task_progress.clone();
+        if let Some(task_progress) = task_progress {
+            self.send_task_progress_update(task_progress);
+        }
+    }
+
+    /// Modify the progress stored in internal data and also send a task progress update message to clients connected via TCP.
+    pub async fn modify_task_progress(&self, modifier: impl Fn(&mut Option<TaskProgress>)) {
+        let new_progress = {
+            let mut task_progress = self.data.task_progress.lock().await;
+            modifier(&mut task_progress);
+            task_progress.clone()
+        };
+        if let Some(task_progress) = new_progress {
+            self.send_task_progress_update(task_progress);
+        }
     }
 
     /// A very over-simplified way of updating task progress using just a string.
@@ -187,7 +237,7 @@ impl Worker {
             current_stage_progress_max: 1,
             current_stage_progress_msg: message,
         };
-        self.update_task_progress(task_progress).await
+        self.set_task_progress(Some(task_progress)).await
     }
 
     /// Create a full worker name from a short name (usually chosen randomly from [`names`]) and a process ID (pid) number.
@@ -273,7 +323,7 @@ impl Worker {
 
         loop {
             if let Some(task_to_do) = worker.take_task().await.expect("todo error handling") {
-                worker.clone().execute_task(task_to_do).await;
+                worker.clone().execute_task(task_to_do).await.expect("todo error handling");
             } else {
                 info!("no tasks to do!");
                 if worker.config.mode.quit_when_no_tasks() {
@@ -296,18 +346,6 @@ impl Worker {
         Ok(())
     }
 
-    async fn set_status_task_started(self: &Arc<Self>, task_uuid: UuidString) {
-        let mut status = self.data.status.lock().await;
-        status.state = WorkerState::Working;
-        status.current_task = Some(task_uuid);
-    }
-
-    async fn set_status_task_finished(self: &Arc<Self>) {
-        let mut status = self.data.status.lock().await;
-        status.state = WorkerState::Finished;
-        status.current_task = None;
-    }
-
     /// Execute a task from the queue in the current thread.
     ///
     /// Please note that executing a task may take a long time.
@@ -316,13 +354,13 @@ impl Worker {
     /// only after marking the task in the queue will the task start being executed.
     /// After the task finishes, the results of the task are written automatically to the queue file.
     #[named]
-    pub async fn execute_task(self: &Arc<Self>, task: Task) {
+    pub async fn execute_task(self: &Arc<Self>, task: Task) -> Result<(), WorkerError> {
         log_fn_name!("worker" : auto);
         info!("taking on task with uuid: {}", task.uuid.0);
         info!("starting task: {:?}", task);
 
         // Update worker state
-        self.set_status_task_started(task.uuid).await;
+        self.set_worker_status_task_started(task.uuid).await;
 
         // Do the task
         let result = self.clone().execute_task_body(&task).await;
@@ -331,15 +369,18 @@ impl Worker {
         // Send an update about the state of the task to the queue file/server
         match result {
             Ok(success) => {
-                self.update_task_state(task.uuid.0, TaskResult::Success(success), finish_timestamp);
+                self.send_task_state_update(task.uuid.0, TaskResult::Success(success), finish_timestamp)
+                    .await?;
             }
             Err(fail) => {
-                self.update_task_state(task.uuid.0, TaskResult::Error(fail), finish_timestamp);
+                self.send_task_state_update(task.uuid.0, TaskResult::Error(fail), finish_timestamp)
+                    .await?;
             }
         }
 
         // Update worker state
-        self.set_status_task_finished().await;
+        self.set_worker_status_task_finished().await;
+        Ok(())
     }
 
     /// Execute a task in the current thread.
@@ -399,7 +440,12 @@ impl Worker {
             .await
     }
 
-    pub async fn update_task_state(&self, task_uuid: Uuid, result: TaskResult, finish_timestamp: NsTimestamp) -> Result<(), WorkerError> {
+    pub async fn send_task_state_update(
+        &self,
+        task_uuid: Uuid,
+        result: TaskResult,
+        finish_timestamp: NsTimestamp,
+    ) -> Result<(), WorkerError> {
         self.queue_connection
             .lock()
             .await
@@ -430,10 +476,8 @@ impl Worker {
                 .as_ref()
                 .expect("todo error handling: stpl url has to have a resource path");
             let referenced_file_path = library_dir.path.join(url_path);
-
             let library_entry = self.server_connection.get_library_entry_by_url(url).await?;
-
-            Ok(Get::new_referenced(todo!(), referenced_file_path))
+            Ok(Get::new_referenced(library_entry, referenced_file_path))
         } else {
             todo!()
         }
