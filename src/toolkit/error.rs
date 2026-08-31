@@ -1,4 +1,4 @@
-use scoretracker::config::library_tab::LibraryTableError;
+use scoretracker::config::toml::TomlConfigError;
 use scoretracker::util::{command_line::AskError, file_ex, lockfile};
 use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerStartError, spreadsheet::SpreadsheetImportError};
 use std::path::PathBuf;
@@ -52,9 +52,9 @@ pub enum CmdError {
     ConfigWriteError(lockfile::Error),
     //
     #[error("could not read library info: {0}")]
-    LibraryInfoReadError(file_ex::Error),
+    LibraryInfoReadError(TomlConfigError),
     #[error("could not write library info: {0}")]
-    LibraryInfoWriteError(file_ex::Error),
+    LibraryInfoWriteError(TomlConfigError),
     //
     #[error("could not read library index: {0}")]
     LibraryIndexReadError(file_ex::Error),
@@ -88,8 +88,8 @@ pub enum CmdError {
     // ---
     #[error("library scan error: {0}")]
     LibraryScanError(#[from] LibraryScanError),
-    #[error("could not create worker: {0}")]
-    WorkerCreateError(#[from] WorkerStartError),
+    #[error("worker start error: {0}")]
+    WorkerStartError(#[from] WorkerStartError),
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
 
@@ -101,7 +101,7 @@ pub enum CmdError {
     ServerConfigError(#[from] ServerConfigError),
 
     #[error("library table error: {0}")]
-    LibraryTableError(#[from] LibraryTableError),
+    LibraryTableError(TomlConfigError),
     // ---
     #[error("could not reveal directory: {0}")]
     RevealDirectoryError(io::Error),
@@ -154,7 +154,7 @@ impl CmdError {
             Self::PerformanceDatabaseWriteError(..) => 26,
             // ---
             Self::LibraryScanError(..) => 31,
-            Self::WorkerCreateError(..) => 32,
+            Self::WorkerStartError(..) => 32,
             Self::SpreadsheetImportError(..) => 33,
             Self::RevealDirectoryError(..) => 34,
             Self::PlayerAlreadyInDatabase(..) => 35,

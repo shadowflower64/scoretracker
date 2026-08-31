@@ -8,8 +8,11 @@ use actix_web::{App, HttpServer, Scope, get};
 use actix_web::{Error, HttpRequest};
 use function_name::named;
 use relative_path::{Component, RelativePathBuf};
+use scoretracker::config::library_tab::InternalLibraryAccessPath;
+use scoretracker::config::library_tab::InternalLibraryAccessPathWithStatus;
 use scoretracker::config::library_tab::InternalLibraryConnection;
 use scoretracker::config::library_tab::LibraryTab;
+use scoretracker::config::toml::TomlConfig;
 use scoretracker::data::library::info::LibraryInfo;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::filelocked::FileLockableData;
@@ -96,7 +99,7 @@ mod testing_area {
 }
 
 #[derive(Debug, Clone)]
-pub enum LibraryConnection {
+pub enum ServerLibraryConnection {
     /// This library is on the same system as the server, and the files of the library can be directly accessed by the server process.
     Internal(InternalLibraryConnection),
 
@@ -113,7 +116,7 @@ pub enum AccessRules {
 
 #[derive(Debug, Clone)]
 pub struct LibraryConnectionInfo {
-    pub connection: LibraryConnection,
+    pub connection: ServerLibraryConnection,
     pub library_info: LibraryInfo,
     pub permissions: AccessRules,
 }
@@ -198,8 +201,8 @@ impl AppData {
         }
 
         match &connection_info.connection {
-            LibraryConnection::External { url } => Ok(DomainResolved::External { url: url.clone() }),
-            LibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
+            ServerLibraryConnection::External { url } => Ok(DomainResolved::External { url: url.clone() }),
+            ServerLibraryConnection::Internal { .. } => todo!(), // DomainResolveResult::Internal, // TODO: get libraryaccessapi url if it exists; do not return/expose local paths if possible
         }
     }
 }
@@ -208,7 +211,11 @@ type LibraryConnections = HashMap<LibraryDomain, LibraryConnectionInfo>;
 
 #[named]
 fn connect_internal_libraries(internal_libraries: &HashMap<LibraryDomain, Vec<PathBuf>>) -> LibraryConnections {
+    // TODO: majority of this is now handled within the LibraryTab module; merge these two together
     log_fn_name!(auto);
+
+    let tab = LibraryTab::load().expect("todo: error handling");
+    let connections = tab.scan();
 
     let mut connections = HashMap::new();
     for (domain, paths) in internal_libraries {
@@ -218,7 +225,12 @@ fn connect_internal_libraries(internal_libraries: &HashMap<LibraryDomain, Vec<Pa
         let paths: Vec<_> = paths.iter().map(|library_dir| {
             let Ok(library_info) = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)) else {
                 warn!("{domain}: library directory offline: {library_dir:?}, skipping");
-                return (library_dir.to_owned(), Status::Unavailable);
+                return InternalLibraryAccessPathWithStatus {
+                    body: InternalLibraryAccessPath {
+                        path: library_dir.to_owned(),
+
+                    }
+                } (library_dir.to_owned(), Status::Unavailable);
             };
 
             let domain_from_info = library_info.domain.clone();
@@ -241,7 +253,7 @@ fn connect_internal_libraries(internal_libraries: &HashMap<LibraryDomain, Vec<Pa
         };
 
         let conn_info = LibraryConnectionInfo {
-            connection: LibraryConnection::Internal(InternalLibraryConnection { all_paths: paths }),
+            connection: ServerLibraryConnection::Internal(InternalLibraryConnection::new(paths)),
             library_info: library_info,
             permissions: AccessRules::AllowByDefault { denylist: Vec::new() },
         };

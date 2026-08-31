@@ -5,7 +5,6 @@
 use crate::config::toml::TomlConfig;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::LibraryDomain;
-use crate::util::filelocked::FileLockableData;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -60,15 +59,15 @@ pub struct InternalLibraryAccessPath {
 }
 
 #[derive(Debug, Clone)]
-pub struct LibraryAccessPathWithStatus {
+pub struct InternalLibraryAccessPathWithStatus {
     /// Main part of the structure.
-    body: InternalLibraryAccessPath,
+    pub body: InternalLibraryAccessPath,
 
     /// Whether this path is currently available.
-    status: Status,
+    pub status: Status,
 }
 
-impl LibraryAccessPathWithStatus {
+impl InternalLibraryAccessPathWithStatus {
     /// Returns `Some(LibraryAccessPath)` if the status of this path entry is [`Status::Available`]. Returns `None` if the path is unavailable.
     pub fn available_path(&self) -> Option<&InternalLibraryAccessPath> {
         match self.status {
@@ -83,12 +82,12 @@ impl LibraryAccessPathWithStatus {
 pub struct InternalLibraryConnection {
     /// Invariant: this vec is always sorted so that the accessible path is always first.
     /// You can get the most useful path in O(1) time by using [`Vec::first`] (and checking whether it's available).
-    access_paths: Vec<LibraryAccessPathWithStatus>,
+    access_paths: Vec<InternalLibraryAccessPathWithStatus>,
 }
 
 impl InternalLibraryConnection {
     /// Create a connection from a set of paths with their status.
-    pub fn new(mut access_paths: Vec<LibraryAccessPathWithStatus>) -> Self {
+    pub fn new(mut access_paths: Vec<InternalLibraryAccessPathWithStatus>) -> Self {
         access_paths.sort_by_key(|x| x.body.priority);
         access_paths.sort_by_key(|x| x.status.sort_key());
         Self { access_paths }
@@ -96,7 +95,7 @@ impl InternalLibraryConnection {
 
     /// Create a connection from a given set of paths to the library.
     ///
-    /// This function will also check for the existence of a `library_info.json` file at the provided paths.
+    /// This function will also check for the existence of a `library_info.toml` file at the provided paths.
     /// If the file cannot be read, the access path is marked as unavailable.
     ///
     /// The path may be checked again using the `redetect` function.
@@ -105,7 +104,7 @@ impl InternalLibraryConnection {
         let mut priority = 0;
         for path in paths {
             let status = Self::check_path_availability(&path, expected_domain);
-            paths_with_status.push(LibraryAccessPathWithStatus {
+            paths_with_status.push(InternalLibraryAccessPathWithStatus {
                 body: InternalLibraryAccessPath { priority, path },
                 status,
             });
@@ -124,7 +123,7 @@ impl InternalLibraryConnection {
         if !library_info_path.is_file() {
             return Status::Unavailable;
         }
-        match LibraryInfo::read_without_locking(&library_info_path) {
+        match LibraryInfo::load_from_file(&library_info_path) {
             Ok(library_info) => {
                 if &library_info.domain != expected_domain {
                     return Status::Bad(Arc::new(BadLibraryError::WrongDomain {

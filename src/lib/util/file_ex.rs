@@ -19,6 +19,8 @@ pub enum Error {
     CannotDeserializeJSONLines { path: PathBuf, e: io::Error },
     #[error("cannot serialize jsonlines {path:?}: {e}")]
     CannotSerializeJSONLines { path: PathBuf, e: io::Error },
+    #[error("cannot serialize toml {path:?}: {e}")]
+    CannotSerializeTOML { path: PathBuf, e: toml::ser::Error },
 }
 
 impl Error {

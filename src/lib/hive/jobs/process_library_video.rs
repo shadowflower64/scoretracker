@@ -1,6 +1,6 @@
 //! Process (compress) a video from the library and save result to library
 use crate::data::library::database::QualityState;
-use crate::data::library::stpl_url::{LibraryRoot, StplUrl};
+use crate::data::library::stpl_url::StplUrl;
 use crate::ffmpeg::audio_settings::{AudioEncoder, AudioSettings, Bitrate};
 use crate::ffmpeg::video_settings::{CpuPreset, VideoEncoder, VideoSettings};
 use crate::ffmpeg::{ffmpeg_process_video, get_version};

@@ -2,12 +2,12 @@ use crate::cmd::{self, CmdError};
 use crate::worker::start::worker_main;
 use chrono::{DateTime, Local};
 use function_name::named;
-use scoretracker::data::library::stpl_url::{LibraryRoot, StplUrl};
+use scoretracker::data::library::root::LibraryRoot;
 use scoretracker::hive::job::Job;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
+use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::Task;
-use scoretracker::hive::{queue::TaskQueue, worker::Worker};
 use scoretracker::info_npr;
 use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::util::lossless_cut_project::LlcProj;
@@ -18,7 +18,7 @@ use std::time::SystemTime;
 
 #[named]
 pub fn start_worker() -> Result<(), CmdError> {
-    worker_main()
+    worker_main().map_err(CmdError::WorkerStartError)
 }
 
 #[named]

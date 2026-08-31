@@ -14,7 +14,8 @@ use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::database::LibraryEntry;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
-use crate::data::library::stpl_url::{LibraryDomain, LibraryRoot, StplUrl};
+use crate::data::library::root::LibraryRoot;
+use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
 use crate::hive::job::{self, Fail, Job, Success};
 use crate::hive::queue::TaskNotFound;
 use crate::hive::task::{Task, TaskResult};
@@ -41,7 +42,7 @@ use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fs, io, panic, process, thread};
+use std::{io, panic, process, thread};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -69,7 +70,7 @@ pub enum WorkerError {
     #[error("cannot read library database: {0}")]
     CannotReadLibraryDatabase(file_ex::Error),
     #[error("cannot read library info: {0}")]
-    CannotReadLibraryInfo(file_ex::Error),
+    CannotReadLibraryInfo(TomlConfigError),
     #[error("cannot read library index: {0}")]
     CannotReadLibraryIndex(file_ex::Error),
 }
@@ -133,7 +134,7 @@ impl Worker {
     }
 
     pub fn read_library_info(&self, library_dir: &Path) -> Result<LibraryInfo, WorkerError> {
-        LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(WorkerError::CannotReadLibraryInfo)
+        LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(WorkerError::CannotReadLibraryInfo)
     }
 
     pub fn read_library_index(&self, library_dir: &Path) -> Result<LibraryIndex, WorkerError> {
@@ -453,7 +454,7 @@ impl Worker {
     pub async fn create_temp_path_for(&self, url: &StplUrl) -> PathBuf {
         let local_temp = self.local_library_dir(&url.domain).await.and_then(|library_access| {
             let root = LibraryRoot::of(&library_access.path).expect("todo: error handling");
-            root.create_temp_path()
+            root.create_temp_path(url.path.as_ref().map(String::as_str))
         });
         local_temp.unwrap_or_else(|| self.create_temp_path_global())
     }

@@ -36,6 +36,10 @@ pub trait TomlConfig: Sized + Serialize + for<'a> Deserialize<'a> {
         })
     }
 
+    fn load_raw() -> Result<String, TomlConfigError> {
+        Self::load_raw_from_file(Self::default_path())
+    }
+
     fn load_raw_from_file(path: impl AsRef<Path>) -> Result<String, TomlConfigError> {
         fs::read_to_string(&path).map_err(|e| TomlConfigError::ReadError {
             path: path.as_ref().to_path_buf(),

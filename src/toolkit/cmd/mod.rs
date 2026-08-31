@@ -5,7 +5,8 @@ use crate::cmd::library::LibraryIdentifier;
 use crate::error::CmdError;
 use scoretracker::config::Config;
 use scoretracker::config::library_tab::LibraryTab;
-use scoretracker::data::library::stpl_url::LibraryDomain;
+use scoretracker::config::toml::TomlConfig;
+use scoretracker::data::library::stpl_url::{LibraryDomain, StplUrl};
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
 use scoretracker::util::timestamp::NsLocalTimestamp;
@@ -160,36 +161,35 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
         "hive" => match ctx.cmd()? {
             "worker" => match ctx.cmd()? {
                 "spawn" => {
-                    let persistent: bool = ctx.pull_arg("persistent", "should the worker stay alive after finishing a task?")?;
-                    cmd::hive::start_worker(persistent)
+                    // let persistent: bool = ctx.pull_arg("persistent", "should the worker stay alive after finishing a task?")?;
+                    cmd::hive::start_worker(/*persistent*/)
                 }
                 _ => ctx.unknown_cmd(),
             },
             "task" => match ctx.cmd()? {
                 "add" => match ctx.cmd()? {
                     "cut-video" => {
-                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to cloth video")?;
-                        let destination_path: PathBuf = ctx.pull_arg("destination_path", "destination path to fragment video")?;
+                        let source: StplUrl = ctx.pull_arg("source", "source url to cloth video")?;
+                        let destination: StplUrl = ctx.pull_arg("destination", "destination url to fragment video")?;
                         let cut_start_point: Option<f64> = ctx.pull_arg_opt("cut_start_point", "timestamp to start of cut (in seconds)")?;
                         let cut_end_point: Option<f64> = ctx.pull_arg_opt("cut_end_point", "timestamp to end of cut (in seconds)")?;
                         cmd::hive::add_task(CutLibraryVideoJob {
-                            source_path,
+                            source,
                             source_proof_uuid_precondition_check: None,
+                            destination,
                             cut_start_point: cut_start_point.map(NsLocalTimestamp::from_secs_f64),
                             cut_end_point: cut_end_point.map(NsLocalTimestamp::from_secs_f64),
-                            destination_path,
                         })
                     }
                     "process-video" => {
-                        let source_path: PathBuf = ctx.pull_arg("source_path", "source path to dry video")?;
-                        let destination_path: PathBuf = ctx.pull_arg("destination_path", "destination path to wet video")?;
-                        let processing_type: Operation =
-                            ctx.pull_arg("processing_type", "type/quality preset of video compression to do")?;
+                        let source: StplUrl = ctx.pull_arg("source", "source url to dry video")?;
+                        let destination: StplUrl = ctx.pull_arg("destination", "destination url to wet video")?;
+                        let operation: Operation = ctx.pull_arg("operation", "type/quality preset of video compression to do")?;
                         cmd::hive::add_task(ProcessLibraryVideoJob {
-                            source: source_path,
+                            source,
                             source_proof_uuid_precondition_check: None,
-                            operation: processing_type,
-                            destination: destination_path,
+                            destination,
+                            operation,
                         })
                     }
                     "execute-llc" => {

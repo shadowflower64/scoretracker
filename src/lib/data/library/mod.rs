@@ -4,7 +4,7 @@
 //! that are proof of a player's [performance](crate::data::scoreboard::performance) on a song.
 //!
 //! Apart from just video and image files, a library directory contains additional files:
-//! * `library_info.json` ([`mod@info`]) - contains basic information about the library, such as the domain name.
+//! * `library_info.toml` ([`mod@info`]) - contains basic information about the library, such as the domain name.
 //! * `library_cache.json` ([`cache`]) - stores file hashes in relation to file names and file stat, so that the hash doesn't have to be recalculated all the time.
 //! * `library_index.json` ([`index`]) - contains a mapping from file paths to proof UUIDs, for easily locating proof files.
 //! * `library_aux.json` ([`aux_data`]) - contains additional auxiliary data about the library, such as local tags.
@@ -18,8 +18,10 @@ pub mod cache;
 pub mod database;
 pub mod index;
 pub mod info;
+pub mod root;
 pub mod stpl_url;
 
+use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::cache::LibraryCache;
 use crate::data::library::database::{LibraryDatabase, LibraryEntry};
 use crate::data::library::index::LibraryIndex;
@@ -41,8 +43,8 @@ use walkdir::{DirEntry, WalkDir};
 
 /// Returns the library directory ("repository directory") of the specified file.
 ///
-/// This function searches for the root directory of the library by repeatedly going up a level until it finds a file named `library_info.json`.
-/// The function returns the path of the directory that the "library_info.json" file is located in.
+/// This function searches for the root directory of the library by repeatedly going up a level until it finds a file named `library_info.toml`.
+/// The function returns the path of the directory that the "library_info.toml" file is located in.
 ///
 /// Returns [`None`] if the file was not found in any parent directory.
 pub fn library_dir_of_path(path: &Path) -> Option<PathBuf> {
@@ -101,7 +103,7 @@ pub fn create_stpl_url_to_relfile(library_info: LibraryInfo, target_file_relpath
 #[derive(Debug, Error)]
 pub enum LibraryScanError {
     #[error("cannot read library info: {0}")]
-    CannotReadInfo(file_ex::Error),
+    CannotReadInfo(TomlConfigError),
     #[error("cannot read library index: {0}")]
     CannotReadIndex(file_ex::Error),
     #[error("cannot open library index: {0}")]
@@ -151,7 +153,7 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
 
     let scanning_start_timestamp = Instant::now();
 
-    let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = library_info.domain;
 
     let mut index = LibraryIndex::default();
@@ -289,7 +291,7 @@ pub fn scan_register_added_files(
 
     let scanning_start_timestamp = Instant::now();
 
-    let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = library_info.domain;
 
     let mut index = LibraryIndex::lock_and_read_or_default(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info).expect("todo");
@@ -440,7 +442,7 @@ pub fn scan_register_removed_files(
     type E = LibraryScanError;
     log_fn_name!("library" : auto);
 
-    let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = library_info.domain;
 
     let mut library_index =
@@ -547,9 +549,8 @@ pub fn sync_library_index_with_db(
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
     type E = LibraryScanError;
-    let library_info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = library_info.domain;
-
     let library_index =
         LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(E::CannotReadIndex)?;
 
