@@ -92,6 +92,8 @@ pub enum CmdError {
     WorkerStartError(#[from] WorkerStartError),
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
+    #[error("postgres error: {0}")]
+    DbError(#[from] postgres::Error),
 
     #[cfg(feature = "toolkit-server")]
     #[error("server start error: {0}")]
@@ -167,6 +169,7 @@ impl CmdError {
             Self::ServerConfigError(..) => 39,
 
             Self::LibraryTableError(..) => 40,
+            Self::DbError(..) => 41,
             // ---
             Self::LibraryRescanNeeded(..) => 51,
             // ---

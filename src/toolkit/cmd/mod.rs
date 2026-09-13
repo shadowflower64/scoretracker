@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 pub mod automark;
 pub mod config;
+pub mod db;
 pub mod hive;
 pub mod library;
 pub mod log;
@@ -155,6 +156,13 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
                 let config_key: String = ctx.pull_arg("config_key", "name of the key to change in the configuration")?;
                 let config_value: String = ctx.pull_arg("config_value", "new value for the selected key")?;
                 cmd::config::set(config_key, config_value)
+            }
+            _ => ctx.unknown_cmd(),
+        },
+        "db" => match ctx.cmd()? {
+            "init" => {
+                let database_name: String = ctx.pull_arg("database_name", "name for the new database to create")?;
+                cmd::db::init(database_name)
             }
             _ => ctx.unknown_cmd(),
         },
