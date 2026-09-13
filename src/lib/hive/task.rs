@@ -29,6 +29,15 @@ pub enum TaskResult {
     Error(job::Fail),
 }
 
+impl TaskResult {
+    pub fn state(&self) -> TaskState {
+        match self {
+            Self::Success(_) => TaskState::Done,
+            Self::Error(_) => TaskState::Failed,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub uuid: UuidString,

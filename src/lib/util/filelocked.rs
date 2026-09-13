@@ -153,3 +153,73 @@ impl<T: FileLockableData> ClosedFileLocked<T> {
         T::lock_and_read(self.main_file_path, worker_info)
     }
 }
+
+#[derive(Debug)]
+enum Clopen<T: FileLockableData> {
+    Open(FileLocked<T>),
+    Closed(ClosedFileLocked<T>),
+}
+
+#[derive(Debug)]
+pub struct ClosedOrOpen<T: FileLockableData> {
+    // Invariant: this is always Some, it is only None temporarily while closing/opening.
+    some: Option<Clopen<T>>,
+}
+
+impl<T: FileLockableData> From<FileLocked<T>> for ClosedOrOpen<T> {
+    fn from(value: FileLocked<T>) -> Self {
+        ClosedOrOpen {
+            some: Some(Clopen::Open(value)),
+        }
+    }
+}
+
+impl<T: FileLockableData> From<ClosedFileLocked<T>> for ClosedOrOpen<T> {
+    fn from(value: ClosedFileLocked<T>) -> Self {
+        ClosedOrOpen {
+            some: Some(Clopen::Closed(value)),
+        }
+    }
+}
+
+impl<T: FileLockableData> ClosedOrOpen<T> {
+    pub fn open(&mut self) -> Result<&mut FileLocked<T>, lockfile::Error> {
+        let some = self.some.take().unwrap();
+        match some {
+            Clopen::Open(open) => {
+                // Put it back gently, its already open...
+                self.some = Some(Clopen::Open(open));
+            }
+            Clopen::Closed(closed) => {
+                // Put it back in the opened state
+                let reopened = closed.reopen()?;
+                self.some = Some(Clopen::Open(reopened));
+            }
+        }
+
+        match self.some.as_mut().unwrap() {
+            Clopen::Open(open) => Ok(open),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn save_and_close(&mut self) -> Result<&mut ClosedFileLocked<T>, lockfile::Error> {
+        let some = self.some.take().unwrap();
+        match some {
+            Clopen::Closed(closed) => {
+                // Put it back gently, its already closed...
+                self.some = Some(Clopen::Closed(closed));
+            }
+            Clopen::Open(open) => {
+                // Put it back in the closed state
+                let reopened = open.save_and_close()?;
+                self.some = Some(Clopen::Closed(reopened));
+            }
+        }
+
+        match self.some.as_mut().unwrap() {
+            Clopen::Closed(closed) => Ok(closed),
+            _ => unreachable!(),
+        }
+    }
+}

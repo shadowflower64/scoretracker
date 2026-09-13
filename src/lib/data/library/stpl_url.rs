@@ -1,10 +1,13 @@
+use crate::config::toml::TomlConfigError;
+use crate::data::library::root::LibraryRoot;
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
+use std::path::Path;
 use std::str::FromStr;
 use thiserror::Error;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
 pub enum StplUrlError {
     #[error("protocol is not present in url")]
     ProtocolNotPresent,
@@ -12,6 +15,12 @@ pub enum StplUrlError {
     InvalidProtocol(String),
     #[error("library domain name cannot contain character: '{0}'")]
     DomainNameContainsChar(char),
+    #[error("path is not in any library dir")]
+    NotInLibraryDir,
+    #[error("cannot read library info: {0}")]
+    CannotReadLibraryInfo(TomlConfigError),
+    #[error("creating path failed")]
+    PathFail,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -112,6 +121,21 @@ impl StplUrl {
             domain: domain.to_owned().try_into()?,
             path: None,
         })
+    }
+
+    /// Traverse the filesystem to find the library root, open the library info, and create a StplUrl pointing to the specified file.
+    ///
+    /// Note: since this function traverses the filesystem, and reads and deserializes the `library_info.toml` file, it may be inefficient to use multiple times.
+    /// Consider using other functions when creating URLs for multiple files within the same library.
+    pub fn of(path: &Path) -> Result<Self, StplUrlError> {
+        Ok(LibraryRoot::of(path)?.url_to(path)?)
+    }
+}
+
+impl FromStr for StplUrl {
+    type Err = StplUrlError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from(s.to_owned())
     }
 }
 

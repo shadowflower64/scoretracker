@@ -1,3 +1,4 @@
+use crate::hive::worker::UnwindSafeMutex;
 use crate::util::{timestamp::NsTimestamp, uuid::UuidString};
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
@@ -44,9 +45,29 @@ impl WorkerInfo {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerState {
+    /// Initial state.
+    #[default]
+    Initial,
+
+    /// Currently working on a task.
+    Working,
+
+    /// Just finished working on a task.
+    Finished,
+
+    /// Idle, waiting for new tasks.
+    Idle,
+
+    /// Sleeping period inbetween task executions.
+    Sleeping,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct WorkerStatus {
-    pub working: bool,
+    pub state: WorkerState,
     pub current_task: Option<UuidString>,
 }
 
@@ -74,14 +95,14 @@ pub struct TaskProgress {
     pub current_stage_progress_msg: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WorkerData {
     /// Basic immutable information about the worker.
     pub info: WorkerInfo,
 
     /// Current status of the worker (is it working? idle? for how long?)
-    pub status: WorkerStatus,
+    pub status: UnwindSafeMutex<WorkerStatus>,
 
     /// Progress status of the currently executed task, or the task that was executed most recently.
-    pub task_progress: Option<TaskProgress>,
+    pub task_progress: UnwindSafeMutex<Option<TaskProgress>>,
 }

@@ -1,5 +1,5 @@
 use crate::{cmd::library::LibraryIdentifier, error::CmdError};
-use scoretracker::data::library::stpl_url::LibraryDomain;
+use scoretracker::data::library::stpl_url::{LibraryDomain, StplUrl};
 use scoretracker::hive::jobs::process_library_video::Operation;
 use std::{fmt, path::PathBuf, str::FromStr};
 
@@ -92,6 +92,12 @@ impl CmdlineArgument for bool {
 impl CmdlineArgument for LibraryDomain {
     fn arg_type() -> &'static str {
         "valid library domain"
+    }
+}
+
+impl CmdlineArgument for StplUrl {
+    fn arg_type() -> &'static str {
+        "url with the stpl:// protocol"
     }
 }
 
