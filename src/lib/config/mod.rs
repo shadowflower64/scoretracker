@@ -1,5 +1,7 @@
 pub mod library_tab;
+pub mod secrets;
 pub mod toml;
+pub mod toolkit;
 
 use crate::data::library::aux_data::LibraryAuxData;
 use crate::data::library::cache::LibraryCache;

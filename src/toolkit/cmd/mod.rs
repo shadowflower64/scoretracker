@@ -19,6 +19,7 @@ pub mod db;
 pub mod hive;
 pub mod library;
 pub mod log;
+pub mod paths;
 pub mod schema;
 pub mod scoreboard;
 pub mod spreadsheet;
@@ -287,6 +288,10 @@ pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
             _ => ctx.unknown_cmd(),
         },
         "logs" => cmd::log::open(),
+        "paths" => match ctx.cmd()? {
+            "show" => cmd::paths::show(),
+            _ => ctx.unknown_cmd(),
+        },
         "scoreboard" => match ctx.cmd()? {
             "init" => cmd::scoreboard::init(),
             "performance" => match ctx.cmd()? {

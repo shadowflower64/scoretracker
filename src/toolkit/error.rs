@@ -104,6 +104,8 @@ pub enum CmdError {
 
     #[error("library table error: {0}")]
     LibraryTableError(TomlConfigError),
+    #[error("secrets config error: {0}")]
+    SecretsConfigError(&'static TomlConfigError),
     // ---
     #[error("could not reveal directory: {0}")]
     RevealDirectoryError(io::Error),
@@ -170,6 +172,7 @@ impl CmdError {
 
             Self::LibraryTableError(..) => 40,
             Self::DbError(..) => 41,
+            Self::SecretsConfigError(..) => 42,
             // ---
             Self::LibraryRescanNeeded(..) => 51,
             // ---

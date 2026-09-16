@@ -12,6 +12,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Table of libraries available on this machine.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct LibraryTab {
     pub internal_libraries: HashMap<LibraryDomain, Vec<PathBuf>>,

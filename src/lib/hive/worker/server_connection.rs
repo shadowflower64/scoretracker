@@ -11,9 +11,10 @@ use uuid::Uuid;
 #[derive(Debug, Error)]
 pub enum ServerError {}
 
-// TODO
 #[derive(Debug)]
-pub enum ServerConnection {}
+pub enum ServerConnection {
+    // TODO
+}
 
 impl ServerConnection {
     pub async fn connect() -> Result<Self, ServerError> {
