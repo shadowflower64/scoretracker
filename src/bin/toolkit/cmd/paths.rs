@@ -1,5 +1,5 @@
-use crate::error::CmdError;
 use crate::server::config::ServerConfig;
+use crate::toolkit::error::CmdError;
 use function_name::named;
 use scoretracker::config::secrets::SecretsConfig;
 use scoretracker::config::toolkit::ToolkitConfig;

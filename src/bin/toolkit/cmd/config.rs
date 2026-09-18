@@ -1,4 +1,4 @@
-use crate::cmd::CmdError;
+use crate::toolkit::cmd::CmdError;
 use scoretracker::config::Config;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::command_line::{ask_string, ask_yn};

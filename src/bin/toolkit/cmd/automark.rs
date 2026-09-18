@@ -1,4 +1,4 @@
-use crate::error::CmdError;
+use crate::toolkit::error::CmdError;
 use constcat::concat;
 use function_name::named;
 use regex::Regex;

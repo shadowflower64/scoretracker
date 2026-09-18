@@ -1,5 +1,5 @@
-use crate::cmd::CmdError;
-use crate::error::CmdError::{
+use crate::toolkit::cmd::CmdError;
+use crate::toolkit::error::CmdError::{
     ConfigReadError, MatchDatabaseOpenError, MatchDatabaseWriteError, PerformanceDatabaseOpenError, PerformanceDatabaseWriteError,
     PlayerDatabaseOpenError, PlayerDatabaseWriteError,
 };

@@ -1,4 +1,4 @@
-use crate::error::CmdError;
+use crate::toolkit::error::CmdError;
 use fs_extra::file::write_all;
 use function_name::named;
 use scoretracker::data::games::registered_games;

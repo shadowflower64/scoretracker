@@ -14,15 +14,15 @@ path = "src/lib/lib.rs"
 
 [[bin]]
 name = "scoretracker-toolkit"
-path = "src/toolkit/main.rs"
+path = "src/bin/main.rs"
 
 [[bin]]
 name = "scoretracker-server"
-path = "src/toolkit/server/main.rs"
+path = "src/bin/server/main.rs"
 
 [[bin]]
 name = "scoretracker-worker"
-path = "src/toolkit/worker/main.rs"
+path = "src/bin/worker/main.rs"
 
 [[bin]]
 name = "scoretracker-playground"

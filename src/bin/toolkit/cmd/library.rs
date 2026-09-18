@@ -1,4 +1,4 @@
-use crate::cmd::CmdError;
+use crate::toolkit::cmd::CmdError;
 use function_name::named;
 use relative_path::RelativePathBuf;
 use scoretracker::config::Config;

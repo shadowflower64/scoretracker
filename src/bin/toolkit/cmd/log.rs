@@ -1,4 +1,4 @@
-use crate::error::CmdError;
+use crate::toolkit::error::CmdError;
 use scoretracker::util::{dirs::log_dir, reveal_directory};
 use scoretracker::{info_npr, success_npr};
 

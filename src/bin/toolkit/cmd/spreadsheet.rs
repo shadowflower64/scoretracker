@@ -1,4 +1,4 @@
-use crate::cmd::CmdError;
+use crate::toolkit::cmd::CmdError;
 use scoretracker::{spreadsheet, success_npr};
 use std::path::Path;
 

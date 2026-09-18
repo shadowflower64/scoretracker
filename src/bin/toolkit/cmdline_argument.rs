@@ -1,4 +1,4 @@
-use crate::{cmd::library::LibraryIdentifier, error::CmdError};
+use crate::toolkit::{cmd::library::LibraryIdentifier, error::CmdError};
 use scoretracker::data::library::stpl_url::{LibraryDomain, StplUrl};
 use scoretracker::hive::jobs::process_library_video::Operation;
 use std::{fmt, path::PathBuf, str::FromStr};

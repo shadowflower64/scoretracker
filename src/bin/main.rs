@@ -1,13 +1,10 @@
-use crate::cmd::handle_command;
+use crate::toolkit::cmd::handle_command;
 use scoretracker::{error_npr, util::log};
 use std::{env::args, process::ExitCode};
 
-pub mod arg;
-pub mod cmd;
-pub mod error;
-
 #[cfg(feature = "toolkit-server")]
 pub mod server;
+pub mod toolkit;
 pub mod worker;
 
 fn main() -> ExitCode {

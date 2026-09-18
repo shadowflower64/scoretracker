@@ -1,4 +1,4 @@
-use crate::error::CmdError;
+use crate::toolkit::error::CmdError;
 use function_name::named;
 use postgres::{Client, NoTls};
 use scoretracker::config::secrets::SecretsConfig;

@@ -1,5 +1,5 @@
-use crate::cmd::CmdError;
-use crate::cmd::vitals::LogCheckError::GetSizeError;
+use crate::toolkit::cmd::CmdError;
+use crate::toolkit::cmd::vitals::LogCheckError::GetSizeError;
 use fs_extra::dir::get_size;
 use regex::Regex;
 use scoretracker::config::Config;
