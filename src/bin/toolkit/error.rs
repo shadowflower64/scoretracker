@@ -1,13 +1,17 @@
+use scoretracker::cli::cmdline_error::CmdlineError;
 use scoretracker::config::toml::TomlConfigError;
-use scoretracker::util::{command_line::AskError, file_ex, lockfile};
-use scoretracker::{data::library::LibraryScanError, hive::worker::WorkerStartError, spreadsheet::SpreadsheetImportError};
+use scoretracker::data::library::LibraryScanError;
+use scoretracker::hive::worker::WorkerStartError;
+use scoretracker::spreadsheet::SpreadsheetImportError;
+use scoretracker::util::command_line::AskError;
+use scoretracker::util::{file_ex, lockfile};
 use std::path::PathBuf;
 use std::{io, process::ExitCode};
 use thiserror::Error;
 use uuid::Uuid;
 
 #[cfg(feature = "toolkit-server")]
-use crate::server::start::ServerStartError;
+use crate::server::error::ServerError;
 
 #[derive(Debug, Error)]
 pub enum CmdError {
@@ -16,24 +20,9 @@ pub enum CmdError {
     UnknownError,
     #[error("help was displayed")]
     Help,
-    #[error("no command provided")]
-    NoCommandProvided,
-    #[error("{cmd}: no subcommand provided")]
-    NoSubcommandProvided { cmd: String },
-    #[error("unknown command: {cmd}")]
-    UnknownCommand { cmd: String },
-    #[error("{cmd}: unknown subcommand: {subcmd}")]
-    UnknownSubcommand { cmd: String, subcmd: String },
-    #[error("{cmd}: argument not provided: {arg_name} ({arg_desc})")]
-    ArgumentNotProvided { cmd: String, arg_name: String, arg_desc: String },
-    #[error("{cmd}: argument '{arg_name}' could not be converted to {arg_type}: {err_msg}")]
-    WrongArgumentType {
-        cmd: String,
-        arg_name: String,
-        arg_desc: String,
-        arg_type: String,
-        err_msg: String,
-    },
+    #[error("command line error: {0}")]
+    CmdlineError(#[from] CmdlineError),
+    //
     #[error("no game with id: {0}")]
     NoGameWithId(String),
     #[error("invalid config key: {0}")]
@@ -96,11 +85,8 @@ pub enum CmdError {
     DbError(#[from] postgres::Error),
 
     #[cfg(feature = "toolkit-server")]
-    #[error("server start error: {0}")]
-    ServerStartError(#[from] ServerStartError),
-    #[cfg(feature = "toolkit-server")]
-    #[error("server config error: {0}")]
-    ServerConfigError(TomlConfigError),
+    #[error("server error: {0}")]
+    ServerError(#[from] ServerError),
 
     #[error("library table error: {0}")]
     LibraryTableError(TomlConfigError),
@@ -131,12 +117,8 @@ impl CmdError {
             #[allow(deprecated)]
             Self::UnknownError => 1,
             Self::Help => 2,
-            Self::NoCommandProvided
-            | Self::NoSubcommandProvided { .. }
-            | Self::UnknownCommand { .. }
-            | Self::UnknownSubcommand { .. }
-            | Self::ArgumentNotProvided { .. } => 3,
-            Self::WrongArgumentType { .. } | Self::NoGameWithId(..) | Self::InvalidConfigKey(..) => 4,
+            Self::CmdlineError(_) => 3,
+            Self::NoGameWithId(..) | Self::InvalidConfigKey(..) => 4,
             Self::AskError(..) => 5,
             Self::IoError(..) => 6,
             // ---
@@ -166,9 +148,7 @@ impl CmdError {
             Self::CreateDirAllError(..) => 37,
 
             #[cfg(feature = "toolkit-server")]
-            Self::ServerStartError(..) => 38,
-            #[cfg(feature = "toolkit-server")]
-            Self::ServerConfigError(..) => 39,
+            Self::ServerError(e) => e.exit_code_num(),
 
             Self::LibraryTableError(..) => 40,
             Self::DbError(..) => 41,

@@ -1,7 +1,7 @@
 //! `secrets.toml` config file handling.
 //!
 //! This module handles reading the `secrets.toml` global config file, which contains database credentials.
-//! This config is used by the toolkit and the server to connect to the datagbase.
+//! This config is used by the server to connect to the database.
 
 use super::toml::{TomlConfig, TomlConfigError};
 use serde::{Deserialize, Serialize};

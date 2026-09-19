@@ -1,6 +1,7 @@
 use crate::toolkit::cmd::CmdError;
 use function_name::named;
 use relative_path::RelativePathBuf;
+use scoretracker::cli::cmdline_argument::CmdlineArgument;
 use scoretracker::config::Config;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::{TomlConfig, TomlConfigError};
@@ -64,6 +65,12 @@ impl LibraryIdentifier {
             )),
             LibraryIdentifier::DirPath(path) => Ok(Cow::Borrowed(path)),
         }
+    }
+}
+
+impl CmdlineArgument for LibraryIdentifier {
+    fn arg_type() -> &'static str {
+        "library identifier"
     }
 }
 

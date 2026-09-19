@@ -1,0 +1,1 @@
+CREATE USER scoretracker_dev;

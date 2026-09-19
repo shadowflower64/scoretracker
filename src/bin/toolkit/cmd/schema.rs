@@ -108,7 +108,7 @@ pub fn gen_types() -> Result<(), CmdError> {
 #[named]
 #[cfg(feature = "toolkit-server")]
 pub fn gen_api() -> Result<(), CmdError> {
-    use crate::server::api::ApiDoc;
+    use crate::server::http::api::ApiDoc;
     use utoipa::OpenApi;
 
     log_fn_name!(auto);

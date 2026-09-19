@@ -2,9 +2,6 @@ pub mod r#match;
 pub mod performance;
 pub mod worker_connect;
 
-use super::start::AppData;
-use super::start::DomainResolveError;
-use super::start::DomainResolved;
 use actix_web::body::EitherBody;
 use actix_web::http::StatusCode;
 use actix_web::web::Data;
@@ -19,6 +16,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use utoipa::OpenApi;
 use utoipa::ToSchema;
+
+use super::super::domain_resolved::DomainResolveError;
+use super::super::domain_resolved::DomainResolved;
+use super::super::globals::ServerGlobals;
 
 pub trait ApiError: fmt::Display + Serialize {
     /// Get HTTP status code for this result.
@@ -100,7 +101,7 @@ pub type DomainResolveResult = ApiResult<DomainResolved, DomainResolveError>;
 #[get("/api/resolve_stpl_url")]
 #[named]
 pub async fn resolve_stpl_url(
-    app_data: Data<AppData>,
+    app_data: Data<ServerGlobals>,
     Query(ResolveStplUrlRequest { stpl_url }): Query<ResolveStplUrlRequest>,
 ) -> DomainResolveResult {
     log_fn_name!(auto);

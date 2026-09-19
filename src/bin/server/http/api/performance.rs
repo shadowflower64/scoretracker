@@ -1,5 +1,3 @@
-use super::super::start::AppData;
-use super::ApiResult;
 use actix_web::{HttpRequest, get, put, web};
 use function_name::named;
 use scoretracker::data::scoreboard::r#match::MatchDatabase;
@@ -8,6 +6,9 @@ use scoretracker::util::{filelocked::FileLockableData, uuid::UuidString};
 use scoretracker::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::super::super::globals::ServerGlobals;
+use super::ApiResult;
 
 /// `ToSchema`-compatible wrapper for [`AnyMatch`].
 // TODO: make this generate an actually useful schema
@@ -34,7 +35,7 @@ pub async fn list_performances(req: HttpRequest) -> ApiResult<ListRes, ()> {
     log_fn_name!(auto);
     info!("received get request for performance list");
 
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let app_data = req.app_data::<ServerGlobals>().expect("app data should be present");
     let performance_db = PerformanceDatabase::read_without_locking(app_data.server_config.performance_database_path())
         .expect("could not read performance database");
     ApiResult::Ok {
@@ -57,7 +58,7 @@ pub async fn get_performance(req: HttpRequest, path: web::Path<UuidString>) -> A
     let uuid = path.into_inner();
     info!("received get request for performance: {uuid}");
 
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let app_data = req.app_data::<ServerGlobals>().expect("app data should be present");
     let performance_db = PerformanceDatabase::read_without_locking(app_data.server_config.performance_database_path())
         .expect("could not read performance database");
 
@@ -86,7 +87,7 @@ pub async fn put_performance(
 
     assert_eq!(uuid, performance.uuid(), "uuid in url should performance uuid in request body");
 
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let app_data = req.app_data::<ServerGlobals>().expect("app data should be present");
     let mut match_db =
         MatchDatabase::lock_and_read(app_data.server_config.match_database_path(), None).expect("could not read match database");
     let mut performance_db = PerformanceDatabase::lock_and_read(app_data.server_config.performance_database_path(), None)

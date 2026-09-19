@@ -1,4 +1,5 @@
-use super::super::start::AppData;
+use super::super::super::globals::ServerGlobals;
+
 use super::ApiResult;
 use actix_web::{HttpRequest, get, put, web};
 use function_name::named;
@@ -33,7 +34,7 @@ pub async fn list_matches(req: HttpRequest) -> ApiResult<ListRes, ()> {
     log_fn_name!(auto);
     info!("received get request for match list");
 
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let app_data = req.app_data::<ServerGlobals>().expect("app data should be present");
     let match_db =
         MatchDatabase::read_without_locking(app_data.server_config.match_database_path()).expect("could not read match database");
     ApiResult::Ok {
@@ -54,7 +55,7 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> ApiResu
     let uuid = path.into_inner();
     info!("received get request for match: {uuid}");
 
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let app_data = req.app_data::<ServerGlobals>().expect("app data should be present");
     let match_db =
         MatchDatabase::read_without_locking(app_data.server_config.match_database_path()).expect("could not read match database");
 
@@ -79,7 +80,7 @@ pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web:
 
     assert_eq!(uuid, match_data.uuid(), "uuid in url should match uuid in request body");
 
-    let app_data = req.app_data::<AppData>().expect("app data should be present");
+    let app_data = req.app_data::<ServerGlobals>().expect("app data should be present");
     let mut match_db =
         MatchDatabase::lock_and_read(app_data.server_config.match_database_path(), None).expect("could not read match database");
 

@@ -1,8 +1,7 @@
 use crate::toolkit::cmd;
-use crate::toolkit::cmd::CmdError::NoCommandProvided;
 use crate::toolkit::cmd::library::LibraryIdentifier;
-use crate::toolkit::cmdline_argument::{CmdlineArgument, parse_arg, parse_arg_opt};
 use crate::toolkit::error::CmdError;
+use scoretracker::cli::cmdline_context::CmdlineContext;
 use scoretracker::config::Config;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::TomlConfig;
@@ -25,118 +24,8 @@ pub mod scoreboard;
 pub mod spreadsheet;
 pub mod vitals;
 
-pub struct CmdlineContext<'a> {
-    arguments: &'a [String],
-    full_command_name: String,
-    top: usize,
-}
-
-impl<'a> CmdlineContext<'a> {
-    pub fn cmd(&mut self) -> Result<&str, CmdError> {
-        let cmd = self.arguments.get(self.top).map(String::as_str).ok_or_else(|| {
-            if self.full_command_name.is_empty() {
-                NoCommandProvided
-            } else {
-                CmdError::NoSubcommandProvided {
-                    cmd: self.full_command_name.clone(),
-                }
-            }
-        })?;
-        if self.full_command_name.is_empty() {
-            self.full_command_name = cmd.to_string();
-        } else {
-            self.full_command_name = format!("{}:{cmd}", self.full_command_name);
-        }
-        self.top += 1;
-        Ok(cmd)
-    }
-
-    pub fn cmd_opt(&mut self) -> Result<Option<&str>, CmdError> {
-        let cmd_opt = self.arguments.get(self.top).map(String::as_str);
-        if let Some(cmd) = cmd_opt {
-            if self.full_command_name.is_empty() {
-                self.full_command_name = cmd.to_string();
-            } else {
-                self.full_command_name = format!("{}:{cmd}", self.full_command_name);
-            }
-            self.top += 1;
-        }
-        Ok(cmd_opt)
-    }
-
-    fn last_cmd(&mut self) -> Option<&str> {
-        self.arguments.get(self.top - 1).map(String::as_str)
-    }
-
-    pub fn peek(&mut self) -> Option<&str> {
-        self.arguments.get(self.top).map(String::as_str)
-    }
-
-    pub fn pull_arg<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<T, CmdError> {
-        let arg = parse_arg(
-            self.arguments.get(self.top).map(String::as_str),
-            name,
-            description,
-            &self.full_command_name,
-        )?;
-        self.top += 1;
-        Ok(arg)
-    }
-
-    pub fn pull_arg_opt<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<Option<T>, CmdError> {
-        let arg = parse_arg_opt(
-            self.arguments.get(self.top).map(String::as_str),
-            name,
-            description,
-            &self.full_command_name,
-        )?;
-        self.top += 1;
-        Ok(arg)
-    }
-
-    pub fn pull_args<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<Vec<T>, CmdError> {
-        let mut vec = Vec::new();
-        while self.peek().is_some() {
-            let arg = parse_arg(
-                self.arguments.get(self.top).map(String::as_str),
-                name,
-                description,
-                &self.full_command_name,
-            )?;
-            self.top += 1;
-            vec.push(arg);
-        }
-        Ok(vec)
-    }
-
-    pub fn unknown_cmd(&mut self) -> Result<(), CmdError> {
-        let matched = self
-            .last_cmd()
-            .expect("invalid use of CmdlineContext::unknown_cmd - use it in a match, after calling CmdlineContext::cmd")
-            .to_owned();
-        if self.full_command_name.is_empty() {
-            Err(CmdError::UnknownCommand { cmd: matched })
-        } else {
-            Err(CmdError::UnknownSubcommand {
-                cmd: self.full_command_name.clone(),
-                subcmd: matched,
-            })
-        }
-    }
-
-    pub fn new(arguments: &'a [String]) -> Self {
-        Self {
-            arguments,
-            full_command_name: String::new(),
-            top: 1,
-        }
-    }
-}
-
 #[allow(unused_assignments)]
-pub fn handle_command(arguments: &[String]) -> Result<(), CmdError> {
-    let mut ctx = CmdlineContext::new(arguments);
-
+pub fn handle_command(ctx: &mut CmdlineContext) -> Result<(), CmdError> {
     match ctx.cmd()? {
         "hello" => {
             info_npr!("hello world!");

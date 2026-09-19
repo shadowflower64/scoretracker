@@ -1,6 +1,6 @@
-use crate::toolkit::{cmd::library::LibraryIdentifier, error::CmdError};
-use scoretracker::data::library::stpl_url::{LibraryDomain, StplUrl};
-use scoretracker::hive::jobs::process_library_video::Operation;
+use crate::cli::cmdline_error::CmdlineError;
+use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
+use crate::hive::jobs::process_library_video::Operation;
 use std::{fmt, path::PathBuf, str::FromStr};
 
 pub struct ArgError {
@@ -23,9 +23,9 @@ pub trait CmdlineArgument: CmdlineArgumentParse {
     fn arg_type() -> &'static str;
 }
 
-pub fn parse_arg<T: CmdlineArgument>(arg: Option<&str>, name: &str, description: &str, fcn: &str) -> Result<T, CmdError> {
+pub fn parse_arg<T: CmdlineArgument>(arg: Option<&str>, name: &str, description: &str, fcn: &str) -> Result<T, CmdlineError> {
     if let Some(arg) = arg {
-        T::try_from_arg(arg).map_err(|e| CmdError::WrongArgumentType {
+        T::try_from_arg(arg).map_err(|e| CmdlineError::WrongArgumentType {
             cmd: fcn.to_string(),
             arg_name: name.to_string(),
             arg_desc: description.to_string(),
@@ -33,7 +33,7 @@ pub fn parse_arg<T: CmdlineArgument>(arg: Option<&str>, name: &str, description:
             err_msg: e.error_message,
         })
     } else {
-        Err(CmdError::ArgumentNotProvided {
+        Err(CmdlineError::ArgumentNotProvided {
             cmd: fcn.to_string(),
             arg_name: name.to_string(),
             arg_desc: description.to_string(),
@@ -41,9 +41,9 @@ pub fn parse_arg<T: CmdlineArgument>(arg: Option<&str>, name: &str, description:
     }
 }
 
-pub fn parse_arg_opt<T: CmdlineArgument>(arg: Option<&str>, name: &str, description: &str, fcn: &str) -> Result<Option<T>, CmdError> {
+pub fn parse_arg_opt<T: CmdlineArgument>(arg: Option<&str>, name: &str, description: &str, fcn: &str) -> Result<Option<T>, CmdlineError> {
     if let Some(arg) = arg {
-        T::try_from_arg(arg).map(Some).map_err(|e| CmdError::WrongArgumentType {
+        T::try_from_arg(arg).map(Some).map_err(|e| CmdlineError::WrongArgumentType {
             cmd: fcn.to_string(),
             arg_name: name.to_string(),
             arg_desc: description.to_string(),
@@ -104,11 +104,5 @@ impl CmdlineArgument for StplUrl {
 impl CmdlineArgument for Operation {
     fn arg_type() -> &'static str {
         "video compression preset type"
-    }
-}
-
-impl CmdlineArgument for LibraryIdentifier {
-    fn arg_type() -> &'static str {
-        "library identifier"
     }
 }

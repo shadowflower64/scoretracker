@@ -44,6 +44,7 @@
 //! - **Song** - A song in a rhythm game. One song can have multiple charts (for example, different difficulties, or different instruments).
 //! - **Worker** - A process that contributes computational resources by taking on various tasks from a central system called the "*Hive*".
 
+pub mod cli;
 pub mod config;
 pub mod data;
 pub mod ffmpeg;
