@@ -3,7 +3,7 @@ use constcat::concat;
 use function_name::named;
 use regex::Regex;
 use relative_path::RelativePath;
-use scoretracker::config::Config;
+use scoretracker::config::LegacyConfig;
 use scoretracker::data::library::database::MediaCategory;
 use scoretracker::data::library::{database::LibraryDatabase, index::LibraryIndex};
 use scoretracker::util::filelocked::FileLockableData;
@@ -71,7 +71,7 @@ pub fn automark_library_files(library_dir: PathBuf) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
     info!("reading database");
-    let config = Config::load().map_err(CmdError::ConfigReadError)?;
+    let config = LegacyConfig::load().map_err(CmdError::ConfigReadError)?;
     let library_index =
         LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(CmdError::LibraryIndexReadError)?;
     let mut library_db =

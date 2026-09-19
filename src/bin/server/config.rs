@@ -11,6 +11,7 @@ use std::path::PathBuf;
 pub struct ServerConfig {
     // pub display_name: String,
     pub shared_data_repo_path: PathBuf,
+    pub database_connection: Option<String>,
 }
 
 impl TomlConfig for ServerConfig {

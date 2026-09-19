@@ -1,7 +1,6 @@
 use crate::server::config::ServerConfig;
 use crate::toolkit::error::CmdError;
 use function_name::named;
-use scoretracker::config::secrets::SecretsConfig;
 use scoretracker::config::toolkit::ToolkitConfig;
 use scoretracker::config::{library_tab::LibraryTab, toml::TomlConfig};
 use scoretracker::log_fn_name;
@@ -12,18 +11,17 @@ use std::path::Path;
 pub fn show() -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    fn print_path(header: &str, value: &Path) {
+    fn pretty_print_path(header: &str, value: &Path) {
         println!("{header:>30} = {value:?}");
     }
 
-    print_path("config dir", &config_dir());
-    print_path("log dir", &log_dir());
-    print_path("project temp dir", &project_temp_dir());
+    pretty_print_path("config_dir", &config_dir());
+    pretty_print_path("log_dir", &log_dir());
+    pretty_print_path("project_temp_dir", &project_temp_dir());
 
-    print_path("toolkit config", &ToolkitConfig::default_path());
-    print_path("server config", &ServerConfig::default_path());
-    print_path("shared secrets config", &SecretsConfig::default_path());
-    print_path("library tab", &LibraryTab::default_path());
+    pretty_print_path("toolkit_config", &ToolkitConfig::default_path());
+    pretty_print_path("server_config", &ServerConfig::default_path());
+    pretty_print_path("library_tab", &LibraryTab::default_path());
 
     Ok(())
 }

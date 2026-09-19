@@ -81,7 +81,7 @@ pub enum CmdError {
     WorkerStartError(#[from] WorkerStartError),
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
-    #[error("postgres error: {0}")]
+    #[error("postgres error: {0:?}")]
     DbError(#[from] postgres::Error),
 
     #[cfg(feature = "include-server-in-toolkit")]

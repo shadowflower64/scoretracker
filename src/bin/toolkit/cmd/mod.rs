@@ -1,9 +1,9 @@
 use crate::toolkit::cmd;
 use crate::toolkit::cmd::library::LibraryIdentifier;
 use crate::toolkit::error::CmdError;
-use scoretracker::cli::cmdline_context::{CmdlineContext, CmdlineContextView};
+use scoretracker::cli::cmdline_context::CmdlineContext;
 use scoretracker::cli::cmdline_error::CmdlineError;
-use scoretracker::config::Config;
+use scoretracker::config::LegacyConfig;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::TomlConfig;
 use scoretracker::data::library::stpl_url::{LibraryDomain, StplUrl};
@@ -36,7 +36,7 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             let library_dir: Option<PathBuf> = ctx.pull_arg_opt("library_dir", "path of the library directory")?;
             let library_dir = library_dir
                 .map(Ok)
-                .unwrap_or_else(|| Config::load().map(|x| x.default_library_dir_path.clone()))
+                .unwrap_or_else(|| LegacyConfig::load().map(|x| x.default_library_dir_path.clone()))
                 .map_err(CmdError::ConfigReadError)?;
             cmd::automark::automark_library_files(library_dir)
         }
@@ -52,13 +52,14 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
         },
         "db" => match ctx.cmd()? {
             "init" => {
-                let database_name: String = ctx.pull_arg("database_name", "name for the new database to create")?;
-                cmd::db::init(database_name)
+                let schema_name: String = ctx.pull_arg("schema_name", "name for the new schema to create in the database")?;
+                cmd::db::init(schema_name)
             }
             _ => ctx.unknown_cmd(),
         },
         "hive" => match ctx.cmd()? {
             "worker" => match ctx.cmd()? {
+                // TODO: rename to "start", "spawn" implies spawning a background process
                 "spawn" => {
                     // let persistent: bool = ctx.pull_arg("persistent", "should the worker stay alive after finishing a task?")?;
                     cmd::hive::start_worker(/*persistent*/)
@@ -146,7 +147,7 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
                 let library: LibraryIdentifier =
                     if let Some(arg) = ctx.pull_arg_opt("library", "library domain name or path to the library directory")? {
                         Ok(arg)
-                    } else if let Some(default) = &Config::load().map_err(CmdError::ConfigReadError)?.default_library {
+                    } else if let Some(default) = &LegacyConfig::load().map_err(CmdError::ConfigReadError)?.default_library {
                         Ok(LibraryIdentifier::DomainName(default.clone()))
                     } else {
                         Err(CmdlineError::ArgumentNotProvided {
@@ -178,8 +179,8 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             _ => ctx.unknown_cmd(),
         },
         "logs" => cmd::log::open(),
-        "paths" => match ctx.cmd()? {
-            "show" => cmd::paths::show(),
+        "paths" => match ctx.cmd_opt()? {
+            None | Some("show") => cmd::paths::show(),
             _ => ctx.unknown_cmd(),
         },
         "scoreboard" => match ctx.cmd()? {

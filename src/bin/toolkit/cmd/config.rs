@@ -1,5 +1,5 @@
 use crate::toolkit::cmd::CmdError;
-use scoretracker::config::Config;
+use scoretracker::config::LegacyConfig;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::command_line::{ask_string, ask_yn};
 use scoretracker::util::file_ex::FileEx;
@@ -10,7 +10,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-fn print_config(config: &Config) -> Result<(), CmdError> {
+fn print_config(config: &LegacyConfig) -> Result<(), CmdError> {
     let mut stdout = io::stdout();
     serde_json::to_writer_pretty(&stdout, &config).map_err(CmdError::ConfigSerializationError)?;
     stdout.write_all(b"\n")?;
@@ -19,7 +19,7 @@ fn print_config(config: &Config) -> Result<(), CmdError> {
 }
 
 pub fn init() -> Result<(), CmdError> {
-    let path = Config::default_path();
+    let path = LegacyConfig::default_path();
     let has_to_confirm = match path.read_from_json() {
         Ok(Some(config)) => {
             info_npr!("current config is:");
@@ -47,7 +47,7 @@ pub fn init() -> Result<(), CmdError> {
     let default_library: LibraryDomain = ask_string("default library", None)?.try_into().expect("todo: error handling");
     let default_library_dir_path = ask_string("path to the library directory", None)?.into();
     let shared_data_repo_path = ask_string("path to the shared data repository", None)?.into();
-    let config = Config {
+    let config = LegacyConfig {
         default_library: if default_library.to_string().is_empty() {
             None
         } else {
@@ -69,12 +69,12 @@ pub fn init() -> Result<(), CmdError> {
 }
 
 pub fn show() -> Result<(), CmdError> {
-    let config = Config::load().map_err(CmdError::ConfigReadError)?;
+    let config = LegacyConfig::load().map_err(CmdError::ConfigReadError)?;
     print_config(config)
 }
 
 pub fn set(key: String, value: String) -> Result<(), CmdError> {
-    let mut config = Config::lock_default_and_read(None).map_err(CmdError::ConfigOpenError)?;
+    let mut config = LegacyConfig::lock_default_and_read(None).map_err(CmdError::ConfigOpenError)?;
 
     match key.as_str() {
         "default_library" => {

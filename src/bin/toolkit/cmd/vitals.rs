@@ -2,7 +2,7 @@ use crate::toolkit::cmd::CmdError;
 use crate::toolkit::cmd::vitals::LogCheckError::GetSizeError;
 use fs_extra::dir::get_size;
 use regex::Regex;
-use scoretracker::config::Config;
+use scoretracker::config::LegacyConfig;
 use scoretracker::data::game::game_instance_from_id;
 use scoretracker::data::library::database::{LibraryDatabase, LibraryEntry};
 use scoretracker::data::scoreboard::r#match::{MatchDatabase, MatchTrait};
@@ -526,11 +526,11 @@ pub fn check_all() -> Result<(), CmdError> {
     // Disable lockfile logging
     lockfile::DEBUG_PRINT.store(false, Ordering::Release);
 
-    let config_path = Config::default_path();
+    let config_path = LegacyConfig::default_path();
     println!("config located at: {config_path:?}");
     print_check_name("checking config");
 
-    let config = match Config::load() {
+    let config = match LegacyConfig::load() {
         Ok(config) => {
             print_check_ok();
             config

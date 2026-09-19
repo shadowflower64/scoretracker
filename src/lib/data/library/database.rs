@@ -75,7 +75,7 @@ pub enum MediaCategory {
     Unspecified,
 
     /// An image of the screen captured from a PC.
-    PCScreenshot,
+    PcScreenshot,
 
     /// An image of the screen captured from a phone.
     MobileScreenshot,

@@ -1,5 +1,4 @@
 pub mod library_tab;
-pub mod secrets;
 pub mod toml;
 pub mod toolkit;
 
@@ -21,15 +20,15 @@ use std::path::PathBuf;
 use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Config {
+pub struct LegacyConfig {
     pub shared_data_repo_path: PathBuf,
     pub default_library_dir_path: PathBuf,
     pub default_library: Option<LibraryDomain>,
 }
 
-impl Config {
+impl LegacyConfig {
     pub fn load() -> Result<&'static Self, &'static file_ex::Error> {
-        static LOADED_CONFIG: LazyLock<file_ex::Result<Config>> = LazyLock::new(Config::read_default_without_locking);
+        static LOADED_CONFIG: LazyLock<file_ex::Result<LegacyConfig>> = LazyLock::new(LegacyConfig::read_default_without_locking);
         LOADED_CONFIG.as_ref()
     }
 
@@ -66,15 +65,15 @@ impl Config {
     }
 }
 
-impl Config {
+impl LegacyConfig {
     pub const STANDARD_FILENAME: &str = "scoretracker_config.json";
     fn default_path_static() -> PathBuf {
         config_dir().join(Self::STANDARD_FILENAME)
     }
 }
 
-impl FileLockableDataJson for Config {}
-impl FileLockableDataWithDefaultPath for Config {
+impl FileLockableDataJson for LegacyConfig {}
+impl FileLockableDataWithDefaultPath for LegacyConfig {
     fn default_path() -> PathBuf {
         env::var("SCORETRACKER_CONFIG_PATH")
             .map(PathBuf::from)

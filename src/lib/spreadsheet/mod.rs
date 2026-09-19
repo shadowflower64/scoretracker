@@ -3,7 +3,7 @@ pub mod field_path;
 pub mod field_value;
 pub mod record;
 
-use crate::config::Config;
+use crate::config::LegacyConfig;
 use crate::data::game::song::AnySong;
 use crate::data::game::{AnyGame, Game, game_instance_from_id};
 use crate::data::library::database::LibraryDatabase;
@@ -339,7 +339,7 @@ pub fn import_org_spreadsheet_generic(
     let mut matches = Vec::new();
     let mut performances = Vec::new();
 
-    let config = Config::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
+    let config = LegacyConfig::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
     let player_database =
         PlayerDatabase::read_without_locking(config.player_database_path()).map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
     let mut library_db =

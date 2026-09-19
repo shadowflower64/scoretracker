@@ -12,7 +12,7 @@ use scoretracker::info_npr;
 use scoretracker::util::filelocked::FileLockableDataDefault;
 use scoretracker::util::lossless_cut_project::LlcProj;
 use scoretracker::util::timestamp::NsLocalTimestamp;
-use scoretracker::{config::Config, info, log_fn_name};
+use scoretracker::{config::LegacyConfig, info, log_fn_name};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -26,7 +26,7 @@ pub fn add_task(job: impl Job) -> Result<(), CmdError> {
     log_fn_name!("cmd" : auto);
 
     let job = job.into_any();
-    let config = Config::load().map_err(CmdError::ConfigReadError)?;
+    let config = LegacyConfig::load().map_err(CmdError::ConfigReadError)?;
     let mut task_queue = TaskQueue::lock_and_read_or_default(config.task_queue_path(), None).map_err(CmdError::TaskQueueOpenError)?;
     let time_identifier = DateTime::<Local>::from(SystemTime::now()).format("%Y%m%d%H%M%S%3f");
     let task = Task::new(format!("Manually added task #{time_identifier}"), job);

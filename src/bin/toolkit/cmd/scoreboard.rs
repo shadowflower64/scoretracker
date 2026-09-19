@@ -4,7 +4,7 @@ use crate::toolkit::error::CmdError::{
     PlayerDatabaseOpenError, PlayerDatabaseWriteError,
 };
 use function_name::named;
-use scoretracker::config::Config;
+use scoretracker::config::LegacyConfig;
 use scoretracker::data::game::game_instance_from_id;
 use scoretracker::data::scoreboard::r#match::MatchDatabase;
 use scoretracker::data::scoreboard::performance::PerformanceDatabase;
@@ -14,7 +14,7 @@ use scoretracker::util::filelocked::{FileLockableData, FileLockableDataDefault};
 use scoretracker::{info_npr, log_fn_name, util::command_line::ask_yn};
 
 pub fn init() -> Result<(), CmdError> {
-    let config = Config::load().map_err(ConfigReadError)?;
+    let config = LegacyConfig::load().map_err(ConfigReadError)?;
 
     let player_database = PlayerDatabase::lock_and_read_or_default(config.player_database_path(), None).map_err(PlayerDatabaseOpenError)?;
     player_database.save_and_unlock().map_err(PlayerDatabaseWriteError)?;
@@ -55,7 +55,7 @@ pub fn add_player(name: String) -> Result<(), CmdError> {
     log_fn_name!("cmd" : auto);
     info_npr!("adding new player: '{name}'");
 
-    let player_db_path = Config::load().map_err(CmdError::ConfigReadError)?.player_database_path();
+    let player_db_path = LegacyConfig::load().map_err(CmdError::ConfigReadError)?.player_database_path();
     let mut player_db = PlayerDatabase::lock_and_read(player_db_path, None).map_err(CmdError::PlayerDatabaseOpenError)?;
     let result = player_db.add(&name);
     player_db.save_and_close().map_err(CmdError::PlayerDatabaseWriteError)?;

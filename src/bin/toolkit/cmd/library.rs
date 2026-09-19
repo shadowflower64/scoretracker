@@ -2,7 +2,7 @@ use crate::toolkit::cmd::CmdError;
 use function_name::named;
 use relative_path::RelativePathBuf;
 use scoretracker::cli::cmdline_argument::CmdlineArgument;
-use scoretracker::config::Config;
+use scoretracker::config::LegacyConfig;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::{TomlConfig, TomlConfigError};
 use scoretracker::data::library::info::LibraryInfo;
@@ -134,7 +134,7 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
 pub fn rescan(library_dir: &Path) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    let library_db_path = Config::load().map_err(CmdError::ConfigReadError)?.library_database_path();
+    let library_db_path = LegacyConfig::load().map_err(CmdError::ConfigReadError)?.library_database_path();
     scan_full(library_dir, &library_db_path, None)?;
 
     success_npr!("successfully rescanned library");
@@ -145,7 +145,7 @@ pub fn rescan(library_dir: &Path) -> Result<(), CmdError> {
 pub fn remove_domain(library_domain: LibraryDomain) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    let library_db_path = Config::load().map_err(CmdError::ConfigReadError)?.library_database_path();
+    let library_db_path = LegacyConfig::load().map_err(CmdError::ConfigReadError)?.library_database_path();
     remove_library_domain_from_db(library_domain.clone(), &library_db_path, None)?;
 
     success_npr!("successfully removed urls with the domain '{library_domain}' from database");
