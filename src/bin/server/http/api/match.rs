@@ -1,6 +1,6 @@
-use super::super::super::globals::ServerGlobals;
+use crate::server::globals::ServerGlobals;
 
-use super::ApiResult;
+use crate::server::http::ApiResult;
 use actix_web::{HttpRequest, get, put, web};
 use function_name::named;
 use scoretracker::data::scoreboard::r#match::{AnyMatch, MatchDatabase};

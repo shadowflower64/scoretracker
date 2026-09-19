@@ -1,21 +1,20 @@
-use super::super::error::ServerError;
-
-use super::super::config::ServerConfig;
-use super::super::connect_internal_libraries;
-use super::super::http::{index, r#static, testing_area};
-
-use super::super::globals::ServerGlobals;
-use super::api;
-use super::api::ApiDoc;
+use crate::server::{
+    config::ServerConfig,
+    connect_internal_libraries,
+    error::ServerError,
+    globals::ServerGlobals,
+    http::{
+        api::{self, ApiDoc},
+        index, r#static, testing_area,
+    },
+};
 use actix_web::{App, HttpServer, Scope};
 use function_name::named;
-use scoretracker::config::toml::{TomlConfig, TomlConfigError};
-use scoretracker::util::relative_path_from_segments;
-use scoretracker::{info, log_fn_name, success, warn};
-use std::io;
-use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
-use thiserror::Error;
+use scoretracker::{config::toml::TomlConfig, info, log_fn_name, success, util::relative_path_from_segments, warn};
+use std::{
+    path::PathBuf,
+    sync::{Arc, RwLock},
+};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 

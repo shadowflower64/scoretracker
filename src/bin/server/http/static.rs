@@ -6,7 +6,7 @@ use function_name::named;
 use relative_path::{Component, RelativePathBuf};
 use scoretracker::{debug, log_fn_name, log_should_print_debug, util::relative_path_from_segments};
 
-use super::start::WEB_FRONTEND_DIR_PATH_SEGMENTS;
+use crate::server::start::WEB_FRONTEND_DIR_PATH_SEGMENTS;
 
 pub fn static_file_dir_path() -> PathBuf {
     relative_path_from_segments(WEB_FRONTEND_DIR_PATH_SEGMENTS).join("app").to_path(".")

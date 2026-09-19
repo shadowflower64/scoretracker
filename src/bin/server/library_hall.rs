@@ -1,4 +1,4 @@
-use super::access_rules::AccessRules;
+use crate::server::access_rules::AccessRules;
 use function_name::named;
 use scoretracker::config::library_tab::{InternalLibraryAccessPath, InternalLibraryConnections, MirrorStatus};
 use scoretracker::data::library::stpl_url::LibraryDomain;

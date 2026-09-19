@@ -10,7 +10,7 @@ use std::{io, process::ExitCode};
 use thiserror::Error;
 use uuid::Uuid;
 
-#[cfg(feature = "toolkit-server")]
+#[cfg(feature = "include-server-in-toolkit")]
 use crate::server::error::ServerError;
 
 #[derive(Debug, Error)]
@@ -84,7 +84,7 @@ pub enum CmdError {
     #[error("postgres error: {0}")]
     DbError(#[from] postgres::Error),
 
-    #[cfg(feature = "toolkit-server")]
+    #[cfg(feature = "include-server-in-toolkit")]
     #[error("server error: {0}")]
     ServerError(#[from] ServerError),
 
@@ -147,7 +147,7 @@ impl CmdError {
             Self::ConfigSerializationError(..) => 36,
             Self::CreateDirAllError(..) => 37,
 
-            #[cfg(feature = "toolkit-server")]
+            #[cfg(feature = "include-server-in-toolkit")]
             Self::ServerError(e) => e.exit_code_num(),
 
             Self::LibraryTableError(..) => 40,

@@ -2,7 +2,9 @@ use function_name::named;
 use scoretracker::{error, info, log_fn_name, util::log};
 use std::process::ExitCode;
 
-mod start;
+use crate::worker::start::worker_start;
+
+mod worker;
 
 #[named]
 fn main() -> ExitCode {
@@ -11,7 +13,7 @@ fn main() -> ExitCode {
     log_fn_name!(auto);
 
     info!("starting worker");
-    match start::worker_main() {
+    match worker_start() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             error!("critical worker error: {}", error);

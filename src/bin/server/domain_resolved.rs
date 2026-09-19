@@ -3,7 +3,7 @@ use serde::Serialize;
 use thiserror::Error;
 use utoipa::ToSchema;
 
-use super::http::api::ApiError;
+use crate::server::http::api::ApiError;
 
 #[derive(Serialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]

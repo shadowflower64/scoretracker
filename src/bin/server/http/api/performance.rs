@@ -7,8 +7,8 @@ use scoretracker::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::super::super::globals::ServerGlobals;
-use super::ApiResult;
+use crate::server::globals::ServerGlobals;
+use crate::server::http::api::ApiResult;
 
 /// `ToSchema`-compatible wrapper for [`AnyMatch`].
 // TODO: make this generate an actually useful schema

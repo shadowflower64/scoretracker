@@ -204,7 +204,7 @@ pub fn handle_command(ctx: &mut CmdlineContext) -> Result<(), CmdError> {
             "gen-json" => cmd::schema::gen_json(),
             "gen-types" => cmd::schema::gen_types(),
 
-            #[cfg(feature = "toolkit-server")]
+            #[cfg(feature = "include-server-in-toolkit")]
             "gen-api" => cmd::schema::gen_api(),
 
             "clean" => cmd::schema::clean(),
@@ -212,7 +212,7 @@ pub fn handle_command(ctx: &mut CmdlineContext) -> Result<(), CmdError> {
         },
         "server" => match ctx.cmd()? {
             "init" => {
-                #[cfg(feature = "toolkit-server")]
+                #[cfg(feature = "include-server-in-toolkit")]
                 {
                     use crate::server::config::ServerConfig;
                     let path = ServerConfig::default_path();
@@ -221,18 +221,18 @@ pub fn handle_command(ctx: &mut CmdlineContext) -> Result<(), CmdError> {
                     Ok(())
                 }
 
-                #[cfg(not(feature = "toolkit-server"))]
+                #[cfg(not(feature = "include-server-in-toolkit"))]
                 Err(CmdError::ServerNotIncluded)
             }
             "start" => {
-                #[cfg(feature = "toolkit-server")]
+                #[cfg(feature = "include-server-in-toolkit")]
                 {
                     use crate::server::start::server_main;
                     server_main()?;
                     Ok(())
                 }
 
-                #[cfg(not(feature = "toolkit-server"))]
+                #[cfg(not(feature = "include-server-in-toolkit"))]
                 Err(CmdError::ServerNotIncluded)
             }
             _ => ctx.unknown_cmd(),

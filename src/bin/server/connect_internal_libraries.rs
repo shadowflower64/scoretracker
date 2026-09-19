@@ -1,6 +1,7 @@
-use super::library_hall::LibraryConnections;
 use function_name::named;
 use scoretracker::config::{library_tab::LibraryTab, toml::TomlConfig};
+
+use crate::server::library_hall::LibraryConnections;
 
 #[named]
 pub fn connect_internal_libraries() -> LibraryConnections {

@@ -28,7 +28,7 @@ pub fn openapi_file_path() -> PathBuf {
 pub fn gen_full() -> Result<(), CmdError> {
     gen_json()?;
     gen_types()?;
-    #[cfg(feature = "toolkit-server")]
+    #[cfg(feature = "include-server-in-toolkit")]
     gen_api()?;
     Ok(())
 }
@@ -106,7 +106,7 @@ pub fn gen_types() -> Result<(), CmdError> {
 }
 
 #[named]
-#[cfg(feature = "toolkit-server")]
+#[cfg(feature = "include-server-in-toolkit")]
 pub fn gen_api() -> Result<(), CmdError> {
     use crate::server::http::api::ApiDoc;
     use utoipa::OpenApi;

@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use scoretracker::data::library::stpl_url::LibraryDomain;
 
-use super::{
+use crate::server::{
     access_rules::AuthenticatedUser,
     config::ServerConfig,
     domain_resolved::{DomainResolveError, DomainResolved},

@@ -5,8 +5,9 @@ edition = "2024"
 default-run = "scoretracker-toolkit"
 
 [features]
-default = ["toolkit-server"]
-toolkit-server = []
+default = ["include-server-in-toolkit", "include-worker-in-toolkit"]
+include-server-in-toolkit = []
+include-worker-in-toolkit = []
 
 [lib]
 name = "scoretracker"
@@ -14,15 +15,15 @@ path = "src/lib/lib.rs"
 
 [[bin]]
 name = "scoretracker-toolkit"
-path = "src/bin/main.rs"
+path = "src/bin/toolkit_main.rs"
 
 [[bin]]
 name = "scoretracker-server"
-path = "src/bin/server/main.rs"
+path = "src/bin/server_main.rs"
 
 [[bin]]
 name = "scoretracker-worker"
-path = "src/bin/worker/main.rs"
+path = "src/bin/worker_main.rs"
 
 [[bin]]
 name = "scoretracker-playground"

@@ -3,7 +3,7 @@
 //! This module handles reading the `secrets.toml` global config file, which contains database credentials.
 //! This config is used by the server to connect to the database.
 
-use super::toml::{TomlConfig, TomlConfigError};
+use crate::config::toml::{TomlConfig, TomlConfigError};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 

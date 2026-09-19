@@ -2,16 +2,9 @@ use function_name::named;
 use scoretracker::{error, info, log_fn_name, util::log};
 use std::process::ExitCode;
 
-use crate::http::start::http_server_start;
+use crate::server::http::start::http_server_start;
 
-mod access_rules;
-mod config;
-mod connect_internal_libraries;
-mod domain_resolved;
-pub mod error;
-mod globals;
-mod http;
-mod library_hall;
+mod server;
 
 #[named]
 fn main() -> ExitCode {

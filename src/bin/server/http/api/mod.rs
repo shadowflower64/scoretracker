@@ -17,9 +17,9 @@ use std::fmt;
 use utoipa::OpenApi;
 use utoipa::ToSchema;
 
-use super::super::domain_resolved::DomainResolveError;
-use super::super::domain_resolved::DomainResolved;
-use super::super::globals::ServerGlobals;
+use crate::server::domain_resolved::DomainResolveError;
+use crate::server::domain_resolved::DomainResolved;
+use crate::server::globals::ServerGlobals;
 
 pub trait ApiError: fmt::Display + Serialize {
     /// Get HTTP status code for this result.
