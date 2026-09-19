@@ -1,4 +1,5 @@
 pub mod access_rules;
+pub mod cmd;
 pub mod config;
 pub mod connect_internal_libraries;
 pub mod domain_resolved;

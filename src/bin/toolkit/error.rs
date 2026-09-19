@@ -106,7 +106,7 @@ pub enum CmdError {
     LibraryRescanNeeded(Uuid),
     // ---
     #[error(
-        "the server is not included in this build of scoretracker-toolkit; please compile the project with the `server` feature enabled to start the server from this binary."
+        "the server is not included in this build of scoretracker-toolkit; please compile the project with the `include-server-in-toolkit` feature enabled to start the server from this binary."
     )]
     ServerNotIncluded,
 }

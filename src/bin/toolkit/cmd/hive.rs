@@ -1,5 +1,5 @@
 use crate::toolkit::cmd::{self, CmdError};
-use crate::worker::start::worker_main;
+use crate::worker::start::worker_start;
 use chrono::{DateTime, Local};
 use function_name::named;
 use scoretracker::data::library::root::LibraryRoot;
@@ -18,7 +18,7 @@ use std::time::SystemTime;
 
 #[named]
 pub fn start_worker() -> Result<(), CmdError> {
-    worker_main().map_err(CmdError::WorkerStartError)
+    worker_start().map_err(CmdError::WorkerStartError)
 }
 
 #[named]

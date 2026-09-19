@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::cli::{
     cmdline_argument::{CmdlineArgument, parse_arg, parse_arg_opt},
     cmdline_error::CmdlineError,
@@ -108,5 +110,41 @@ impl<'a> CmdlineContext<'a> {
             full_command_name: String::new(),
             top: 1,
         }
+    }
+
+    pub fn with_error_type<'ctx_borrow, E: From<CmdlineError>>(&'ctx_borrow mut self) -> CmdlineContextView<'ctx_borrow, 'a, E> {
+        CmdlineContextView::new(self)
+    }
+}
+
+pub struct CmdlineContextView<'ctx_borrow, 'args_borrow: 'ctx_borrow, E: From<CmdlineError>>(
+    pub &'ctx_borrow mut CmdlineContext<'args_borrow>,
+    PhantomData<E>,
+);
+
+impl<'ctx_borrow, 'args_borrow: 'ctx_borrow, E: From<CmdlineError>> CmdlineContextView<'ctx_borrow, 'args_borrow, E> {
+    pub fn cmd(&mut self) -> Result<&str, E> {
+        self.0.cmd()
+    }
+    pub fn cmd_opt(&mut self) -> Result<Option<&str>, E> {
+        self.0.cmd_opt()
+    }
+    pub fn peek(&mut self) -> Option<&str> {
+        self.0.peek()
+    }
+    pub fn pull_arg<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<T, E> {
+        self.0.pull_arg(name, description)
+    }
+    pub fn pull_arg_opt<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<Option<T>, E> {
+        self.0.pull_arg_opt(name, description)
+    }
+    pub fn pull_args<T: CmdlineArgument>(&mut self, name: &str, description: &str) -> Result<Vec<T>, E> {
+        self.0.pull_args(name, description)
+    }
+    pub fn unknown_cmd(&mut self) -> Result<(), E> {
+        self.0.unknown_cmd()
+    }
+    pub fn new(ctx: &'ctx_borrow mut CmdlineContext<'args_borrow>) -> Self {
+        Self(ctx, PhantomData)
     }
 }

@@ -88,8 +88,7 @@ pub async fn put_performance(
     assert_eq!(uuid, performance.uuid(), "uuid in url should performance uuid in request body");
 
     let app_data = req.app_data::<ServerGlobals>().expect("app data should be present");
-    let mut match_db =
-        MatchDatabase::lock_and_read(app_data.server_config.match_database_path(), None).expect("could not read match database");
+    let match_db = MatchDatabase::lock_and_read(app_data.server_config.match_database_path(), None).expect("could not read match database");
     let mut performance_db = PerformanceDatabase::lock_and_read(app_data.server_config.performance_database_path(), None)
         .expect("could not read performance database");
 

@@ -1,7 +1,8 @@
 use crate::toolkit::cmd;
 use crate::toolkit::cmd::library::LibraryIdentifier;
 use crate::toolkit::error::CmdError;
-use scoretracker::cli::cmdline_context::CmdlineContext;
+use scoretracker::cli::cmdline_context::{CmdlineContext, CmdlineContextView};
+use scoretracker::cli::cmdline_error::CmdlineError;
 use scoretracker::config::Config;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::TomlConfig;
@@ -24,8 +25,8 @@ pub mod scoreboard;
 pub mod spreadsheet;
 pub mod vitals;
 
-#[allow(unused_assignments)]
-pub fn handle_command(ctx: &mut CmdlineContext) -> Result<(), CmdError> {
+pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
+    let mut ctx = context.with_error_type::<CmdError>();
     match ctx.cmd()? {
         "hello" => {
             info_npr!("hello world!");
@@ -148,7 +149,7 @@ pub fn handle_command(ctx: &mut CmdlineContext) -> Result<(), CmdError> {
                     } else if let Some(default) = &Config::load().map_err(CmdError::ConfigReadError)?.default_library {
                         Ok(LibraryIdentifier::DomainName(default.clone()))
                     } else {
-                        Err(CmdError::ArgumentNotProvided {
+                        Err(CmdlineError::ArgumentNotProvided {
                             cmd: "library:rescan".to_string(),
                             arg_name: "library".to_string(),
                             arg_desc: "library domain name or path to the library directory".to_string(),
@@ -210,33 +211,13 @@ pub fn handle_command(ctx: &mut CmdlineContext) -> Result<(), CmdError> {
             "clean" => cmd::schema::clean(),
             _ => ctx.unknown_cmd(),
         },
-        "server" => match ctx.cmd()? {
-            "init" => {
-                #[cfg(feature = "include-server-in-toolkit")]
-                {
-                    use crate::server::config::ServerConfig;
-                    let path = ServerConfig::default_path();
-                    ServerConfig::default().write_new(&path).map_err(CmdError::ServerConfigError)?;
-                    success_npr!("config successfully written to: {path:?}");
-                    Ok(())
-                }
-
-                #[cfg(not(feature = "include-server-in-toolkit"))]
+        "server" => {
+            if cfg!(feature = "include-server-in-toolkit") {
+                Ok(crate::server::cmd::handle_command(context)?)
+            } else {
                 Err(CmdError::ServerNotIncluded)
             }
-            "start" => {
-                #[cfg(feature = "include-server-in-toolkit")]
-                {
-                    use crate::server::start::server_main;
-                    server_main()?;
-                    Ok(())
-                }
-
-                #[cfg(not(feature = "include-server-in-toolkit"))]
-                Err(CmdError::ServerNotIncluded)
-            }
-            _ => ctx.unknown_cmd(),
-        },
+        }
         "spreadsheet" => match ctx.cmd()? {
             "import-org-ods" => {
                 let path: PathBuf = ctx.pull_arg("path", "path of the ods spreadsheet file")?;
