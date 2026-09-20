@@ -4,9 +4,9 @@
 //! Spreadsheet bug: `!artist_title` field in the spreadsheet - song ID is not present, it should be present in the input data. (TODO)
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::MatchTrait;
-use crate::data::scoreboard::performance::PerformanceTrait;
-use crate::data::scoreboard::{r#match::CommonMatchInfo, performance::CommonPerformanceInfo};
+use crate::data::scoreboard::r#match::MatchDetails;
+use crate::data::scoreboard::performance::PerformanceDetails;
+use crate::data::scoreboard::{r#match::Match, performance::Performance};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
@@ -24,10 +24,7 @@ pub enum Mode {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct FnfestMatchDetails {
     /// Game mode that this match was played on.
     pub mode: Mode,
 
@@ -40,10 +37,7 @@ pub struct Match {
 }
 
 #[typetag::serde(name = "fnfest")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for FnfestMatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }
@@ -117,10 +111,7 @@ pub enum Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct FnfestPerformanceDetails {
     /// Played instrument.
     pub instrument: Instrument,
 
@@ -149,7 +140,7 @@ pub struct Performance {
     pub max_streak: u32,
 }
 
-impl Performance {
+impl FnfestPerformanceDetails {
     /// Custom formula calculating the X-Accuracy of the performance.
     ///
     /// Ouputs a number from 0.0 to 1.0.
@@ -165,10 +156,7 @@ impl Performance {
 }
 
 #[typetag::serde(name = "fnfest")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for FnfestPerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.score as f64
     }
@@ -223,14 +211,12 @@ impl Game for FortniteFestival {
             ))
         }
 
-        let match_data = Match {
-            common: ctx.create_common_m(record)?,
+        let match_data = FnfestMatchDetails {
             mode: Mode::MainStage,
             leaderboard_placement: create_lb_placement(record)?,
             game_version: None,
         };
-        let performance_data = Performance {
-            common: ctx.create_common_p(record, match_data.uuid())?,
+        let performance_data = FnfestPerformanceDetails {
             instrument,
             difficulty: record.string_enum("difficulty")?,
             lamp,

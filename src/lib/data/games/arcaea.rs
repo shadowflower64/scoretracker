@@ -3,8 +3,8 @@
 //! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::r#match::{Match, MatchDetails};
+use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
@@ -16,20 +16,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct ArcaeaMatchDetails {
     /// String of the game version that was played on for this match.
     /// None for unknown.
     pub game_version: Option<String>,
 }
 
 #[typetag::serde(name = "arcaea")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for ArcaeaMatchDetails {
     fn sorting_key(&self) -> f64 {
         unimplemented!()
     }
@@ -100,10 +94,7 @@ impl TryFrom<&Record> for Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct ArcaeaPerformanceDetails {
     /// Mode that this performance was played on.
     pub mode: Mode,
 
@@ -129,13 +120,10 @@ pub struct Performance {
     pub score: u32,
 }
 
-impl Performance {}
+impl ArcaeaPerformanceDetails {}
 
 #[typetag::serde(name = "arcaea")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for ArcaeaPerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.score as f64
     }
@@ -157,12 +145,8 @@ impl Game for Arcaea {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        let match_data = Match {
-            common: ctx.create_common_m(record)?,
-            game_version: None,
-        };
-        let performance_data = Performance {
-            common: ctx.create_common_p(record, match_data.uuid())?,
+        let match_data = ArcaeaMatchDetails { game_version: None };
+        let performance_data = ArcaeaPerformanceDetails {
             mode: Mode::UnknownSingle,
             difficulty: record.string_enum("difficulty")?,
             lamp: record.try_into()?,

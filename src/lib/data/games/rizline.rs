@@ -3,8 +3,8 @@
 //! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::r#match::{Match, MatchDetails};
+use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
@@ -16,20 +16,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct RizlineMatchDetails {
     /// String of the game version that was played on for this match.
     /// None for unknown.
     pub game_version: Option<String>,
 }
 
 #[typetag::serde(name = "rizline")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for RizlineMatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }
@@ -69,10 +63,7 @@ pub enum Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct RizlinePerformanceDetails {
     /// Difficulty level of the chart.
     pub difficulty: Difficulty,
 
@@ -108,10 +99,7 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "rizline")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for RizlinePerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.score as f64
     }
@@ -144,12 +132,8 @@ impl Game for Rizline {
             lamp = Lamp::PFC;
         }
         let score = record.int("score").or_skip()?;
-        let match_data = Match {
-            common: ctx.create_common_m(record)?,
-            game_version: None,
-        };
-        let performance_data = Performance {
-            common: ctx.create_common_p(record, match_data.uuid())?,
+        let match_data = RizlineMatchDetails { game_version: None };
+        let performance_data = RizlinePerformanceDetails {
             difficulty: record.string_enum("difficulty")?,
             lamp,
             stars: record.int("stars")?,

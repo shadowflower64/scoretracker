@@ -4,9 +4,9 @@ use fs_extra::dir::get_size;
 use regex::Regex;
 use scoretracker::config::LegacyConfig;
 use scoretracker::data::game::game_instance_from_id;
-use scoretracker::data::library::database::{LibraryDatabase, LibraryEntry};
-use scoretracker::data::scoreboard::r#match::{MatchDatabase, MatchTrait};
-use scoretracker::data::scoreboard::performance::{PerformanceDatabase, PerformanceTrait};
+use scoretracker::data::library::entry::{LibraryDatabase, LibraryEntry};
+use scoretracker::data::scoreboard::r#match::{MatchDatabase, MatchDetails};
+use scoretracker::data::scoreboard::performance::{PerformanceDatabase, PerformanceDetails};
 use scoretracker::data::scoreboard::player::{Player, PlayerDatabase};
 use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::TaskState;
@@ -294,7 +294,7 @@ pub enum PerformanceCheckError {
 }
 
 fn check_performance(
-    performance: &dyn PerformanceTrait,
+    performance: &dyn PerformanceDetails,
     player_db: &PlayerDatabase,
     match_db: &MatchDatabase,
     performance_db: &PerformanceDatabase,
@@ -334,9 +334,7 @@ fn check_performance(
         return Err(E::MatchGameDoesNotMatch(match_game_id.to_owned(), game_id.to_owned()));
     };
 
-    performance
-        .check_vitals(player_db, match_db, performance_db, library_db)
-        .map_err(E::Custom)?;
+    performance.check_vitals().map_err(E::Custom)?;
     Ok(())
 }
 
@@ -355,7 +353,7 @@ pub enum MatchCheckError {
 }
 
 fn check_match(
-    match_data: &dyn MatchTrait,
+    match_data: &dyn MatchDetails,
     player_db: &PlayerDatabase,
     match_db: &MatchDatabase,
     performance_db: &PerformanceDatabase,
@@ -384,9 +382,7 @@ fn check_match(
     let game_id = match_data.game_id();
     let _game = game_instance_from_id(game_id).ok_or(E::UnknownGame(game_id.to_owned()))?;
 
-    match_data
-        .check_vitals(player_db, match_db, performance_db, library_db)
-        .map_err(E::Custom)?;
+    match_data.check_vitals().map_err(E::Custom)?;
     Ok(())
 }
 

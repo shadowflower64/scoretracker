@@ -3,8 +3,8 @@
 //! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::r#match::{Match, MatchDetails};
+use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
@@ -16,20 +16,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct Cytus2MatchDetails {
     /// String of the game version that was played on for this match.
     /// None for unknown.
     pub game_version: Option<String>,
 }
 
 #[typetag::serde(name = "cytus2")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for Cytus2MatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }
@@ -110,10 +104,7 @@ impl TryFrom<&Record> for Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct Cytus2PerformanceDetails {
     /// Mode that this performance was played on.
     pub mode: Mode,
 
@@ -145,7 +136,7 @@ pub struct Performance {
     pub score: Option<u32>,
 }
 
-impl Performance {
+impl Cytus2PerformanceDetails {
     pub fn tp(&self) -> Percentage {
         todo!("implement TP formula from spreadsheet")
     }
@@ -158,10 +149,7 @@ impl Performance {
 }
 
 #[typetag::serde(name = "cytus2")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for Cytus2PerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.mtp_lower_bound().0
     }
@@ -185,12 +173,8 @@ impl Game for Cytus2 {
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         let master = record.int_opt("master")?;
         let perfect = record.int("perfect").or_skip()?;
-        let match_data = Match {
-            common: ctx.create_common_m(record)?,
-            game_version: None,
-        };
-        let performance_data = Performance {
-            common: ctx.create_common_p(record, match_data.uuid())?,
+        let match_data = Cytus2MatchDetails { game_version: None };
+        let performance_data = Cytus2PerformanceDetails {
             mode: if master.is_some() { Mode::Master } else { Mode::Normal },
             difficulty: record.string_enum("difficulty")?,
             lamp: record.try_into()?,

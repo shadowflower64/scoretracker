@@ -1,10 +1,10 @@
 //! Data structures for A Dance of Fire and Ice.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::CommonMatchInfo;
-use crate::data::scoreboard::r#match::MatchTrait;
-use crate::data::scoreboard::performance::CommonPerformanceInfo;
-use crate::data::scoreboard::performance::PerformanceTrait;
+use crate::data::scoreboard::r#match::Match;
+use crate::data::scoreboard::r#match::MatchDetails;
+use crate::data::scoreboard::performance::Performance;
+use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::ParseMatchRecordResult;
@@ -20,16 +20,10 @@ use serde::{Deserialize, Serialize};
 pub type JudgementCount = u32;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-}
+pub struct ADOFAIMatchDetails {}
 
 #[typetag::serde(name = "adofai")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for ADOFAIMatchDetails {
     fn sorting_key(&self) -> f64 {
         unimplemented!()
     }
@@ -74,9 +68,7 @@ impl TryFrom<&Record> for Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
+pub struct ADOFAIPerformanceDetails {
     pub lamp: Lamp,
     pub misses: JudgementCount,
     pub overload: JudgementCount,
@@ -89,7 +81,7 @@ pub struct Performance {
     pub checkpoints_used: u32,
 }
 
-impl Performance {
+impl ADOFAIPerformanceDetails {
     pub fn total_tiles(&self) -> JudgementCount {
         self.misses + self.early + self.late + self.early_perfect + self.late_perfect + self.perfect
     }
@@ -133,10 +125,7 @@ impl Performance {
 }
 
 #[typetag::serde(name = "adofai")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for ADOFAIPerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.x_accuracy()
     }
@@ -159,11 +148,8 @@ impl Game for ADOFAI {
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
         let perfect = record.int("perfect").or_skip()?;
-        let match_data = Match {
-            common: ctx.create_common_m(record)?,
-        };
-        let performance_data = Performance {
-            common: ctx.create_common_p(record, match_data.uuid())?,
+        let match_details = ADOFAIMatchDetails {};
+        let performance_details = ADOFAIPerformanceDetails {
             lamp: record.try_into()?,
             misses: record.int("misses")?,
             overload: record.int("overhits")?,
@@ -175,7 +161,7 @@ impl Game for ADOFAI {
             perfect,
             checkpoints_used: record.int("checkpoints_used")?,
         };
-        Ok((Box::new(match_data), vec![Box::new(performance_data)]))
+        Ok((Box::new(match_details), vec![Box::new(performance_details)]))
     }
 
     fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {

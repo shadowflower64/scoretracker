@@ -1,8 +1,8 @@
 //! Data structures for Guitar Hero Arcade.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::r#match::{Match, MatchDetails};
+use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, ContinueOrQuit::Continue, ParseSongRecordResult, context::Context};
 use crate::util::command_line::AskError;
@@ -28,10 +28,7 @@ impl Mode {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct GHArcadeMatchDetails {
     /// Game mode that this match was played on.
     pub mode: Mode,
 
@@ -50,10 +47,7 @@ pub struct Match {
 }
 
 #[typetag::serde(name = "gharcade")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for GHArcadeMatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }
@@ -127,10 +121,7 @@ impl TryFrom<&Record> for Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct GHArcadePerformanceDetails {
     /// Played instrument.
     pub instrument: Instrument,
 
@@ -154,10 +145,7 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "gharcade")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for GHArcadePerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.score as f64
     }

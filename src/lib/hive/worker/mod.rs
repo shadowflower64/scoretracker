@@ -12,7 +12,7 @@ pub mod ws;
 
 use crate::config::library_tab::{InternalLibraryAccessPath, InternalLibraryConnections, LibraryTab};
 use crate::config::toml::{TomlConfig, TomlConfigError};
-use crate::data::library::database::LibraryEntry;
+use crate::data::library::entry::LibraryEntry;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::root::LibraryRoot;

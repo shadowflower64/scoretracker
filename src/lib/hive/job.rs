@@ -2,7 +2,7 @@
 //!
 //! A job is one action that has to be done by a [`crate::hive::worker`].
 //! One worker may take on a job, and then report a success, or a failure.
-use crate::data::library::database::{ClothInfo, LibraryEntry};
+use crate::data::library::entry::{ClothInfo, LibraryEntry};
 use crate::data::library::stpl_url::StplUrl;
 use crate::ffmpeg::FFmpegError;
 use crate::hive::jobs::cut_library_video::CutLibraryVideoJob;

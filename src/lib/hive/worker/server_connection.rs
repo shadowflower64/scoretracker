@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    data::library::{database::LibraryEntry, stpl_url::StplUrl},
+    data::library::{entry::LibraryEntry, stpl_url::StplUrl},
     hive::task::{Task, TaskResult},
     util::timestamp::NsTimestamp,
 };

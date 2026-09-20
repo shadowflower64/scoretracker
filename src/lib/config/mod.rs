@@ -4,7 +4,7 @@ pub mod toolkit;
 
 use crate::data::library::aux_data::LibraryAuxData;
 use crate::data::library::cache::LibraryCache;
-use crate::data::library::database::LibraryDatabase;
+use crate::data::library::entry::LibraryDatabase;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::stpl_url::LibraryDomain;
 use crate::data::scoreboard::r#match::MatchDatabase;

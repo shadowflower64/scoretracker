@@ -6,9 +6,9 @@ pub mod record;
 use crate::config::LegacyConfig;
 use crate::data::game::song::AnySong;
 use crate::data::game::{AnyGame, Game, game_instance_from_id};
-use crate::data::library::database::LibraryDatabase;
-use crate::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
-use crate::data::scoreboard::performance::{AnyPerformance, PerformanceDatabase};
+use crate::data::library::entry::LibraryDatabase;
+use crate::data::scoreboard::r#match::{AnyMatchDetails, MatchDatabase};
+use crate::data::scoreboard::performance::{AnyPerformanceDetails, PerformanceDatabase};
 use crate::data::scoreboard::player::PlayerDatabase;
 use crate::spreadsheet::ContinueOrQuit::{Continue, Quit};
 use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
@@ -58,7 +58,7 @@ impl From<BadRecordError> for ContinueOrQuit<BadRecordError> {
     }
 }
 
-pub type ParseMatchRecordResult = ParseRecordResult<(Box<AnyMatch>, Vec<Box<AnyPerformance>>)>;
+pub type ParseMatchRecordResult = ParseRecordResult<(Box<AnyMatchDetails>, Vec<Box<AnyPerformanceDetails>>)>;
 pub type ParseSongRecordResult = ParseRecordResult<Box<AnySong>>;
 
 #[derive(Debug, Error)]
@@ -260,8 +260,8 @@ fn import_org_spreadsheet_matches(
     game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
-    matches: &mut Vec<Box<AnyMatch>>,
-    performances: &mut Vec<Box<AnyPerformance>>,
+    matches: &mut Vec<Box<AnyMatchDetails>>,
+    performances: &mut Vec<Box<AnyPerformanceDetails>>,
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
     import_org_spreadsheet_page(

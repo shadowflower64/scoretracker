@@ -1,7 +1,7 @@
 pub mod song;
 
 use crate::data::games::registered_games;
-use crate::data::scoreboard::performance::AnyPerformance;
+use crate::data::scoreboard::performance::AnyPerformanceDetails;
 use crate::spreadsheet::ContinueOrQuit::Quit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
@@ -18,7 +18,7 @@ pub trait Game: Debug {
     fn pretty_name(&self) -> &'static str;
     fn url_shortname(&self) -> &'static str;
 
-    fn ask_for_performance_new(&self) -> Result<Box<AnyPerformance>, AskError> {
+    fn ask_for_performance_new(&self) -> Result<Box<AnyPerformanceDetails>, AskError> {
         unimplemented!("not implemented for game '{}'", self.identifier())
     }
 

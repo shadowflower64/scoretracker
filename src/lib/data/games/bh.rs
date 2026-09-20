@@ -3,10 +3,10 @@
 //! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::CommonMatchInfo;
-use crate::data::scoreboard::r#match::MatchTrait;
-use crate::data::scoreboard::performance::CommonPerformanceInfo;
-use crate::data::scoreboard::performance::PerformanceTrait;
+use crate::data::scoreboard::r#match::Match;
+use crate::data::scoreboard::r#match::MatchDetails;
+use crate::data::scoreboard::performance::Performance;
+use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::game_impl;
 use crate::register_game;
 use crate::spreadsheet::BadRecordError;
@@ -29,10 +29,7 @@ pub enum Mode {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct BandHeroMatchDetails {
     /// Game mode that this match was played on.
     pub mode: Mode,
 
@@ -42,10 +39,7 @@ pub struct Match {
 }
 
 #[typetag::serde(name = "bh")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for BandHeroMatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }
@@ -112,10 +106,7 @@ pub enum Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct BandHeroPerformanceDetails {
     /// Played instrument.
     pub instrument: Instrument,
 
@@ -139,10 +130,7 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "bh")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for BandHeroPerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.score as f64
     }
@@ -172,13 +160,11 @@ impl Game for BandHero {
         if record.bool("fc")? {
             lamp = Lamp::FC;
         }
-        let match_data = Match {
-            common: ctx.create_common_m(record)?,
+        let match_data = BandHeroMatchDetails {
             mode: Mode::UnknownSingle,
             game_version: None,
         };
-        let performance_data = Performance {
-            common: ctx.create_common_p(record, match_data.uuid())?,
+        let performance_data = BandHeroPerformanceDetails {
             instrument: record.string_enum("instrument")?,
             difficulty: record.string_enum("difficulty")?,
             lamp,

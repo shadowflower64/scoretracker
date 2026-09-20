@@ -1,5 +1,5 @@
 use scoretracker::config::toml::TomlConfig;
-use scoretracker::data::library::database::LibraryDatabase;
+use scoretracker::data::library::entry::LibraryDatabase;
 use scoretracker::data::scoreboard::r#match::MatchDatabase;
 use scoretracker::data::scoreboard::performance::PerformanceDatabase;
 use scoretracker::data::scoreboard::player::PlayerDatabase;

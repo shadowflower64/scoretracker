@@ -3,9 +3,9 @@ use chrono_tz::Tz;
 use indexmap::IndexMap;
 use uuid::Uuid;
 
-use crate::data::library::database::{LibraryDatabase, LibraryEntry};
-use crate::data::scoreboard::r#match::CommonMatchInfo;
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceMetadata};
+use crate::data::library::entry::{LibraryDatabase, LibraryEntry};
+use crate::data::scoreboard::r#match::Match;
+use crate::data::scoreboard::performance::{Performance, PerformanceMetadata};
 use crate::data::scoreboard::player::{Player, PlayerDatabase};
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, BadRecordErrorWithContext, ParseRecordResult, SkipOrQuit};
@@ -95,7 +95,7 @@ impl Context<'_> {
         ))
     }
 
-    pub fn create_common_p(&mut self, record: &Record, match_uuid: UuidString) -> Result<CommonPerformanceInfo, BadRecordError> {
+    pub fn create_common_p(&mut self, record: &Record, match_uuid: UuidString) -> Result<Performance, BadRecordError> {
         let comment = match record.field_value("comment") {
             Ok(value) => Some(
                 value
@@ -105,8 +105,8 @@ impl Context<'_> {
             ),
             Err(_) => None,
         };
-        Ok(CommonPerformanceInfo {
-            uuid: Uuid::now_v7().into(),
+        Ok(Performance {
+            performance_uuid: Uuid::now_v7().into(),
             player_uuid: self.find_player_by_name(record.string("player")?)?.uuid,
             match_uuid,
             proof: self.create_proof(record)?,
@@ -115,11 +115,11 @@ impl Context<'_> {
         })
     }
 
-    pub fn create_common_m(&mut self, record: &Record) -> ParseRecordResult<CommonMatchInfo> {
-        Ok(CommonMatchInfo {
-            uuid: Uuid::now_v7().into(),
+    pub fn create_common_m(&mut self, record: &Record) -> ParseRecordResult<Match> {
+        Ok(Match {
+            match_uuid: Uuid::now_v7().into(),
             timestamp: record.timestamp("timestamp", self.tz).or_skip()?,
-            song_id: record.string("song_id")?.to_owned(),
+            chartset_id: record.string("song_id")?.to_owned(),
             proof: Vec::new(),
             comment: None,
             metadata: IndexMap::new(),

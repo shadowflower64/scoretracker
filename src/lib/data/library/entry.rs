@@ -452,80 +452,35 @@ impl Default for LibraryEntry {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct LibraryDatabase {
-    pub entries: Vec<LibraryEntry>,
-}
-
 #[derive(Debug, Error)]
-pub enum InsertError {
+pub enum ProofInsertError {
     #[error("proof is already in the database: {0}")]
     ExistsAlready(Uuid),
 }
 
-impl LibraryDatabase {
-    pub const STANDARD_PATH_SEGMENTS: [&str; 2] = ["data", "library_database.jsonl"];
+// /// Returns a UUID for an existing database record without modification, or creates a new record, inserts it into the database, and returns the UUID for that.
+// pub fn fetch_or_insert(&mut self, sha256: String, url: StplUrl) -> (Uuid, bool) {
+//     if let Some(existing_entry) = self.find_entry_by_sha256_hash_mut(&sha256) {
+//         (existing_entry.uuid.0, true)
+//     } else {
+//         let new_library_entry = LibraryEntry {
+//             library_urls: vec![url],
+//             sha256: Some(sha256),
+//             ..Default::default()
+//         };
+//         let uuid = new_library_entry.uuid.0;
+//         self.entries.push(new_library_entry);
+//         (uuid, false)
+//     }
+// }
 
-    pub fn path_within_shared_repo() -> &'static RelativePath {
-        static CACHE: LazyLock<RelativePathBuf> = LazyLock::new(|| relative_path_from_segments(&LibraryDatabase::STANDARD_PATH_SEGMENTS));
-        &CACHE
-    }
+// /// Inserts an entry into the database, returning an error if a record with this UUID already exists.
+// pub fn insert(&mut self, entry: LibraryEntry) -> Result<Uuid, InsertError> {
+//     if let Some(existing_performance) = self.find_entry_by_uuid(entry.uuid.0) {
+//         return Err(InsertError::ExistsAlready(existing_performance.uuid.0));
+//     }
 
-    pub fn find_entry_by_uuid(&self, uuid: Uuid) -> Option<&LibraryEntry> {
-        self.entries.iter().find(|x| x.uuid.0 == uuid)
-    }
-
-    pub fn find_entry_by_uuid_mut(&mut self, uuid: Uuid) -> Option<&mut LibraryEntry> {
-        self.entries.iter_mut().find(|x| x.uuid.0 == uuid)
-    }
-
-    pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
-        self.entries.iter().find(|x| x.sha256.as_deref() == Some(sha256))
-    }
-
-    pub fn find_entry_by_sha256_hash_mut(&mut self, sha256: &str) -> Option<&mut LibraryEntry> {
-        self.entries.iter_mut().find(|x| x.sha256.as_deref() == Some(sha256))
-    }
-
-    pub fn find_entry_by_youtube_id(&self, youtube_id: &str) -> Option<&LibraryEntry> {
-        self.entries
-            .iter()
-            .find(|x| x.youtube_id.as_ref().is_some_and(|id| id == youtube_id))
-    }
-
-    /// Returns a UUID for an existing database record without modification, or creates a new record, inserts it into the database, and returns the UUID for that.
-    pub fn fetch_or_insert(&mut self, sha256: String, url: StplUrl) -> (Uuid, bool) {
-        if let Some(existing_entry) = self.find_entry_by_sha256_hash_mut(&sha256) {
-            (existing_entry.uuid.0, true)
-        } else {
-            let new_library_entry = LibraryEntry {
-                library_urls: vec![url],
-                sha256: Some(sha256),
-                ..Default::default()
-            };
-            let uuid = new_library_entry.uuid.0;
-            self.entries.push(new_library_entry);
-            (uuid, false)
-        }
-    }
-
-    /// Inserts an entry into the database, returning an error if a record with this UUID already exists.
-    pub fn insert(&mut self, entry: LibraryEntry) -> Result<Uuid, InsertError> {
-        if let Some(existing_performance) = self.find_entry_by_uuid(entry.uuid.0) {
-            return Err(InsertError::ExistsAlready(existing_performance.uuid.0));
-        }
-
-        let uuid = entry.uuid;
-        self.entries.push(entry);
-        Ok(uuid.0)
-    }
-}
-
-impl FileLockableData for LibraryDatabase {
-    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
-        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { entries: y }))
-    }
-    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
-        file_ex.write_as_jsonlines(&self.entries)
-    }
-}
+//     let uuid = entry.uuid;
+//     self.entries.push(entry);
+//     Ok(uuid.0)
+// }

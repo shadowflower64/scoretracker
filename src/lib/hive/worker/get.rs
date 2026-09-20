@@ -1,7 +1,7 @@
 use function_name::named;
 
 use crate::{
-    data::library::database::LibraryEntry, debug, hive::worker::DEBUG_WORKER_TEMP_FILE_CLEANUP, log_fn_name, log_should_print_debug,
+    data::library::entry::LibraryEntry, debug, hive::worker::DEBUG_WORKER_TEMP_FILE_CLEANUP, log_fn_name, log_should_print_debug,
     util::uuid::UuidString, warn,
 };
 use std::path::{Path, PathBuf};

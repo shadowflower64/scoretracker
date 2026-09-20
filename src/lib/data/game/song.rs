@@ -29,7 +29,7 @@ impl From<SongAlbumInfo> for Option<String> {
     }
 }
 
-pub trait SongTrait: Debug {
+pub trait Chartset: Debug {
     fn global_song_id(&self) -> Option<Uuid> {
         None
     }
@@ -43,11 +43,11 @@ pub trait SongTrait: Debug {
     }
 }
 
-pub type AnySong = dyn SongTrait + 'static;
+pub type AnySong = dyn Chartset + 'static;
 
 #[derive(Deserialize, Serialize)]
-pub struct GameSongList<Song: SongTrait> {
+pub struct GameSongList<CS: Chartset> {
     pub format_version: i32,
     pub game_id: String,
-    pub songs: Vec<Song>,
+    pub chartsets: Vec<CS>,
 }

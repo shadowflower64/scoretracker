@@ -1,7 +1,7 @@
 //! Data structures for Beatstar.
 
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::r#match::{Match, MatchDetails};
+use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::game_impl;
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
@@ -14,20 +14,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct BeatstarMatchDetails {
     /// String of the game version that was played on for this match.
     /// None for unknown.
     pub game_version: Option<String>,
 }
 
 #[typetag::serde(name = "beatstar")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for BeatstarMatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }
@@ -80,10 +74,7 @@ impl TryFrom<&Record> for Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct BeatstarPerformanceDetails {
     /// Difficulty level of the chart.
     pub difficulty: Difficulty,
 
@@ -104,10 +95,7 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "beatstar")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for BeatstarPerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.score as f64
     }

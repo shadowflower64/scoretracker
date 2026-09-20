@@ -3,8 +3,8 @@
 //! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::r#match::{Match, MatchDetails};
+use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
@@ -39,10 +39,7 @@ impl Mode {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-
+pub struct GH3MatchDetails {
     /// Game mode that this match was played on.
     pub mode: Mode,
 
@@ -61,10 +58,7 @@ pub struct Match {
 }
 
 #[typetag::serde(name = "gh3")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for GH3MatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }
@@ -138,10 +132,7 @@ impl TryFrom<&Record> for Lamp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct GH3PerformanceDetails {
     /// Played instrument.
     pub instrument: Instrument,
 
@@ -165,10 +156,7 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "gh3")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for GH3PerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.score as f64
     }
@@ -190,16 +178,14 @@ impl Game for GuitarHero3 {
     }
 
     fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        let match_data = Match {
-            common: ctx.create_common_m(record)?,
+        let match_data = GH3MatchDetails {
             mode: Mode::UnknownSingle,
             score: record.int("score")?,
             notes_hit: record.int("hit_notes")?,
             max_streak: record.int("note_streak")?,
             game_version: None,
         };
-        let performance_data = Performance {
-            common: ctx.create_common_p(record, match_data.uuid())?,
+        let performance_data = GH3PerformanceDetails {
             instrument: record.string_enum("instrument")?,
             difficulty: record.string_enum("difficulty")?,
             lamp: record.try_into()?,

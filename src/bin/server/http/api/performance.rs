@@ -1,7 +1,7 @@
 use actix_web::{HttpRequest, get, put, web};
 use function_name::named;
 use scoretracker::data::scoreboard::r#match::MatchDatabase;
-use scoretracker::data::scoreboard::performance::{AnyPerformance, PerformanceDatabase};
+use scoretracker::data::scoreboard::performance::{AnyPerformanceDetails, PerformanceDatabase};
 use scoretracker::util::{filelocked::FileLockableData, uuid::UuidString};
 use scoretracker::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
@@ -16,12 +16,12 @@ use crate::server::http::api::ApiResult;
 pub struct AnyPerformanceWrapper {
     #[serde(flatten)]
     #[schema(ignore = true)]
-    inner: Box<AnyPerformance>,
+    inner: Box<AnyPerformanceDetails>,
 }
 
 #[derive(Serialize)]
 pub struct ListRes {
-    items: Vec<Box<AnyPerformance>>,
+    items: Vec<Box<AnyPerformanceDetails>>,
 }
 
 #[utoipa::path(
@@ -52,7 +52,7 @@ pub async fn list_performances(req: HttpRequest) -> ApiResult<ListRes, ()> {
 )]
 #[get("/performance/{uuid}")]
 #[named]
-pub async fn get_performance(req: HttpRequest, path: web::Path<UuidString>) -> ApiResult<Box<AnyPerformance>, ()> {
+pub async fn get_performance(req: HttpRequest, path: web::Path<UuidString>) -> ApiResult<Box<AnyPerformanceDetails>, ()> {
     log_fn_name!(auto);
 
     let uuid = path.into_inner();
@@ -63,7 +63,7 @@ pub async fn get_performance(req: HttpRequest, path: web::Path<UuidString>) -> A
         .expect("could not read performance database");
 
     let performance = dyn_clone::clone_box(performance_db.find_performance_by_uuid(uuid).expect("performance not found"));
-    let res: ApiResult<Box<AnyPerformance>, ()> = ApiResult::Ok { result: performance };
+    let res: ApiResult<Box<AnyPerformanceDetails>, ()> = ApiResult::Ok { result: performance };
     res
 }
 
@@ -78,7 +78,7 @@ pub async fn put_performance(
     req: HttpRequest,
     path: web::Path<UuidString>,
     body: web::Json<AnyPerformanceWrapper>,
-) -> ApiResult<Box<AnyPerformance>, ()> {
+) -> ApiResult<Box<AnyPerformanceDetails>, ()> {
     log_fn_name!(auto);
 
     let uuid = path.into_inner();

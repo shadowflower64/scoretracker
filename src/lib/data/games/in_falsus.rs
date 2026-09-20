@@ -1,8 +1,8 @@
 //! Data structures for In Falsus.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{CommonMatchInfo, MatchTrait};
-use crate::data::scoreboard::performance::{CommonPerformanceInfo, PerformanceTrait};
+use crate::data::scoreboard::r#match::{Match, MatchDetails};
+use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::{game_impl, register_game};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -160,33 +160,22 @@ pub struct Results {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
+pub struct InFalsusPerformanceDetails {
     pub results: Results,
 }
 
 #[typetag::serde(name = "in_falsus")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for InFalsusPerformanceDetails {
     fn sorting_key(&self) -> f64 {
         self.results.score as f64
     }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Match {
-    #[serde(flatten)]
-    pub common: CommonMatchInfo,
-}
+pub struct InFalsusMatchDetails {}
 
 #[typetag::serde(name = "in_falsus")]
-impl MatchTrait for Match {
-    fn common(&self) -> &CommonMatchInfo {
-        &self.common
-    }
+impl MatchDetails for InFalsusMatchDetails {
     fn sorting_key(&self) -> f64 {
         todo!()
     }

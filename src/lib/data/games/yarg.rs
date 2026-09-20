@@ -1,7 +1,7 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
 use crate::data::game::Game;
-use crate::data::game::song::{SongAlbumInfo, SongTrait};
-use crate::data::scoreboard::performance::{self, CommonPerformanceInfo, PerformanceMetadata, PerformanceTrait};
+use crate::data::game::song::{Chartset, SongAlbumInfo};
+use crate::data::scoreboard::performance::{self, Performance, PerformanceDetails, PerformanceMetadata};
 use crate::util::command_line::{AskError, ask_string, ask_u64, ask_uuid, ask_yn};
 use crate::util::normalize_unsigned_to_unit_range;
 use crate::util::percentage::Percentage;
@@ -69,10 +69,7 @@ pub enum Modifier {
 
 /// A YARG performance - a performance of one player playing on one instrument on a specific chart.
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-pub struct Performance {
-    #[serde(flatten)]
-    pub common: CommonPerformanceInfo,
-
+pub struct YARGPerformanceDetails {
     /// Timestamp of the performance - specifically, the timestamp of the first frame of the end screen. Can be approximate.
     // this should be moved to Match
     // pub timestamp: NsTimestamp,
@@ -115,12 +112,9 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "yarg")]
-impl PerformanceTrait for Performance {
-    fn common(&self) -> &CommonPerformanceInfo {
-        &self.common
-    }
+impl PerformanceDetails for YARGPerformanceDetails {
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
-        self.common.comment = Some(ask_string("comment", self.comment().map(str::to_owned))?);
+        // self.common.comment = Some(ask_string("comment", self.comment().map(str::to_owned))?);
         Ok(())
     }
     fn sorting_key(&self) -> f64 {
@@ -129,7 +123,7 @@ impl PerformanceTrait for Performance {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Song {
+pub struct YARGChartset {
     pub global_song_id: Option<UuidString>,
     pub title: String,
     pub artist: String,
@@ -137,7 +131,7 @@ pub struct Song {
     pub year: String,
 }
 
-impl SongTrait for Song {
+impl Chartset for YARGChartset {
     fn global_song_id(&self) -> Option<Uuid> {
         self.global_song_id.map(|x| x.0)
     }
@@ -167,17 +161,8 @@ impl Game for YARG {
         "yarg"
     }
 
-    fn ask_for_performance_new(&self) -> Result<Box<dyn performance::PerformanceTrait>, AskError> {
-        Ok(Box::new(Performance {
-            common: CommonPerformanceInfo {
-                uuid: Uuid::now_v7().into(),
-                player_uuid: ask_uuid("player uuid", None)?.into(),
-                match_uuid: ask_uuid("match uuid", None)?.into(),
-                proof: Vec::new(),
-                // timestamp: NsTimestamp::now(),
-                comment: None,
-                metadata: PerformanceMetadata::new(),
-            },
+    fn ask_for_performance_new(&self) -> Result<Box<dyn performance::PerformanceDetails>, AskError> {
+        Ok(Box::new(YARGPerformanceDetails {
             song_id: ask_string("song id", None)?,
             instrument: Instrument::LeadGuitar,
             difficulty: Difficulty::Expert,

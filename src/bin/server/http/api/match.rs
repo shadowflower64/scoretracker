@@ -3,7 +3,7 @@ use crate::server::http::api::ApiResult;
 use actix_web::{HttpRequest, get, put, web};
 use chrono::Utc;
 use function_name::named;
-use scoretracker::data::scoreboard::r#match::{AnyMatch, MatchDatabase};
+use scoretracker::data::scoreboard::r#match::{AnyMatchDetails, MatchDatabase};
 use scoretracker::util::{filelocked::FileLockableData, uuid::UuidString};
 use scoretracker::{info, log_fn_name};
 use serde::{Deserialize, Serialize};
@@ -16,12 +16,12 @@ use uuid::Uuid;
 pub struct AnyMatchWrapper {
     #[serde(flatten)]
     #[schema(ignore = true)]
-    inner: Box<AnyMatch>,
+    inner: Box<AnyMatchDetails>,
 }
 
 #[derive(Serialize)]
 pub struct ListRes {
-    items: Vec<Box<AnyMatch>>,
+    items: Vec<Box<AnyMatchDetails>>,
 }
 
 #[utoipa::path(
@@ -72,7 +72,7 @@ pub async fn list_matches(req: HttpRequest) -> ApiResult<ListRes, ()> {
 )]
 #[get("/match/{uuid}")]
 #[named]
-pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> ApiResult<Box<AnyMatch>, ()> {
+pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> ApiResult<Box<AnyMatchDetails>, ()> {
     log_fn_name!(auto);
 
     let uuid = path.into_inner();
@@ -83,7 +83,7 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> ApiResu
         MatchDatabase::read_without_locking(app_data.server_config.match_database_path()).expect("could not read match database");
 
     let match_data = dyn_clone::clone_box(match_db.find_match_by_uuid(uuid).expect("match not found"));
-    let res: ApiResult<Box<AnyMatch>, ()> = ApiResult::Ok { result: match_data };
+    let res: ApiResult<Box<AnyMatchDetails>, ()> = ApiResult::Ok { result: match_data };
     res
 }
 
@@ -95,7 +95,11 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> ApiResu
 )]
 #[put("/match/{uuid}")]
 #[named]
-pub async fn put_match(req: HttpRequest, path: web::Path<UuidString>, body: web::Json<AnyMatchWrapper>) -> ApiResult<Box<AnyMatch>, ()> {
+pub async fn put_match(
+    req: HttpRequest,
+    path: web::Path<UuidString>,
+    body: web::Json<AnyMatchWrapper>,
+) -> ApiResult<Box<AnyMatchDetails>, ()> {
     log_fn_name!(auto);
 
     let uuid = path.into_inner();

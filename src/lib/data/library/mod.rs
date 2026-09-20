@@ -15,7 +15,7 @@
 
 pub mod aux_data;
 pub mod cache;
-pub mod database;
+pub mod entry;
 pub mod index;
 pub mod info;
 pub mod root;
@@ -23,7 +23,7 @@ pub mod stpl_url;
 
 use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::cache::LibraryCache;
-use crate::data::library::database::{LibraryDatabase, LibraryEntry};
+use crate::data::library::entry::LibraryEntry;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
