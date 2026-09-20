@@ -9,19 +9,42 @@ use crate::server::{
     },
 };
 use actix_web::{App, HttpServer, Scope};
+use chrono::Utc;
 use function_name::named;
 use scoretracker::{config::toml::TomlConfig, info, log_fn_name, success, util::relative_path_from_segments, warn};
+use smol::lock::Mutex;
 use std::{
     path::PathBuf,
+    str::FromStr,
     sync::{Arc, RwLock},
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use uuid::Uuid;
 
 pub const WEB_FRONTEND_DIR_PATH_SEGMENTS: &[&str] = &["web-frontend"];
 pub fn web_frontend_dir_path() -> PathBuf {
     relative_path_from_segments(WEB_FRONTEND_DIR_PATH_SEGMENTS).to_path(".")
 }
+
+#[named]
+async fn connect_to_db(database_connection_string: &str) -> Result<tokio_postgres::Client, tokio_postgres::Error> {
+    log_fn_name!(auto);
+
+    let config = tokio_postgres::Config::from_str(database_connection_string)?;
+    // info!("config: {config:?}");
+
+    let (client, connection) = config.connect(tokio_postgres::NoTls).await?;
+    actix_web::rt::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    success!("connected to database");
+    Ok(client)
+}
+
 #[actix_web::main]
 #[named]
 pub async fn http_server_start() -> Result<(), ServerError> {
@@ -42,11 +65,14 @@ pub async fn http_server_start() -> Result<(), ServerError> {
         }
     }
 
+    let db = Arc::new(Mutex::new(connect_to_db(&server_config.database_connection).await?));
+
     Ok(HttpServer::new(move || {
         App::new()
             .app_data(ServerGlobals {
                 server_config: Arc::clone(&server_config),
                 connected_libraries: Arc::clone(&internal_library_connections),
+                db: Arc::clone(&db),
             })
             .service(SwaggerUi::new("/swagger-ui/{_:.*}").url("/openapi.json", ApiDoc::openapi()))
             // .service(openapi_doc) // <- uncomment if swaggerui is not available for some reason

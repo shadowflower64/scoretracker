@@ -1,6 +1,6 @@
-use std::sync::{Arc, RwLock};
-
 use scoretracker::data::library::stpl_url::LibraryDomain;
+use smol::lock::Mutex;
+use std::sync::{Arc, RwLock};
 
 use crate::server::{
     access_rules::AuthenticatedUser,
@@ -12,6 +12,7 @@ use crate::server::{
 pub struct ServerGlobals {
     pub server_config: Arc<ServerConfig>,
     pub connected_libraries: Arc<RwLock<LibraryConnections>>,
+    pub db: Arc<Mutex<tokio_postgres::Client>>,
 }
 
 impl ServerGlobals {

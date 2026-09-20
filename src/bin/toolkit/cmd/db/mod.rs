@@ -9,7 +9,7 @@ use scoretracker::{config::toolkit::ToolkitConfig, log_fn_name, success};
 pub const INIT_DB_SCRIPT: &str = include_str!("init_db.sql");
 
 #[named]
-fn connect_to_db(database_connection: &Option<String>) -> Result<Client, postgres::Error> {
+fn connect_to_db_sync(database_connection: &Option<String>) -> Result<Client, postgres::Error> {
     log_fn_name!(auto);
 
     let params = database_connection.as_ref().map(String::as_str).unwrap_or("");
@@ -35,7 +35,7 @@ pub fn init(schema_name: String) -> Result<(), CmdError> {
     let config = ToolkitConfig::global().map_err(CmdError::SecretsConfigError)?;
     // info!("config: {config:?}");
 
-    let mut client = connect_to_db(&config.database_connection)?;
+    let mut client = connect_to_db_sync(&config.database_connection)?;
 
     let init_db_script_replaced = INIT_DB_SCRIPT.replace("$SCHEMA_NAME", &schema_name);
     client.batch_execute(&init_db_script_replaced)?;
