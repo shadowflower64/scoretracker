@@ -23,7 +23,7 @@ to generate typescript code from rust types run:
 cargo run schema gen
 ```
 
-# Database sestup
+# Database setup
 
 to setup the database schema, log in to the postgress database manually, and execute the following statements:
 ```sql
@@ -38,3 +38,8 @@ cargo run db init scoretracker_dev
 ```
 
 the `scoretracker_dev` above is the name of the schema to initialize, so you can actually change the schema name to whatever you like. the name of the user should be stored in `server.toml` or `toolkit.toml` along with the password, so you can also name the user however you like.
+
+to delete the schema use the following statement:
+```sql
+DROP SCHEMA IF EXISTS scoretracker_dev CASCADE;
+```

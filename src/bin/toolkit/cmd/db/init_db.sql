@@ -57,16 +57,75 @@ ALTER TYPE media_category OWNER TO scoretracker_dev;
 
 
 
+-- Table: albums
+-- DROP TABLE IF EXISTS albums;
+CREATE TABLE IF NOT EXISTS albums
+(
+    album_id text NOT NULL PRIMARY KEY,
+    title text,
+    artist text,
+    year integer
+)
+TABLESPACE pg_default;
+ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
+
+
+
+-- Table: songs
+-- DROP TABLE IF EXISTS songs;
+CREATE TABLE IF NOT EXISTS songs
+(
+    song_id text NOT NULL PRIMARY KEY,
+    title text,
+    artist text,
+    year integer
+)
+TABLESPACE pg_default;
+ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
+
+
+
+-- Table: album_songs
+-- DROP TABLE IF EXISTS album_songs;
+CREATE TABLE IF NOT EXISTS album_songs
+(
+    album_id text NOT NULL REFERENCES albums (album_id),
+    position integer NOT NULL,
+    song_id text NOT NULL REFERENCES songs (song_id)
+)
+TABLESPACE pg_default;
+ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
+
+
+
+-- Table: chartsets
+-- DROP TABLE IF EXISTS chartsets;
+CREATE TABLE IF NOT EXISTS chartsets
+(
+    game text NOT NULL,
+    chartset_id text NOT NULL,
+    song_id text NOT NULL REFERENCES songs (song_id),
+    details jsonb,
+    PRIMARY KEY (game, chartset_id)
+)
+TABLESPACE pg_default;
+ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
+
+
+
 -- Table: charts
 -- DROP TABLE IF EXISTS charts;
 CREATE TABLE IF NOT EXISTS charts
 (
-    game text COLLATE pg_catalog."default" NOT NULL,
-    song_id text COLLATE pg_catalog."default" NOT NULL,
-    chart_type text COLLATE pg_catalog."default" NOT NULL,
+    game text NOT NULL,
+    chartset_id text NOT NULL,
+    instrument text NOT NULL,
+    difficulty text NOT NULL,
     details jsonb NOT NULL,
-    chart_group text COLLATE pg_catalog."default" NOT NULL,
-    CONSTRAINT chart_key PRIMARY KEY (game, song_id, chart_type)
+    chart_group text NOT NULL,
+    song_id_override text REFERENCES songs (song_id),
+    PRIMARY KEY (game, chartset_id, instrument, difficulty),
+    FOREIGN KEY (game, chartset_id) REFERENCES chartsets
 )
 TABLESPACE pg_default;
 ALTER TABLE IF EXISTS charts OWNER TO scoretracker_dev;
@@ -77,10 +136,10 @@ ALTER TABLE IF EXISTS charts OWNER TO scoretracker_dev;
 -- DROP TABLE IF EXISTS library;
 CREATE TABLE IF NOT EXISTS library
 (
-    uuid uuid NOT NULL,
+    proof_uuid uuid NOT NULL PRIMARY KEY,
     sha256 bytea,
-    library_urls text[] COLLATE pg_catalog."default" NOT NULL,
-    youtube_id character(11) COLLATE pg_catalog."default",
+    library_urls text[] NOT NULL,
+    youtube_id character(11),
     entry_kind library_entry_kind NOT NULL,
     file_stat jsonb,
     media_metadata jsonb,
@@ -95,10 +154,9 @@ CREATE TABLE IF NOT EXISTS library
     timestamp_end timestamp with time zone,
     duration double precision,
     automatic_content_detection_information jsonb,
-    tags character varying(256)[] COLLATE pg_catalog."default",
+    tags character varying(256)[],
     timestamp_added timestamp with time zone NOT NULL DEFAULT now(),
-    metadata jsonb,
-    CONSTRAINT library_pkey PRIMARY KEY (uuid)
+    metadata jsonb
 )
 TABLESPACE pg_default;
 ALTER TABLE IF EXISTS library OWNER TO scoretracker_dev;
@@ -109,14 +167,14 @@ ALTER TABLE IF EXISTS library OWNER TO scoretracker_dev;
 -- DROP TABLE IF EXISTS matches;
 CREATE TABLE IF NOT EXISTS matches
 (
-    uuid uuid NOT NULL,
+    match_uuid uuid NOT NULL PRIMARY KEY,
     "timestamp" timestamp(6) with time zone NOT NULL,
-    song_id text COLLATE pg_catalog."default" NOT NULL,
+    game text NOT NULL,
+    chartset_id text NOT NULL,
     proof uuid[] NOT NULL,
-    game text COLLATE pg_catalog."default" NOT NULL,
     details jsonb NOT NULL,
     metadata jsonb,
-    CONSTRAINT matches_pkey PRIMARY KEY (uuid)
+    FOREIGN KEY (game, chartset_id) REFERENCES chartsets
 )
 TABLESPACE pg_default;
 ALTER TABLE IF EXISTS matches OWNER TO scoretracker_dev;
@@ -127,9 +185,8 @@ ALTER TABLE IF EXISTS matches OWNER TO scoretracker_dev;
 -- DROP TABLE IF EXISTS players;
 CREATE TABLE IF NOT EXISTS players
 (
-    uuid uuid NOT NULL,
-    name character varying(32) COLLATE pg_catalog."default",
-    CONSTRAINT players_pkey PRIMARY KEY (uuid)
+    player_uuid uuid NOT NULL PRIMARY KEY,
+    name character varying(32)
 )
 TABLESPACE pg_default;
 ALTER TABLE IF EXISTS players OWNER TO scoretracker_dev;
@@ -140,26 +197,30 @@ ALTER TABLE IF EXISTS players OWNER TO scoretracker_dev;
 -- DROP TABLE IF EXISTS performances;
 CREATE TABLE IF NOT EXISTS performances
 (
-    uuid uuid NOT NULL,
-    player_uuid uuid NOT NULL,
-    match_uuid uuid NOT NULL,
-    proof uuid[],
+    performance_uuid uuid NOT NULL PRIMARY KEY,
+    player_uuid uuid NOT NULL REFERENCES players,
+    match_uuid uuid NOT NULL REFERENCES matches,
+    game text NOT NULL,
+    chartset_id text NOT NULL,
+    instrument text NOT NULL,
+    difficulty text NOT NULL,
     details jsonb NOT NULL,
     metadata jsonb,
     legit_fc boolean,
-    chart_type text COLLATE pg_catalog."default",
-    CONSTRAINT performances_pkey PRIMARY KEY (uuid),
-    CONSTRAINT performances_match_uuid_fkey FOREIGN KEY (match_uuid)
-        REFERENCES matches (uuid) MATCH SIMPLE
-        ON UPDATE NO ACTION
-        ON DELETE NO ACTION
-        NOT VALID,
-    CONSTRAINT performances_player_uuid_fkey FOREIGN KEY (player_uuid)
-        REFERENCES players (uuid) MATCH SIMPLE
-        ON UPDATE NO ACTION
-        ON DELETE NO ACTION
+    FOREIGN KEY (game, chartset_id, instrument, difficulty) REFERENCES charts
 )
 TABLESPACE pg_default;
 ALTER TABLE IF EXISTS performances OWNER TO scoretracker_dev;
-COMMENT ON COLUMN performances.chart_type IS 'instrument id + difficulty id';
 
+
+
+-- Table: performance_proofs
+-- DROP TABLE IF EXISTS performance_proofs;
+CREATE TABLE IF NOT EXISTS performance_proofs
+(
+    performance_uuid uuid NOT NULL REFERENCES performances,
+    proof_uuid uuid NOT NULL REFERENCES library,
+    UNIQUE (performance_uuid, proof_uuid)
+)
+TABLESPACE pg_default;
+ALTER TABLE IF EXISTS performance_proofs OWNER TO scoretracker_dev;
