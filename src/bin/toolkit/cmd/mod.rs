@@ -20,8 +20,9 @@ pub mod hive;
 pub mod library;
 pub mod log;
 pub mod paths;
+pub mod performance;
+pub mod player;
 pub mod schema;
-pub mod scoreboard;
 pub mod spreadsheet;
 pub mod version;
 pub mod vitals;
@@ -184,21 +185,18 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             None | Some("show") => cmd::paths::show(),
             _ => ctx.unknown_cmd(),
         },
-        "scoreboard" => match ctx.cmd()? {
-            "performance" => match ctx.cmd()? {
-                "add" => {
-                    let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
-                    cmd::scoreboard::add_performance(game_id)
-                }
-                _ => ctx.unknown_cmd(),
-            },
-            "player" => match ctx.cmd()? {
-                "add" => {
-                    let name: String = ctx.pull_arg("name", "name of the player")?;
-                    cmd::scoreboard::add_player(name)
-                }
-                _ => ctx.unknown_cmd(),
-            },
+        "performance" => match ctx.cmd()? {
+            "add" => {
+                let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
+                cmd::performance::add(game_id)
+            }
+            _ => ctx.unknown_cmd(),
+        },
+        "player" => match ctx.cmd()? {
+            "add" => {
+                let name: String = ctx.pull_arg("name", "name of the player")?;
+                cmd::player::add(name)
+            }
             _ => ctx.unknown_cmd(),
         },
         "schema" => match ctx.cmd()? {

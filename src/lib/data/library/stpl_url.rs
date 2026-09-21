@@ -64,33 +64,33 @@ impl Serialize for LibraryDomain {
         serializer.serialize_str(&self.to_string())
     }
 }
-struct LibraryDomainNameVisitor;
-
-impl<'de> Visitor<'de> for LibraryDomainNameVisitor {
-    type Value = LibraryDomain;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a properly-formed url domain name string")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
-    }
-
-    // fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
-    // where
-    //     E: serde::de::Error,
-    // {
-    //     v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
-    // }
-}
 
 impl<'de> Deserialize<'de> for LibraryDomain {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_string(LibraryDomainNameVisitor)
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = LibraryDomain;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "a properly-formed url domain name string")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
+            }
+
+            // fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            // where
+            //     E: serde::de::Error,
+            // {
+            //     v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
+            // }
+        }
+
+        deserializer.deserialize_string(V)
     }
 }
 

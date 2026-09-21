@@ -1,6 +1,7 @@
 use crate::{
     config::toml::{TomlConfig, TomlConfigError},
     data::library::stpl_url::LibraryDomain,
+    db::schema_name::SafeSchemaName,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
@@ -9,7 +10,7 @@ use std::sync::LazyLock;
 pub struct ToolkitConfig {
     pub default_library: Option<LibraryDomain>,
     pub database_connection: Option<String>,
-    pub database_schema: Option<String>,
+    pub database_schema: Option<SafeSchemaName>,
 }
 
 impl ToolkitConfig {

@@ -10,7 +10,7 @@ pub enum ServerError {
     ServerConfigError(#[from] TomlConfigError),
     #[error("http server error: {0}")]
     HttpServerError(#[from] io::Error),
-    #[error("postgres error: {0:?}")]
+    #[error("postgres error: {0:?} {0}")]
     DbError(#[from] postgres::Error),
 }
 

@@ -470,7 +470,7 @@ pub fn import_org_spreadsheet_generic(
 
     // Add correct records to database
     smol::block_on(async move {
-        let db = Database::connect_and_spawn_smol(
+        let db = Database::connect_with_tokio(
             config
                 .database_connection
                 .as_ref()

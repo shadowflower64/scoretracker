@@ -9,7 +9,9 @@ pub mod server;
 #[cfg(feature = "include-worker-in-toolkit")]
 pub mod worker;
 
-fn main() -> ExitCode {
+// TODO: maybe we can get rid of tokio in the future
+#[tokio::main]
+async fn main() -> ExitCode {
     let args: Vec<_> = args().collect();
     log::open_default_log_file().expect("could not open log file"); // TODO: open log file only when needed (server, worker, long tasks), don't log to file on short tasks
 

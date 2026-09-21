@@ -136,7 +136,7 @@ pub fn rescan(library_dir: &Path) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
     smol::block_on(async {
-        let mut db = Database::connect_and_spawn_smol_with_toolkit().await?;
+        let mut db = Database::connect_with_tokio_for_toolkit().await?;
         library_scan_full(library_dir, &mut db, None).await?;
         Result::<(), CmdError>::Ok(())
     })?;
@@ -150,7 +150,7 @@ pub fn remove_domain(library_domain: LibraryDomain) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
     smol::block_on(async {
-        let mut db = Database::connect_and_spawn_smol_with_toolkit().await?;
+        let mut db = Database::connect_with_tokio_for_toolkit().await?;
         db.remove_library_domain_from_db(&library_domain).await?;
         Result::<(), DbError>::Ok(())
     })?;

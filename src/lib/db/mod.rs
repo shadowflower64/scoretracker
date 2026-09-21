@@ -1,3 +1,5 @@
+pub mod schema_name;
+
 use std::str::FromStr;
 
 use function_name::named;
@@ -10,7 +12,8 @@ use crate::{
         library::{entry::LibraryEntry, stpl_url::LibraryDomain},
         scoreboard::{r#match::Match, performance::Performance, player::Player},
     },
-    info, log_fn_name, success,
+    db::schema_name::SafeSchemaName,
+    info, info_npr, log_fn_name, success,
 };
 
 /// Asynchronous database connection.
@@ -20,11 +23,11 @@ pub struct Database {
 
 #[derive(Debug, Error)]
 pub enum DbError {
-    #[error("postgres error: {0:?}")]
+    #[error("postgres error: {0:?} {0}")]
     PostgresError(#[from] tokio_postgres::Error),
-    #[error("json error: {0:?}")]
+    #[error("json error: {0:?} {0}")]
     JsonError(#[from] serde_json::Error),
-    #[error("config error: {0:?}")]
+    #[error("config error: {0}")]
     GlobalConfigError(#[from] &'static TomlConfigError),
     #[error("toolkit config is missing database connection string")]
     ToolkitConfigNoDbConnectionString,
@@ -47,7 +50,7 @@ const PREALLOCATE_CAPACITY_LIMIT: u32 = 100;
 
 impl Database {
     #[named]
-    pub async fn connect_and_spawn_actix_web(connection_string: &str, schema_name: &str) -> DbResult<Self> {
+    pub async fn connect_with_actix_web(connection_string: &str, schema_name: &str) -> DbResult<Self> {
         log_fn_name!(auto);
 
         let config = tokio_postgres::Config::from_str(connection_string)?;
@@ -62,12 +65,14 @@ impl Database {
         });
 
         success!("connected to database");
-        client.execute("SET search_path TO $1", &[&schema_name]).await?;
+        client.execute(&format!("SET search_path TO {schema_name}"), &[]).await?;
+
+        success!("set database search path to '{schema_name}'");
         Ok(Self { client: client })
     }
 
     #[named]
-    pub async fn connect_and_spawn_smol(connection_string: &str, schema_name: &str) -> DbResult<Self> {
+    pub async fn connect_with_tokio(connection_string: &str, schema_name: &SafeSchemaName) -> DbResult<Self> {
         log_fn_name!(auto);
 
         let config = tokio_postgres::Config::from_str(connection_string)?;
@@ -75,23 +80,22 @@ impl Database {
 
         let (client, connection) = config.connect(tokio_postgres::NoTls).await?;
 
-        smol::spawn(async move {
+        tokio::task::spawn(async move {
             if let Err(e) = connection.await {
                 eprintln!("connection error: {}", e);
             }
-        })
-        .detach();
+        });
 
         success!("connected to database");
-        client.execute("SET search_path TO $1", &[&schema_name]).await?;
+        client.execute(&format!("SET search_path TO {schema_name}"), &[]).await?;
 
         success!("set database search path to '{schema_name}'");
         Ok(Self { client: client })
     }
 
-    pub async fn connect_and_spawn_smol_with_toolkit() -> DbResult<Self> {
+    pub async fn connect_with_tokio_for_toolkit() -> DbResult<Self> {
         let config = ToolkitConfig::global()?;
-        Self::connect_and_spawn_smol(
+        Self::connect_with_tokio(
             config
                 .database_connection
                 .as_ref()
@@ -175,8 +179,9 @@ impl Database {
 
         let transaction = self.client.transaction().await?;
         let query = transaction
-            .query("SELECT player_uuid FROM players WHERE player_name = $1", &[&player_name])
+            .query("SELECT player_uuid FROM players WHERE name = $1 LIMIT 1", &[&player_name])
             .await?;
+
         if let Some(row) = query.first() {
             transaction.commit().await?;
             let player_uuid = row.try_get("player_uuid")?;
@@ -187,10 +192,11 @@ impl Database {
             let player_uuid = Uuid::now_v7();
             let count = transaction
                 .execute(
-                    "INSERT INTO players (player_uuid, player_name) VALUES ($1, $2)",
+                    "INSERT INTO players (player_uuid, name) VALUES ($1, $2)",
                     &[&player_uuid, &player_name],
                 )
                 .await?;
+            info_npr!("testing3");
             transaction.commit().await?;
 
             success!("added new player successfully ({count} rows affected)");
