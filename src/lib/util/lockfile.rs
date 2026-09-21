@@ -3,7 +3,7 @@ use crate::hive::worker::data::WorkerInfo;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
-use crate::{VERSION, debug, info, log_fn_name, log_should_print_debug, warn};
+use crate::{SCORETRACKER_VERSION, debug, info, log_fn_name, log_should_print_debug, warn};
 use function_name::named;
 use notify::{ErrorKind, Event, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -154,7 +154,7 @@ impl LockfileHandle {
     fn generate_lockfile_contents(worker_info: Option<&WorkerInfo>) -> String {
         let content = LockfileContent {
             program: "scoretracker".to_string(),
-            version: VERSION.to_string(),
+            version: SCORETRACKER_VERSION.to_string(),
             pid: process::id(),
             lock_timestamp: NsTimestamp::now(),
             worker: worker_info.cloned(),

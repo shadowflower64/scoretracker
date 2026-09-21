@@ -23,6 +23,7 @@ pub mod paths;
 pub mod schema;
 pub mod scoreboard;
 pub mod spreadsheet;
+pub mod version;
 pub mod vitals;
 
 pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
@@ -229,6 +230,7 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             }
             _ => ctx.unknown_cmd(),
         },
+        "version" => cmd::version::version(),
         "vitals" => match ctx.cmd_opt()? {
             Some("all") | None => cmd::vitals::check_all(),
             _ => ctx.unknown_cmd(),

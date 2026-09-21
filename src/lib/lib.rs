@@ -55,4 +55,4 @@ pub mod tests;
 pub mod util;
 
 /// Current version of `scoretracker`, read from `CARGO_PKG_VERSION` at compile time.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const SCORETRACKER_VERSION: &str = env!("CARGO_PKG_VERSION");
