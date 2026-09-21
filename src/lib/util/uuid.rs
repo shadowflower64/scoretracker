@@ -1,4 +1,5 @@
 //! Module for [`UuidString`], a (de)serializable wrapper for [`Uuid`].
+use postgres::types::FromSql;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::borrow::Cow;
@@ -64,6 +65,16 @@ impl Serialize for UuidString {
 impl Display for UuidString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+impl<'a> FromSql<'a> for UuidString {
+    fn from_sql(ty: &postgres::types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(UuidString(Uuid::from_sql(ty, raw)?))
+    }
+
+    fn accepts(ty: &postgres::types::Type) -> bool {
+        Uuid::accepts(ty)
     }
 }
 

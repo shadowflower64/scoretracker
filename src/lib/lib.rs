@@ -47,6 +47,7 @@
 pub mod cli;
 pub mod config;
 pub mod data;
+pub mod db;
 pub mod ffmpeg;
 pub mod hive;
 pub mod spreadsheet;

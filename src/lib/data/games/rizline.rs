@@ -120,7 +120,7 @@ impl Game for Rizline {
         "rizline"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
         let mut lamp = Lamp::None;
         if record.bool("c")? {
             lamp = Lamp::C;

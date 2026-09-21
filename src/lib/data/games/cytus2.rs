@@ -170,7 +170,7 @@ impl Game for Cytus2 {
         "cytus2"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
         let master = record.int_opt("master")?;
         let perfect = record.int("perfect").or_skip()?;
         let match_data = Cytus2MatchDetails { game_version: None };

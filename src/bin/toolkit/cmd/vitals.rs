@@ -8,6 +8,7 @@ use scoretracker::data::library::entry::{LibraryDatabase, LibraryEntry};
 use scoretracker::data::scoreboard::r#match::{MatchDatabase, MatchDetails};
 use scoretracker::data::scoreboard::performance::{PerformanceDatabase, PerformanceDetails};
 use scoretracker::data::scoreboard::player::{Player, PlayerDatabase};
+use scoretracker::db::Database;
 use scoretracker::hive::queue::TaskQueue;
 use scoretracker::hive::task::TaskState;
 use scoretracker::util::byte_count::ByteCount;
@@ -352,17 +353,10 @@ pub enum MatchCheckError {
     Custom(String),
 }
 
-fn check_match(
-    match_data: &dyn MatchDetails,
-    player_db: &PlayerDatabase,
-    match_db: &MatchDatabase,
-    performance_db: &PerformanceDatabase,
-    library_db: &LibraryDatabase,
-    uuids: &mut HashSet<UuidString>,
-) -> Result<(), MatchCheckError> {
+fn check_match(match_data: &dyn MatchDetails, db: &Database, uuids: &mut HashSet<UuidString>) -> Result<(), MatchCheckError> {
     type E = MatchCheckError;
 
-    if !uuids.insert(match_data.uuid()) {
+    if !uuids.insert(match_data.uuid) {
         return Err(E::ReusedUuid(match_data.uuid()));
     }
 
@@ -395,8 +389,8 @@ pub enum PlayerCheckError {
 fn check_player(player: &Player, uuids: &mut HashSet<UuidString>) -> Result<(), PlayerCheckError> {
     type E = PlayerCheckError;
 
-    if !uuids.insert(player.uuid) {
-        return Err(E::ReusedUuid(player.uuid));
+    if !uuids.insert(player.player_uuid) {
+        return Err(E::ReusedUuid(player.player_uuid));
     }
 
     Ok(())
@@ -416,7 +410,7 @@ pub enum ScoreboardCheckError {
     Player { uuid: UuidString, e: PlayerCheckError },
 }
 
-fn check_scoreboard_databases(
+fn check_database(
     player_db_path: &Path,
     match_db_path: &Path,
     performance_db_path: &Path,
@@ -505,7 +499,10 @@ fn check_scoreboard_databases(
     print_check_name("checking player database entries");
     for (i, player) in player_db.players.iter().enumerate() {
         print_check_status(&format!("({}/{player_count})", i + 1));
-        check_player(player, &mut all_mainkey_uuids).map_err(|e| E::Player { uuid: player.uuid, e })?;
+        check_player(player, &mut all_mainkey_uuids).map_err(|e| E::Player {
+            uuid: player.player_uuid,
+            e,
+        })?;
     }
 
     // TODO: add:
@@ -545,17 +542,10 @@ pub fn check_all() -> Result<(), CmdError> {
     println!("log directory located at: {log_path:?}");
     result_wrapper(check_log_dir(&log_path));
 
-    let player_db_path = config.player_database_path();
-    println!("player database located at: {player_db_path:?}");
-    let match_db_path = config.match_database_path();
-    println!("match database located at: {match_db_path:?}");
-    let performance_db_path = config.performance_database_path();
-    println!("performance database located at: {performance_db_path:?}");
-    let library_db_path = config.library_database_path();
-    println!("library database located at: {library_db_path:?}");
-    result_wrapper(check_scoreboard_databases(
-        &player_db_path, &match_db_path, &performance_db_path, &library_db_path,
-    ));
+    let db = todo!();
+    /*
+    result_wrapper(check_database(&db));
 
     Ok(())
+     */
 }

@@ -144,7 +144,7 @@ impl Game for Arcaea {
         "arcaea"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
         let match_data = ArcaeaMatchDetails { game_version: None };
         let performance_data = ArcaeaPerformanceDetails {
             mode: Mode::UnknownSingle,

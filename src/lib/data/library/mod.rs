@@ -27,8 +27,9 @@ use crate::data::library::entry::LibraryEntry;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
+use crate::db::Database;
 use crate::hive::worker::data::WorkerInfo;
-use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
+use crate::util::filelocked::FileLockableDataDefault;
 use crate::util::{file_ex, lockfile};
 use crate::util::{filelocked::FileLockableData, uuid::UuidString};
 use crate::{debug, info, log_fn_name, log_should_print_debug, warn};
@@ -139,7 +140,7 @@ pub const VERBOSE_SCANNING: bool = false;
 /// 2. Read the [`LibraryCache`] file into memory - it will be used to skip recalculating SHA256 hashes for known files.
 /// 3. Walk through all files in the library directory, finding all candidate files. (files with a video/image extension)
 /// 4. Fetch SHA256 hashes for known files from the candidate list. Calculate the amount of files for which the hash is not known for progress-reporting reasons.
-/// 5. Compute SHA256 hashes for all files that are not known. This takes a long time!
+/// 5. Compute SHA256 hashes for all files that are not known. This takes a long time! (Autosave results after every file, so the process can be resumed at any time.)
 /// 6. Now that we have all SHA256 hashes for files in the directory, search for them in the [`LibraryDatabase`] and fetch the proof UUID, or generate a new one if the hash does not exist in the database.
 /// 7. Generate a completely new [`LibraryIndex`] file with path paths and UUIDs fetched from the database.
 /// 8. Synchronize with the database; iterate through *every* database entry, remove any existing proof URLs that have the domain of this database, and add fresh ones.
@@ -236,11 +237,12 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
 
     // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
     info!("inserting and updating entries in database");
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
+    let mut db = todo!();
+    /*
     let len = sha256_hashes.len();
     for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
         let stpl_url = StplUrl::new(library_domain.clone(), Some(relative_path.to_string()));
-        let (uuid, existed) = library_db.fetch_or_insert(sha256_hash.clone(), stpl_url.clone());
+        let (uuid, existed) = db.fetch_or_insert(sha256_hash.clone(), stpl_url.clone());
         if existed {
             debug!(
                 "[{}/{}] fetching uuid for existing database entry ({uuid}) for: {relative_path:?}",
@@ -251,7 +253,7 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
             debug!("[{}/{}] adding new database entry ({uuid}) for: {relative_path:?}", i + 1, len);
         }
 
-        let entry = library_db
+        let entry = db
             .find_entry_by_uuid_mut(uuid)
             .expect("uuid should always be valid, we just inserted a new proof");
         entry.update_stat(stpl_url, relative_path.to_path(library_dir));
@@ -265,7 +267,7 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
 
     // Now sync all of the URLs within the index file with the database
     info!("syncing database");
-    sync_library_index_with_db_essence(library_dir, &index, |_| Ok(library_db), library_domain, worker_info)?;
+    sync_library_index_with_db_essence(library_dir, &index, db, library_domain, worker_info)?;
 
     let scanning_end_timestamp = Instant::now();
     let scanning_duration = scanning_end_timestamp.duration_since(scanning_start_timestamp);
@@ -275,6 +277,7 @@ pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option
     );
 
     Ok(())
+     */
 }
 
 #[named]
@@ -375,7 +378,8 @@ pub fn scan_register_added_files(
 
     // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
     info!("inserting and updating entries in database");
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
+    let mut db = todo!();
+    /*
     let len = sha256_hashes.len();
     let mut added_files = HashMap::new();
     for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
@@ -414,6 +418,7 @@ pub fn scan_register_added_files(
     );
 
     Ok(added_files)
+     */
 }
 
 pub fn scan_register_added_file(
@@ -447,8 +452,9 @@ pub fn scan_register_removed_files(
 
     let mut library_index =
         LibraryIndex::lock_and_read(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info).map_err(E::CannotOpenIndex)?;
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
+    let mut db = todo!();
 
+    /*
     for file_path in file_paths {
         let Some(relpath) = path_within_library_dir(library_dir, file_path) else {
             warn!("file path is not within library: library dir: {library_dir:?}, file: {file_path:?}; skipping...");
@@ -469,6 +475,7 @@ pub fn scan_register_removed_files(
 
     library_index.save_and_unlock().map_err(E::CannotWriteIndex)?;
     library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
+     */
     Ok(())
 }
 
@@ -485,7 +492,7 @@ pub fn scan_register_removed_file(
 pub fn sync_library_index_with_db_essence(
     library_dir: &Path,
     library_index: &LibraryIndex,
-    library_db_conn: impl FnOnce(Option<&WorkerInfo>) -> lockfile::Result<FileLocked<LibraryDatabase>>,
+    db: &Database,
     library_domain: LibraryDomain,
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
@@ -504,37 +511,37 @@ pub fn sync_library_index_with_db_essence(
         }
     }
 
-    let mut library_db = library_db_conn(worker_info).map_err(E::CannotOpenDatabase)?;
+    todo!();
+    /*
+       for entry in library_db.entries.iter_mut() {
+           // Remove all old URLs that reference this library, without touching all of the other ones.
+           entry.library_urls.retain(|url| url.domain != library_domain);
 
-    for entry in library_db.entries.iter_mut() {
-        // Remove all old URLs that reference this library, without touching all of the other ones.
-        entry.library_urls.retain(|url| url.domain != library_domain);
+           // Add all URLs that are contained within this library.
+           if let Some(files_for_this_proof) = reverse_index.get_mut(&entry.uuid) {
+               entry.library_urls.extend(
+                   files_for_this_proof
+                       .iter()
+                       .map(|relative_path| StplUrl::new(library_domain.clone(), Some(relative_path.to_string()))),
+               );
+               unused_proof_uuids_in_index.remove(&entry.uuid);
+           }
+       }
+       library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
 
-        // Add all URLs that are contained within this library.
-        if let Some(files_for_this_proof) = reverse_index.get_mut(&entry.uuid) {
-            entry.library_urls.extend(
-                files_for_this_proof
-                    .iter()
-                    .map(|relative_path| StplUrl::new(library_domain.clone(), Some(relative_path.to_string()))),
-            );
-            unused_proof_uuids_in_index.remove(&entry.uuid);
-        }
-    }
-    library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
-
-    // Check if any of the proof UUIDs that are in the index were not present in the database
-    for absent_uuid in unused_proof_uuids_in_index {
-        if let Some(files) = reverse_index.get(&absent_uuid) {
-            warn!(
-                "database does not contain proof entry with uuid: {absent_uuid}; the following files are associated with this uuid in the index: {:?}",
-                files.iter().map(|file_path| file_path.to_path(library_dir))
-            );
-        } else {
-            warn!("database does not contain proof entry with uuid: {absent_uuid}");
-        }
-    }
-
-    Ok(())
+       // Check if any of the proof UUIDs that are in the index were not present in the database
+       for absent_uuid in unused_proof_uuids_in_index {
+           if let Some(files) = reverse_index.get(&absent_uuid) {
+               warn!(
+                   "database does not contain proof entry with uuid: {absent_uuid}; the following files are associated with this uuid in the index: {:?}",
+                   files.iter().map(|file_path| file_path.to_path(library_dir))
+               );
+           } else {
+               warn!("database does not contain proof entry with uuid: {absent_uuid}");
+           }
+       }
+        Ok(())
+    */
 }
 
 /// Synchronize paths stored in the [`LibraryIndex`] with the `stpl://` URLs stored in the [`LibraryDatabase`].
@@ -554,27 +561,6 @@ pub fn sync_library_index_with_db(
     let library_index =
         LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(E::CannotReadIndex)?;
 
-    sync_library_index_with_db_essence(
-        library_dir,
-        &library_index,
-        |worker_info| LibraryDatabase::lock_and_read(library_db_path, worker_info),
-        library_domain,
-        worker_info,
-    )
-}
-
-pub fn remove_library_domain_from_db(
-    library_domain: LibraryDomain,
-    library_db_path: &Path,
-    worker_info: Option<&WorkerInfo>,
-) -> Result<(), LibraryScanError> {
-    type E = LibraryScanError;
-    let mut library_db = LibraryDatabase::lock_and_read(library_db_path, worker_info).map_err(E::CannotOpenDatabase)?;
-
-    for entry in library_db.entries.iter_mut() {
-        // Remove all old URLs that reference this library, without touching all of the other ones.
-        entry.library_urls.retain(|url| url.domain != library_domain);
-    }
-    library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
-    Ok(())
+    let db = todo!();
+    sync_library_index_with_db_essence(library_dir, &library_index, db, library_domain, worker_info)
 }

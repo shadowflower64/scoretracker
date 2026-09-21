@@ -121,7 +121,7 @@ impl Game for Deemo2 {
         "deemo2"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
         let match_data = Deemo2MatchDetails { game_version: None };
         let performance_data = Deemo2PerformanceDetails {
             difficulty: record.string_enum("difficulty")?,

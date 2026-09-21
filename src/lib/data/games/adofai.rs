@@ -146,7 +146,7 @@ impl Game for ADOFAI {
         "adofai"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
         let perfect = record.int("perfect").or_skip()?;
         let match_details = ADOFAIMatchDetails {};
         let performance_details = ADOFAIPerformanceDetails {

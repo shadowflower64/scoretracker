@@ -153,8 +153,7 @@ impl Game for RockBand4 {
         "rb4"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
-        ctx.check_early_skip(record)?;
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
         let mut lamp = Lamp::None;
         if record.bool("clear")? {
             lamp = Lamp::Clear;

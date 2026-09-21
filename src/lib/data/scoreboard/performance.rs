@@ -1,44 +1,14 @@
-use crate::util::file_ex::{self, FileEx};
-use crate::util::filelocked::FileLockableData;
-use crate::util::relative_path_from_segments;
-use crate::util::timestamp::{NsDuration, NsTimestamp};
+use crate::data::scoreboard::metadata::ArbitraryMetadata;
+use crate::util::timestamp::NsDuration;
 use crate::util::{command_line::AskError, uuid::UuidString};
 use dyn_clone::{DynClone, clone_trait_object};
-use indexmap::IndexMap;
-use schemars::JsonSchema;
+use postgres::types::FromSql;
+use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
-use std::cell::Cell;
+use std::borrow::Cow;
 use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
-use std::sync::LazyLock;
 use thiserror::Error;
 use uuid::Uuid;
-
-// use schemars::{Schema, SchemaGenerator, json_schema};
-// use std::borrow::Cow;
-
-// #[derive(Debug, Clone, Deserialize, Serialize)]
-// #[serde(transparent)]
-// pub struct PerformanceMetadata(IndexMap<String, AnyValue>);
-
-// impl PerformanceMetadata {
-//     pub fn new() -> Self {
-//         Self(IndexMap::new())
-//     }
-// }
-
-// impl JsonSchema for PerformanceMetadata {
-//     fn schema_name() -> Cow<'static, str> {
-//         "PerformanceMetadata".into()
-//     }
-//     fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
-//         json_schema!({
-//             "type": "object"
-//         })
-//     }
-// }
-
-pub type PerformanceMetadata = serde_json::Value;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Performance {
@@ -58,7 +28,20 @@ pub struct Performance {
     pub details: Box<AnyPerformanceDetails>,
 
     /// Any additional performance metadata.
-    pub metadata: PerformanceMetadata,
+    pub metadata: ArbitraryMetadata,
+}
+
+impl Performance {
+    pub fn from_postgres_row(row: &postgres::Row) -> Result<Self, postgres::Error> {
+        Ok(Self {
+            performance_uuid: row.try_get("performance_uuid")?,
+            player_uuid: row.try_get("player_uuid")?,
+            match_uuid: row.try_get("match_uuid")?,
+            proof: row.try_get("proof")?,
+            details: row.try_get("details")?,
+            metadata: row.try_get("metadata")?,
+        })
+    }
 }
 
 #[typetag::serde(tag = "game")]
@@ -77,6 +60,30 @@ pub trait PerformanceDetails: Debug + DynClone {
 
 clone_trait_object! {PerformanceDetails}
 pub type AnyPerformanceDetails = dyn PerformanceDetails + 'static;
+
+impl<'a> FromSql<'a> for Box<AnyPerformanceDetails> {
+    fn from_sql(ty: &postgres::types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        let details = serde_json::from_value(value)?;
+        Ok(details)
+    }
+
+    fn accepts(ty: &postgres::types::Type) -> bool {
+        serde_json::Value::accepts(ty)
+    }
+}
+
+impl JsonSchema for Box<AnyPerformanceDetails> {
+    fn schema_name() -> Cow<'static, str> {
+        "AnyPerformanceDetails".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        json_schema!({
+            "type": "object"
+        })
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum PerformanceInsertError {

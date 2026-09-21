@@ -1,23 +1,14 @@
-use crate::data::library::entry::LibraryDatabase;
-use crate::data::scoreboard::MetadataValue;
-use crate::data::scoreboard::performance::PerformanceDatabase;
-use crate::data::scoreboard::player::PlayerDatabase;
-use crate::util::file_ex::{self, FileEx};
-use crate::util::filelocked::FileLockableData;
-use crate::util::relative_path_from_segments;
+use crate::data::scoreboard::metadata::ArbitraryMetadata;
 use crate::util::timestamp::{NsDuration, NsTimestamp};
 use crate::util::{command_line::AskError, uuid::UuidString};
 use dyn_clone::{DynClone, clone_trait_object};
-use relative_path::{RelativePath, RelativePathBuf};
-use schemars::JsonSchema;
+use postgres::types::FromSql;
+use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::fmt::Debug;
-use std::sync::LazyLock;
 use thiserror::Error;
 use uuid::Uuid;
-
-pub type MatchMetadata = serde_json::Value;
-pub type SongId = String;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Match {
@@ -28,7 +19,7 @@ pub struct Match {
     pub timestamp: NsTimestamp,
 
     /// Named ID of the chartset.
-    pub chartset_id: SongId,
+    pub chartset_id: String,
 
     /// List of library entry UUIDs that are proof of this match.
     pub proof: Vec<UuidString>,
@@ -37,7 +28,20 @@ pub struct Match {
     pub details: Box<AnyMatchDetails>,
 
     /// Any additional match metadata.
-    pub metadata: MatchMetadata,
+    pub metadata: ArbitraryMetadata,
+}
+
+impl Match {
+    pub fn from_postgres_row(row: &postgres::Row) -> Result<Self, postgres::Error> {
+        Ok(Self {
+            match_uuid: row.try_get("match_uuid")?,
+            timestamp: row.try_get("timestamp")?,
+            chartset_id: row.try_get("chartset_id")?,
+            proof: row.try_get("proof")?,
+            details: row.try_get("details")?,
+            metadata: row.try_get("metadata")?,
+        })
+    }
 }
 
 #[typetag::serde(tag = "game")]
@@ -55,6 +59,30 @@ pub trait MatchDetails: Debug + DynClone {
 }
 clone_trait_object! {MatchDetails}
 pub type AnyMatchDetails = dyn MatchDetails + 'static;
+
+impl<'a> FromSql<'a> for Box<AnyMatchDetails> {
+    fn from_sql(ty: &postgres::types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        let details = serde_json::from_value(value)?;
+        Ok(details)
+    }
+
+    fn accepts(ty: &postgres::types::Type) -> bool {
+        serde_json::Value::accepts(ty)
+    }
+}
+
+impl JsonSchema for Box<AnyMatchDetails> {
+    fn schema_name() -> Cow<'static, str> {
+        "AnyMatchDetails".into()
+    }
+
+    fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        json_schema!({
+            "type": "object"
+        })
+    }
+}
 
 pub const ADD_TOO_CLOSE_THRESHOLD_SECONDS: f64 = 60.0;
 

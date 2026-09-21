@@ -1,20 +1,13 @@
 use calamine::Hyperlink;
 use chrono_tz::Tz;
-use indexmap::IndexMap;
-use uuid::Uuid;
 
-use crate::data::library::entry::{LibraryDatabase, LibraryEntry};
-use crate::data::scoreboard::r#match::Match;
-use crate::data::scoreboard::performance::{Performance, PerformanceMetadata};
-use crate::data::scoreboard::player::{Player, PlayerDatabase};
+use crate::data::library::entry::LibraryEntry;
+use crate::data::scoreboard::player::Player;
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, BadRecordErrorWithContext, ParseRecordResult, SkipOrQuit};
-use crate::util::uuid::UuidString;
 use crate::util::youtube_id;
 
-pub struct Context<'a> {
-    pub player_database: &'a PlayerDatabase,
-    pub library_database: &'a LibraryDatabase,
+pub struct Context {
     pub proofs_to_insert: Vec<LibraryEntry>,
     pub tz: Tz,
     pub ok_match_record_count: u32,
@@ -25,107 +18,42 @@ pub struct Context<'a> {
     pub fixable_song_records: Vec<BadRecordErrorWithContext>,
 }
 
-impl Context<'_> {
-    pub fn find_player_by_name(&self, name: &str) -> Result<&Player, BadRecordError> {
-        self.player_database
-            .find_player_by_name(name)
-            .ok_or_else(|| BadRecordError::PlayerDoesNotExist { name: name.to_owned() })
+pub fn youtube_id_of_hyperlink(hyperlink: &Hyperlink) -> Result<String, BadRecordError> {
+    let url = hyperlink
+        .target
+        .as_ref()
+        .expect("hyperlink should have the target property set, purely internal hyperlinks are not supported");
+    let Some(youtube_id) = youtube_id(url) else {
+        return Err(BadRecordError::InvalidYouTubeUrl { url: url.to_owned() });
+    };
+    Ok(youtube_id)
+}
+
+pub fn youtube_ids_of_record(record: &Record) -> Result<Vec<String>, BadRecordError> {
+    if let Some(string) = record.string_var("video")?
+        && (string == ":(" || string == "-")
+    {
+        // `:(` => Proof got corrupted before it could be uploaded.
+        // `-` => Proof never existed at all most likely.
+        return Ok(Vec::new());
+    }
+    if let Some(hyperlink) = record.hyperlink_var("video")?
+        && hyperlink.displayed_text == Some("YouTube".to_string())
+    {
+        let youtube_id = youtube_id_of_hyperlink(hyperlink)?;
+        return Ok(vec![youtube_id]);
+    }
+    if record.is_empty("video")? {
+        return Ok(Vec::new());
     }
 
-    pub fn find_proof_by_youtube_id(&self, youtube_id: &str) -> Result<&LibraryEntry, BadRecordError> {
-        if let Some(proof) = self
-            .proofs_to_insert
-            .iter()
-            .find(|x| x.youtube_id.as_ref().is_some_and(|id| id == youtube_id))
-        {
-            return Ok(proof);
-        }
+    Err(BadRecordError::NotAHyperlink(
+        "video".into(),
+        Box::new(record.field_value("video")?.to_owned()),
+    ))
+}
 
-        if let Some(proof) = self.library_database.find_entry_by_youtube_id(youtube_id) {
-            return Ok(proof);
-        }
-
-        Err(BadRecordError::ProofDoesNotExist {
-            youtube_id: youtube_id.to_owned(),
-        })
-    }
-
-    pub fn get_or_insert_proof_by_hyperlink(&mut self, hyperlink: &Hyperlink) -> Result<UuidString, BadRecordError> {
-        let url = hyperlink
-            .target
-            .as_ref()
-            .expect("hyperlink should have the target property set, purely internal hyperlinks are not supported");
-        let Some(youtube_id) = youtube_id(url) else {
-            return Err(BadRecordError::InvalidYouTubeUrl { url: url.to_owned() });
-        };
-        if let Ok(proof) = self.find_proof_by_youtube_id(&youtube_id) {
-            Ok(proof.uuid)
-        } else {
-            let proof = LibraryEntry {
-                youtube_id: Some(youtube_id),
-                ..Default::default()
-            };
-            let uuid = proof.uuid;
-            self.proofs_to_insert.push(proof);
-            Ok(uuid)
-        }
-    }
-
-    fn create_proof(&mut self, record: &Record) -> Result<Vec<UuidString>, BadRecordError> {
-        if let Some(string) = record.string_var("video")?
-            && (string == ":(" || string == "-")
-        {
-            // `:(` => Proof got corrupted before it could be uploaded.
-            // `-` => Proof never existed at all most likely.
-            return Ok(Vec::new());
-        }
-        if let Some(hyperlink) = record.hyperlink_var("video")?
-            && hyperlink.displayed_text == Some("YouTube".to_string())
-        {
-            let proof_uuid = self.get_or_insert_proof_by_hyperlink(hyperlink)?;
-            return Ok(vec![proof_uuid]);
-        }
-        if record.is_empty("video")? {
-            return Ok(Vec::new());
-        }
-
-        Err(BadRecordError::NotAHyperlink(
-            "video".into(),
-            Box::new(record.field_value("video")?.to_owned()),
-        ))
-    }
-
-    pub fn create_common_p(&mut self, record: &Record, match_uuid: UuidString) -> Result<Performance, BadRecordError> {
-        let comment = match record.field_value("comment") {
-            Ok(value) => Some(
-                value
-                    .as_str()
-                    .ok_or(BadRecordError::NotAString("comment".into(), Box::new(value.to_owned())))?
-                    .to_owned(),
-            ),
-            Err(_) => None,
-        };
-        Ok(Performance {
-            performance_uuid: Uuid::now_v7().into(),
-            player_uuid: self.find_player_by_name(record.string("player")?)?.uuid,
-            match_uuid,
-            proof: self.create_proof(record)?,
-            comment,
-            metadata: PerformanceMetadata::new(),
-        })
-    }
-
-    pub fn create_common_m(&mut self, record: &Record) -> ParseRecordResult<Match> {
-        Ok(Match {
-            match_uuid: Uuid::now_v7().into(),
-            timestamp: record.timestamp("timestamp", self.tz).or_skip()?,
-            chartset_id: record.string("song_id")?.to_owned(),
-            proof: Vec::new(),
-            comment: None,
-            metadata: IndexMap::new(),
-        })
-    }
-
+impl Context {
     pub fn check_early_skip(&mut self, record: &Record) -> ParseRecordResult<()> {
         record.timestamp("timestamp", self.tz).or_skip()?;
         Ok(())

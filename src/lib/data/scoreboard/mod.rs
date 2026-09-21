@@ -1,16 +1,4 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 pub mod r#match;
+pub mod metadata;
 pub mod performance;
 pub mod player;
-
-#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
-#[serde(untagged)]
-pub enum MetadataValue {
-    String(String),
-    Number(f64),
-    Bool(bool),
-}
-
-pub type SongId = String;

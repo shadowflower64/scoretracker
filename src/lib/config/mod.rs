@@ -4,12 +4,8 @@ pub mod toolkit;
 
 use crate::data::library::aux_data::LibraryAuxData;
 use crate::data::library::cache::LibraryCache;
-use crate::data::library::entry::LibraryDatabase;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::stpl_url::LibraryDomain;
-use crate::data::scoreboard::r#match::MatchDatabase;
-use crate::data::scoreboard::performance::PerformanceDatabase;
-use crate::data::scoreboard::player::PlayerDatabase;
 use crate::hive::queue::TaskQueue;
 use crate::util::dirs::config_dir;
 use crate::util::file_ex;
@@ -30,22 +26,6 @@ impl LegacyConfig {
     pub fn load() -> Result<&'static Self, &'static file_ex::Error> {
         static LOADED_CONFIG: LazyLock<file_ex::Result<LegacyConfig>> = LazyLock::new(LegacyConfig::read_default_without_locking);
         LOADED_CONFIG.as_ref()
-    }
-
-    pub fn library_database_path(&self) -> PathBuf {
-        LibraryDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
-    }
-
-    pub fn match_database_path(&self) -> PathBuf {
-        MatchDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
-    }
-
-    pub fn performance_database_path(&self) -> PathBuf {
-        PerformanceDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
-    }
-
-    pub fn player_database_path(&self) -> PathBuf {
-        PlayerDatabase::path_within_shared_repo().to_path(&self.shared_data_repo_path)
     }
 
     pub fn task_queue_path(&self) -> PathBuf {

@@ -177,7 +177,7 @@ impl Game for GuitarHero3 {
         "gh3"
     }
 
-    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, ctx: &mut Context) -> ParseMatchRecordResult {
+    fn create_match_and_performance_from_spreadsheet_record(&self, record: &Record, _ctx: &mut Context) -> ParseMatchRecordResult {
         let match_data = GH3MatchDetails {
             mode: Mode::UnknownSingle,
             score: record.int("score")?,

@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 pub struct ToolkitConfig {
     pub default_library: Option<LibraryDomain>,
     pub database_connection: Option<String>,
+    pub database_schema: Option<String>,
 }
 
 impl ToolkitConfig {

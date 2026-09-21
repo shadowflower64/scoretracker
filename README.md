@@ -43,3 +43,8 @@ to delete the schema use the following statement:
 ```sql
 DROP SCHEMA IF EXISTS scoretracker_dev CASCADE;
 ```
+
+
+# Contributing
+
+if you ever want to contribute to this for some reason, you are forbidden to use large language models to generate code. use your brain instead please.

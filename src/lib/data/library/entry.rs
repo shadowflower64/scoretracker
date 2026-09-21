@@ -4,17 +4,12 @@
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
 //! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
 use crate::data::library::stpl_url::StplUrl;
-use crate::util::file_ex::{self, FileEx};
-use crate::util::filelocked::FileLockableData;
-use crate::util::relative_path_from_segments;
 use crate::util::timestamp::{NsDuration, NsLocalTimestamp, NsTimestamp};
 use crate::util::uuid::UuidString;
-use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
-use std::sync::LazyLock;
 use thiserror::Error;
 use uuid::Uuid;
 

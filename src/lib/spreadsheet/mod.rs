@@ -3,23 +3,24 @@ pub mod field_path;
 pub mod field_value;
 pub mod record;
 
-use crate::config::LegacyConfig;
+use crate::config::toml::TomlConfigError;
+use crate::config::toolkit::ToolkitConfig;
 use crate::data::game::song::AnySong;
 use crate::data::game::{AnyGame, Game, game_instance_from_id};
-use crate::data::library::entry::LibraryDatabase;
-use crate::data::scoreboard::r#match::{AnyMatchDetails, MatchDatabase};
-use crate::data::scoreboard::performance::{AnyPerformanceDetails, PerformanceDatabase};
-use crate::data::scoreboard::player::PlayerDatabase;
+use crate::data::scoreboard::r#match::{AnyMatchDetails, Match};
+use crate::data::scoreboard::metadata::ArbitraryMetadata;
+use crate::data::scoreboard::performance::AnyPerformanceDetails;
+use crate::db::{Database, DbError};
 use crate::spreadsheet::ContinueOrQuit::{Continue, Quit};
 use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
-use crate::spreadsheet::context::Context;
+use crate::spreadsheet::context::{Context, youtube_ids_of_record};
 use crate::spreadsheet::field_path::FieldPath;
 use crate::spreadsheet::field_value::{CellContents, FieldValue};
 use crate::spreadsheet::record::{Record, parse_records};
 use crate::success;
 use crate::util::dirs::project_temp_dir;
-use crate::util::filelocked::FileLockableData;
-use crate::util::{file_ex, lockfile};
+use crate::util::lockfile;
+use crate::util::uuid::UuidString;
 use crate::{info, log_fn_name, warn};
 use calamine::Data;
 use calamine::{Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_workbook};
@@ -31,6 +32,7 @@ use std::error::Error;
 use std::path::Path;
 use std::{fmt, fs};
 use thiserror::Error;
+use uuid::Uuid;
 
 pub enum ContinueOrQuit<E> {
     Continue(E),
@@ -146,10 +148,10 @@ pub enum SpreadsheetImportError {
     InvalidSheetName(String),
     #[error("invalid table type: '{0}'")]
     InvalidTableType(String),
-    #[error("cannot read config: {0}")]
-    CannotReadConfig(&'static file_ex::Error),
-    #[error("cannot read player database: {0}")]
-    CannotReadPlayerDatabase(file_ex::Error),
+    #[error("config error: {0}")]
+    ConfigError(#[from] &'static TomlConfigError),
+    #[error("database error: {0}")]
+    DatabaseError(#[from] DbError),
     #[error("cannot read library database: {0}")]
     CannotReadLibraryDatabase(lockfile::Error),
     #[error("cannot parse performance: {0}")]
@@ -177,7 +179,7 @@ fn throw_up(game_id: &str, i: usize, e: BadRecordError, record: &Record, show_re
 
 #[allow(clippy::too_many_arguments)]
 #[named]
-fn import_org_spreadsheet_page<T: fmt::Debug>(
+fn parse_spreadsheet_page<T: fmt::Debug>(
     game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
@@ -256,24 +258,69 @@ fn import_org_spreadsheet_page<T: fmt::Debug>(
     Ok(())
 }
 
-fn import_org_spreadsheet_matches(
+pub type ParsedMatch = Match;
+
+#[derive(Debug)]
+pub struct ParsedPerformance {
+    player_name: String,
+    match_uuid: UuidString,
+    youtube_ids: Vec<String>,
+    metadata: ArbitraryMetadata,
+    details: Box<AnyPerformanceDetails>,
+}
+
+fn parse_org_spreadsheet_matches(
     game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
-    matches: &mut Vec<Box<AnyMatchDetails>>,
-    performances: &mut Vec<Box<AnyPerformanceDetails>>,
+    parsed_matches: &mut Vec<ParsedMatch>,
+    parsed_performances: &mut Vec<ParsedPerformance>,
     ctx: &mut Context,
 ) -> Result<(), SpreadsheetImportError> {
-    import_org_spreadsheet_page(
+    parse_spreadsheet_page(
         game,
         game_id,
         records,
         "match",
         ParseMatchError,
-        |game, record, ctx| game.create_match_and_performance_from_spreadsheet_record(record, ctx),
+        |game, record, ctx| {
+            ctx.check_early_skip(record)?;
+
+            let mut metadata = ArbitraryMetadata::new();
+            if let Ok(value) = record.field_value("comment") {
+                let comment = value
+                    .as_str()
+                    .ok_or(BadRecordError::NotAString("comment".into(), Box::new(value.to_owned())))?
+                    .to_owned();
+                metadata.insert("comment".to_owned(), serde_json::Value::String(comment));
+            };
+
+            let (match_details, performance_details_vec) = game.create_match_and_performance_from_spreadsheet_record(record, ctx)?;
+            let match_data = Match {
+                match_uuid: Uuid::now_v7().into(),
+                timestamp: record.timestamp("timestamp", ctx.tz).or_skip()?,
+                chartset_id: record.string("song_id")?.to_owned(),
+                proof: Vec::new(),
+                metadata: ArbitraryMetadata::new(),
+                details: match_details,
+            };
+
+            let mut performance_data = Vec::new();
+            for performance_details in performance_details_vec {
+                let parsed_performance = ParsedPerformance {
+                    player_name: record.string("player")?.to_owned(),
+                    match_uuid: match_data.match_uuid,
+                    youtube_ids: youtube_ids_of_record(record)?,
+                    metadata: metadata.clone(),
+                    details: performance_details,
+                };
+                performance_data.push(parsed_performance);
+            }
+            Ok((match_data, performance_data))
+        },
         |(match_data, performance_data), ctx| {
-            matches.push(match_data);
-            performances.extend(performance_data);
+            parsed_matches.push(match_data);
+            parsed_performances.extend(performance_data);
             ctx.ok_match_record_count += 1;
         },
         |e, ctx| {
@@ -288,7 +335,7 @@ fn import_org_spreadsheet_matches(
 
 type SongList = Vec<Box<AnySong>>;
 
-fn import_org_spreadsheet_songs(
+fn parse_org_spreadsheet_songs(
     game: AnyGame,
     game_id: &str,
     records: Vec<Record>,
@@ -297,7 +344,7 @@ fn import_org_spreadsheet_songs(
 ) -> Result<(), SpreadsheetImportError> {
     let mut song_list = Vec::new();
 
-    import_org_spreadsheet_page(
+    parse_spreadsheet_page(
         game,
         game_id,
         records,
@@ -321,6 +368,13 @@ fn import_org_spreadsheet_songs(
     Ok(())
 }
 
+// TODO: this entire thing has to be split up into stages:
+// 1. parse data in the spreadsheet
+// 2. try to fetch necessary data from db
+// 2a. fetch uuids of for relevant player names / error out if not found
+// 2b. fetch uuids of proofs with relevant youtube ids / insert if not found
+// 3. construct the final match/performance structs
+// 4. insert match/performance records into database / warn if too close
 #[named]
 pub fn import_org_spreadsheet_generic(
     mut worksheets: Vec<(String, Range<Data>)>,
@@ -339,14 +393,8 @@ pub fn import_org_spreadsheet_generic(
     let mut matches = Vec::new();
     let mut performances = Vec::new();
 
-    let config = LegacyConfig::load().map_err(SpreadsheetImportError::CannotReadConfig)?;
-    let player_database =
-        PlayerDatabase::read_without_locking(config.player_database_path()).map_err(SpreadsheetImportError::CannotReadPlayerDatabase)?;
-    let mut library_db =
-        LibraryDatabase::lock_and_read(config.library_database_path(), None).map_err(SpreadsheetImportError::CannotReadLibraryDatabase)?;
+    let config = ToolkitConfig::global()?;
     let mut ctx = Context {
-        player_database: &player_database,
-        library_database: &library_db,
         proofs_to_insert: Vec::new(),
         tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone
         ok_match_record_count: 0,
@@ -374,10 +422,10 @@ pub fn import_org_spreadsheet_generic(
 
         match table_type.as_str() {
             "matches" => {
-                import_org_spreadsheet_matches(game, game_id, records, &mut matches, &mut performances, &mut ctx)?;
+                parse_org_spreadsheet_matches(game, game_id, records, &mut matches, &mut performances, &mut ctx)?;
             }
             "songs" => {
-                let _ = import_org_spreadsheet_songs(game, game_id, records, &mut song_lists, &mut ctx); // TODO: ignore song errors for now
+                let _ = parse_org_spreadsheet_songs(game, game_id, records, &mut song_lists, &mut ctx); // TODO: ignore song errors for now
             }
             a => Err(SpreadsheetImportError::InvalidTableType(a.to_owned()))?,
         }
@@ -421,28 +469,34 @@ pub fn import_org_spreadsheet_generic(
     info!("fixables written to {fixable_match_path:?} and {fixable_song_path:?}");
 
     // Add correct records to database
-    let mut match_db = MatchDatabase::lock_and_read(config.match_database_path(), None).expect("todo");
-    let mut performance_db = PerformanceDatabase::lock_and_read(config.performance_database_path(), None).expect("todo");
-    for match_data in matches {
-        info!("inserting match: {match_data:?}");
-        let _ = match_db
-            .insert_new(match_data)
-            .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
-    }
-    for performance in performances {
-        info!("inserting performance: {performance:?}");
-        let _ = performance_db
-            .insert_new(performance, &match_db)
-            .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
-    }
-    for proof in ctx.proofs_to_insert {
-        info!("inserting proof: {proof:?}");
-        let _ = library_db.insert(proof).inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
-    }
+    smol::block_on(async move {
+        let db = Database::connect_and_spawn_smol(
+            config
+                .database_connection
+                .as_ref()
+                .expect("todo: database connection string required"),
+            config.database_schema.as_ref().expect("todo: schema name required"),
+        )
+        .await
+        .expect("todo: could not connect to db");
 
-    performance_db.save_and_close().expect("todo");
-    match_db.save_and_close().expect("todo");
-    library_db.save_and_close().expect("todo");
+        // for match_data in matches {
+        //     info!("inserting match: {match_data:?}");
+        //     let _ = match_db
+        //         .insert_new(match_data)
+        //         .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
+        // }
+        // for performance in performances {
+        //     info!("inserting performance: {performance:?}");
+        //     let _ = performance_db
+        //         .insert_new(performance, &match_db)
+        //         .inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
+        // }
+        // for proof in ctx.proofs_to_insert {
+        //     info!("inserting proof: {proof:?}");
+        //     let _ = library_db.insert(proof).inspect_err(|e| warn!("could not insert: {e}; skipping")); // TODO: choose to ignore duplicates or update/replace existing instead
+        // }
+    });
 
     Ok(())
 }
