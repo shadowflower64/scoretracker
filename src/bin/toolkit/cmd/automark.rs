@@ -5,7 +5,7 @@ use regex::Regex;
 use relative_path::RelativePath;
 use scoretracker::config::LegacyConfig;
 use scoretracker::data::library::entry::MediaCategory;
-use scoretracker::data::library::{entry::LibraryDatabase, index::LibraryIndex};
+use scoretracker::data::library::index::LibraryIndex;
 use scoretracker::util::filelocked::FileLockableData;
 use scoretracker::{info, log_fn_name, success};
 use std::path::PathBuf;
@@ -70,36 +70,37 @@ pub fn identify_media_based_on_relpath(relpath: &RelativePath) -> MediaCategory 
 pub fn automark_library_files(library_dir: PathBuf) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    info!("reading database");
-    let config = LegacyConfig::load().map_err(CmdError::ConfigReadError)?;
-    let library_index =
-        LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(CmdError::LibraryIndexReadError)?;
-    let mut library_db =
-        LibraryDatabase::lock_and_read(config.library_database_path(), None).map_err(CmdError::LibraryDatabaseOpenError)?;
+    // TODO
+    // info!("reading database");
+    // let config = LegacyConfig::load().map_err(CmdError::ConfigReadError)?;
+    // let library_index =
+    //     LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(CmdError::LibraryIndexReadError)?;
+    // let mut library_db =
+    //     LibraryDatabase::lock_and_read(config.library_database_path(), None).map_err(CmdError::LibraryDatabaseOpenError)?;
 
-    info!("automarking {} files...", library_index.files.len());
-    let mut counter_modified = 0;
-    let mut counter_unmodified = 0;
+    // info!("automarking {} files...", library_index.files.len());
+    // let mut counter_modified = 0;
+    // let mut counter_unmodified = 0;
 
-    for (relpath, uuid) in library_index.files {
-        let entry = library_db
-            .find_entry_by_uuid_mut(uuid.0)
-            .ok_or(CmdError::LibraryRescanNeeded(uuid.0))?;
+    // for (relpath, uuid) in library_index.files {
+    //     let entry = library_db
+    //         .find_entry_by_uuid_mut(uuid.0)
+    //         .ok_or(CmdError::LibraryRescanNeeded(uuid.0))?;
 
-        if entry.media_category == MediaCategory::Unspecified {
-            let new = identify_media_based_on_relpath(&relpath);
-            success!("specified as: {new:?}; path: {relpath:?}");
-            entry.media_category = new;
-            counter_modified += 1;
-        } else {
-            info!("was already specified: {:?}; path: {relpath:?}", entry.media_category);
-            counter_unmodified += 1;
-        }
-    }
+    //     if entry.media_category == MediaCategory::Unspecified {
+    //         let new = identify_media_based_on_relpath(&relpath);
+    //         success!("specified as: {new:?}; path: {relpath:?}");
+    //         entry.media_category = new;
+    //         counter_modified += 1;
+    //     } else {
+    //         info!("was already specified: {:?}; path: {relpath:?}", entry.media_category);
+    //         counter_unmodified += 1;
+    //     }
+    // }
 
-    info!("saving database");
-    library_db.save_and_close().map_err(CmdError::LibraryDatabaseWriteError)?;
+    // info!("saving database");
+    // library_db.save_and_close().map_err(CmdError::LibraryDatabaseWriteError)?;
 
-    success!("automarked {counter_modified} new files, {counter_unmodified} were already specified");
+    // success!("automarked {counter_modified} new files, {counter_unmodified} were already specified");
     Ok(())
 }

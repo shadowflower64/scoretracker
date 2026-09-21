@@ -6,8 +6,9 @@ use scoretracker::config::LegacyConfig;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::{TomlConfig, TomlConfigError};
 use scoretracker::data::library::info::LibraryInfo;
+use scoretracker::data::library::library_scan_full;
 use scoretracker::data::library::stpl_url::LibraryDomain;
-use scoretracker::data::library::{remove_library_domain_from_db, scan_full};
+use scoretracker::db::{Database, DbError};
 use scoretracker::{log_fn_name, success_npr};
 use std::borrow::Cow;
 use std::convert::Infallible;
@@ -134,8 +135,11 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
 pub fn rescan(library_dir: &Path) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    let library_db_path = LegacyConfig::load().map_err(CmdError::ConfigReadError)?.library_database_path();
-    scan_full(library_dir, &library_db_path, None)?;
+    smol::block_on(async {
+        let mut db = Database::connect_and_spawn_smol_with_toolkit().await?;
+        library_scan_full(library_dir, &mut db, None).await?;
+        Result::<(), CmdError>::Ok(())
+    })?;
 
     success_npr!("successfully rescanned library");
     Ok(())
@@ -145,8 +149,11 @@ pub fn rescan(library_dir: &Path) -> Result<(), CmdError> {
 pub fn remove_domain(library_domain: LibraryDomain) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    let library_db_path = LegacyConfig::load().map_err(CmdError::ConfigReadError)?.library_database_path();
-    remove_library_domain_from_db(library_domain.clone(), &library_db_path, None)?;
+    smol::block_on(async {
+        let mut db = Database::connect_and_spawn_smol_with_toolkit().await?;
+        db.remove_library_domain_from_db(&library_domain).await?;
+        Result::<(), DbError>::Ok(())
+    })?;
 
     success_npr!("successfully removed urls with the domain '{library_domain}' from database");
     Ok(())

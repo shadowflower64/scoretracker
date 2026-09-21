@@ -145,7 +145,7 @@ pub const VERBOSE_SCANNING: bool = false;
 /// 7. Generate a completely new [`LibraryIndex`] file with path paths and UUIDs fetched from the database.
 /// 8. Synchronize with the database; iterate through *every* database entry, remove any existing proof URLs that have the domain of this database, and add fresh ones.
 #[named]
-pub fn scan_full(library_dir: &Path, library_db_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<(), LibraryScanError> {
+pub async fn library_scan_full(library_dir: &Path, db: &mut Database, worker_info: Option<&WorkerInfo>) -> Result<(), LibraryScanError> {
     type E = LibraryScanError;
     log_fn_name!("library" : auto);
     log_should_print_debug!(VERBOSE_SCANNING);

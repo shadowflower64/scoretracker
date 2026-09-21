@@ -9,7 +9,7 @@ use scoretracker::{config::toolkit::ToolkitConfig, log_fn_name, success};
 pub const INIT_DB_SCRIPT: &str = include_str!("init_db.sql");
 
 #[named]
-fn connect_to_db_sync(database_connection: &Option<String>) -> Result<Client, postgres::Error> {
+pub fn connect_to_db_sync(database_connection: &Option<String>) -> Result<Client, postgres::Error> {
     log_fn_name!(auto);
 
     let params = database_connection.as_ref().map(String::as_str).unwrap_or("");

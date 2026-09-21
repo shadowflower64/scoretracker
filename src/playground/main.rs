@@ -2,7 +2,7 @@ use ctrlc::{self};
 use function_name::named;
 use scoretracker::config::LegacyConfig;
 use scoretracker::data::game::game_instance_from_id;
-use scoretracker::data::library::scan_full;
+use scoretracker::data::library::library_scan_full;
 use scoretracker::hive::job::Job;
 use scoretracker::hive::jobs::display_message_and_sleep::DisplayMessageAndSleepJob;
 use scoretracker::hive::queue::TaskQueue;
@@ -80,7 +80,7 @@ pub fn test_scanning(args: &[String]) {
     let library_dir = Path::new(args.get(1).expect("library dir path not provided"));
     let shared_data_repo_path = &LegacyConfig::load().expect("invalid config").shared_data_repo_path;
     let library_db_path = Path::new("playground/test_library_database.json");
-    scan_full(library_dir, library_db_path, None);
+    // library_scan_full(library_dir, library_db_path, None);
 }
 
 #[allow(unused)]

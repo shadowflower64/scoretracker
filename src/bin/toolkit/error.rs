@@ -1,6 +1,7 @@
 use scoretracker::cli::cmdline_error::CmdlineError;
 use scoretracker::config::toml::TomlConfigError;
 use scoretracker::data::library::LibraryScanError;
+use scoretracker::db::DbError;
 use scoretracker::hive::worker::WorkerStartError;
 use scoretracker::spreadsheet::SpreadsheetImportError;
 use scoretracker::util::command_line::AskError;
@@ -82,7 +83,9 @@ pub enum CmdError {
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
     #[error("postgres error: {0:?}")]
-    DbError(#[from] postgres::Error),
+    PostgresError(#[from] postgres::Error),
+    #[error("db error: {0:?}")]
+    DbError(#[from] DbError),
 
     #[cfg(feature = "include-server-in-toolkit")]
     #[error("server error: {0}")]
@@ -151,7 +154,7 @@ impl CmdError {
             Self::ServerError(e) => e.exit_code_num(),
 
             Self::LibraryTableError(..) => 40,
-            Self::DbError(..) => 41,
+            Self::PostgresError(..) | Self::DbError(..) => 41,
             Self::SecretsConfigError(..) => 42,
             // ---
             Self::LibraryRescanNeeded(..) => 51,

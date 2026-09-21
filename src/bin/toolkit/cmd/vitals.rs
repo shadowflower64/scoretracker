@@ -1,30 +1,34 @@
-use crate::toolkit::cmd::CmdError;
-use crate::toolkit::cmd::vitals::LogCheckError::GetSizeError;
+use crate::toolkit::cmd::{CmdError, vitals::LogCheckError::GetSizeError};
 use fs_extra::dir::get_size;
 use regex::Regex;
-use scoretracker::config::LegacyConfig;
-use scoretracker::data::game::game_instance_from_id;
-use scoretracker::data::library::entry::{LibraryDatabase, LibraryEntry};
-use scoretracker::data::scoreboard::r#match::{MatchDatabase, MatchDetails};
-use scoretracker::data::scoreboard::performance::{PerformanceDatabase, PerformanceDetails};
-use scoretracker::data::scoreboard::player::{Player, PlayerDatabase};
-use scoretracker::db::Database;
-use scoretracker::hive::queue::TaskQueue;
-use scoretracker::hive::task::TaskState;
-use scoretracker::util::byte_count::ByteCount;
-use scoretracker::util::dirs::log_dir;
-use scoretracker::util::filelocked::{FileLockableData, FileLockableDataWithDefaultPath};
-use scoretracker::util::lockfile;
-use scoretracker::util::terminal_colors::{ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET, ANSI_ERASE_TO_END};
-use scoretracker::util::terminal_colors::{ANSI_COLOR_BOLD_YELLOW, ansi_move_cursor_left};
-use scoretracker::util::timestamp::NsDuration;
-use scoretracker::util::uuid::UuidString;
-use std::collections::HashSet;
-use std::fmt::{Debug, Display};
-use std::io::{Write, stdout};
-use std::path::Path;
-use std::sync::LazyLock;
-use std::sync::atomic::Ordering;
+use scoretracker::{
+    config::LegacyConfig,
+    data::{
+        game::game_instance_from_id,
+        library::entry::LibraryEntry,
+        scoreboard::{r#match::MatchDetails, performance::Performance, player::Player},
+    },
+    db::Database,
+    hive::{queue::TaskQueue, task::TaskState},
+    util::{
+        byte_count::ByteCount,
+        dirs::log_dir,
+        filelocked::{FileLockableData, FileLockableDataWithDefaultPath},
+        lockfile,
+        terminal_colors::{
+            ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_RESET, ANSI_ERASE_TO_END, ansi_move_cursor_left,
+        },
+        timestamp::NsDuration,
+        uuid::UuidString,
+    },
+};
+use std::{
+    collections::HashSet,
+    fmt::{Debug, Display},
+    io::{Write, stdout},
+    path::Path,
+    sync::{LazyLock, atomic::Ordering},
+};
 use thiserror::Error;
 
 const QUEUE_SIZE_THRESHOLD: usize = 500;
@@ -226,7 +230,6 @@ pub enum LibraryEntryCheckError {
 
 fn check_library_entry(
     entry: &LibraryEntry,
-    library_db: &LibraryDatabase,
     uuids: &mut HashSet<UuidString>,
     sha256_hashes: &mut HashSet<String>,
     youtube_ids: &mut HashSet<String>,
@@ -257,17 +260,17 @@ fn check_library_entry(
         Err(E::NoHashOrYouTubeId)?;
     }
 
-    if let Some(cloth) = &entry.cloth {
-        library_db.find_entry_by_uuid(cloth.uuid.0).ok_or(E::ClothNotFound(cloth.uuid))?;
+    if let Some(_cloth) = &entry.cloth {
+        // library_db.find_entry_by_uuid(cloth.uuid.0).ok_or(E::ClothNotFound(cloth.uuid))?;
     }
 
-    if let Some(dry_uuid) = entry.dry {
-        library_db.find_entry_by_uuid(dry_uuid.0).ok_or(E::DryNotFound(dry_uuid))?;
+    if let Some(_dry_uuid) = entry.dry {
+        // library_db.find_entry_by_uuid(dry_uuid.0).ok_or(E::DryNotFound(dry_uuid))?;
     }
 
     if let Some(clips) = &entry.clips {
-        for clip_uuid in clips {
-            library_db.find_entry_by_uuid(clip_uuid.0).ok_or(E::ClipNotFound(*clip_uuid))?;
+        for _clip_uuid in clips {
+            // library_db.find_entry_by_uuid(clip_uuid.0).ok_or(E::ClipNotFound(*clip_uuid))?;
         }
     }
 
@@ -294,48 +297,41 @@ pub enum PerformanceCheckError {
     Custom(String),
 }
 
-fn check_performance(
-    performance: &dyn PerformanceDetails,
-    player_db: &PlayerDatabase,
-    match_db: &MatchDatabase,
-    performance_db: &PerformanceDatabase,
-    library_db: &LibraryDatabase,
-    uuids: &mut HashSet<UuidString>,
-) -> Result<(), PerformanceCheckError> {
+fn check_performance(performance: &Performance, uuids: &mut HashSet<UuidString>) -> Result<(), PerformanceCheckError> {
     type E = PerformanceCheckError;
 
-    if !uuids.insert(performance.uuid()) {
-        return Err(E::ReusedUuid(performance.uuid()));
+    if !uuids.insert(performance.performance_uuid) {
+        return Err(E::ReusedUuid(performance.performance_uuid));
     }
 
-    let other_close = performance_db
-        .find_close_performances_from_diff_match(performance, NsDuration::from_secs_f64(30.0), match_db)
-        .map_err(|x| E::MatchNotFound(x.into()))?;
-    if !other_close.is_empty() {
-        return Err(E::ClosePerformances(
-            other_close.iter().map(|(m, how_close)| (m.uuid(), *how_close)).collect(),
-        ));
-    }
+    // let other_close = performance_db
+    //     .find_close_performances_from_diff_match(performance, NsDuration::from_secs_f64(30.0), match_db)
+    //     .map_err(|x| E::MatchNotFound(x.into()))?;
+    // if !other_close.is_empty() {
+    //     return Err(E::ClosePerformances(
+    //         other_close.iter().map(|(m, how_close)| (m.uuid(), *how_close)).collect(),
+    //     ));
+    // }
 
-    let player_uuid = performance.player_uuid();
-    let _player = player_db.find_player_by_uuid(player_uuid).ok_or(E::PlayerNotFound(player_uuid))?;
+    let _player_uuid = performance.player_uuid;
+    // let _player = player_db.find_player_by_uuid(player_uuid).ok_or(E::PlayerNotFound(player_uuid))?;
 
-    let match_uuid = performance.match_uuid();
-    let match_data = match_db.find_match_by_uuid(match_uuid).ok_or(E::MatchNotFound(match_uuid))?;
+    let _match_uuid = performance.match_uuid;
+    // let match_data = match_db.find_match_by_uuid(match_uuid).ok_or(E::MatchNotFound(match_uuid))?;
 
-    for proof_uuid in performance.proof() {
-        let _entry = library_db.find_entry_by_uuid(proof_uuid.0).ok_or(E::EntryNotFound(*proof_uuid))?;
-    }
+    // for proof_uuid in performance.proof {
+    // let _entry = library_db.find_entry_by_uuid(proof_uuid.0).ok_or(E::EntryNotFound(*proof_uuid))?;
+    // }
 
-    let game_id = performance.game_id();
+    let game_id = performance.details.game_id();
     let _game = game_instance_from_id(game_id).ok_or(E::UnknownGame(game_id.to_owned()))?;
 
-    let match_game_id = match_data.game_id();
-    if match_game_id != game_id {
-        return Err(E::MatchGameDoesNotMatch(match_game_id.to_owned(), game_id.to_owned()));
-    };
+    // let match_game_id = match_data.game_id();
+    // if match_game_id != game_id {
+    //     return Err(E::MatchGameDoesNotMatch(match_game_id.to_owned(), game_id.to_owned()));
+    // };
 
-    performance.check_vitals().map_err(E::Custom)?;
+    performance.details.check_vitals().map_err(E::Custom)?;
     Ok(())
 }
 
@@ -353,25 +349,25 @@ pub enum MatchCheckError {
     Custom(String),
 }
 
-fn check_match(match_data: &dyn MatchDetails, db: &Database, uuids: &mut HashSet<UuidString>) -> Result<(), MatchCheckError> {
+fn check_match(match_data: &dyn MatchDetails, _db: &Database, _uuids: &mut HashSet<UuidString>) -> Result<(), MatchCheckError> {
     type E = MatchCheckError;
 
-    if !uuids.insert(match_data.uuid) {
-        return Err(E::ReusedUuid(match_data.uuid()));
-    }
+    // if !uuids.insert(match_data.uuid) {
+    //     return Err(E::ReusedUuid(match_data.uuid()));
+    // }
 
-    let other_close = match_db.find_other_close_matches(match_data, NsDuration::from_secs_f64(30.0));
-    if !other_close.is_empty() {
-        return Err(E::CloseMatches(
-            other_close.iter().map(|(m, how_close)| (m.uuid(), *how_close)).collect(),
-        ));
-    }
+    // let other_close = match_db.find_other_close_matches(match_data, NsDuration::from_secs_f64(30.0));
+    // if !other_close.is_empty() {
+    //     return Err(E::CloseMatches(
+    //         other_close.iter().map(|(m, how_close)| (m.uuid(), *how_close)).collect(),
+    //     ));
+    // }
 
     // TODO: check song id here
 
-    for proof_uuid in match_data.proof() {
-        let _entry = library_db.find_entry_by_uuid(proof_uuid.0).ok_or(E::EntryNotFound(*proof_uuid))?;
-    }
+    // for proof_uuid in match_data.proof {
+    // let _entry = library_db.find_entry_by_uuid(proof_uuid.0).ok_or(E::EntryNotFound(*proof_uuid))?;
+    // }
 
     let game_id = match_data.game_id();
     let _game = game_instance_from_id(game_id).ok_or(E::UnknownGame(game_id.to_owned()))?;
@@ -420,90 +416,74 @@ fn check_database(
 
     print_check_name("loading player database");
     print_check_status("waiting for player database filelock...");
-    let player_db = PlayerDatabase::lock_and_read(player_db_path, None).map_err(E::Lockfile)?;
-    let player_count = player_db.players.len();
-    print_check_ok_msg(&format!("{player_count} players"));
+    // let player_db = PlayerDatabase::lock_and_read(player_db_path, None).map_err(E::Lockfile)?;
+    // let player_count = player_db.players.len();
+    // print_check_ok_msg(&format!("{player_count} players"));
 
     print_check_name("loading match database");
     print_check_status("waiting for match database filelock...");
-    let match_db = MatchDatabase::lock_and_read(match_db_path, None).map_err(E::Lockfile)?;
-    let match_count = match_db.matches.len();
-    print_check_ok_msg(&format!("{match_count} matches"));
+    // let match_db = MatchDatabase::lock_and_read(match_db_path, None).map_err(E::Lockfile)?;
+    // let match_count = match_db.matches.len();
+    // print_check_ok_msg(&format!("{match_count} matches"));
 
     print_check_name("loading performance database");
     print_check_status("waiting for performance database filelock...");
-    let performance_db = PerformanceDatabase::lock_and_read(performance_db_path, None).map_err(E::Lockfile)?;
-    let performance_count = performance_db.performances.len();
-    print_check_ok_msg(&format!("{performance_count} performances"));
+    // let performance_db = PerformanceDatabase::lock_and_read(performance_db_path, None).map_err(E::Lockfile)?;
+    // let performance_count = performance_db.performances.len();
+    // print_check_ok_msg(&format!("{performance_count} performances"));
 
     print_check_name("loading library database");
     print_check_status("waiting for library database filelock...");
-    let library_db = LibraryDatabase::lock_and_read(library_db_path, None).map_err(E::Lockfile)?; // TODO: this is loaded earlier already, could be reused
-    let entry_count = library_db.entries.len();
-    print_check_ok_msg(&format!("{entry_count} entries"));
+    // let library_db = LibraryDatabase::lock_and_read(library_db_path, None).map_err(E::Lockfile)?; // TODO: this is loaded earlier already, could be reused
+    // let entry_count = library_db.entries.len();
+    // print_check_ok_msg(&format!("{entry_count} entries"));
 
-    let mut all_mainkey_uuids = HashSet::new();
-    let mut all_sha256_hashes = HashSet::new();
-    let mut all_youtube_ids = HashSet::new();
+    // let mut all_mainkey_uuids = HashSet::new();
+    // let mut all_sha256_hashes = HashSet::new();
+    // let mut all_youtube_ids = HashSet::new();
 
     print_check_name("checking library database entries");
-    for (i, entry) in library_db.entries.iter().enumerate() {
-        print_check_status(&format!("({}/{entry_count})", i + 1));
-        check_library_entry(
-            entry,
-            &library_db,
-            &mut all_mainkey_uuids,
-            &mut all_sha256_hashes,
-            &mut all_youtube_ids,
-        )
-        .map_err(|e| E::LibraryEntry { uuid: entry.uuid, e })?;
-    }
+    // for (i, entry) in library_db.entries.iter().enumerate() {
+    //     print_check_status(&format!("({}/{entry_count})", i + 1));
+    //     check_library_entry(
+    //         entry,
+    //         &library_db,
+    //         &mut all_mainkey_uuids,
+    //         &mut all_sha256_hashes,
+    //         &mut all_youtube_ids,
+    //     )
+    //     .map_err(|e| E::LibraryEntry { uuid: entry.uuid, e })?;
+    // }
     print_check_ok();
 
     print_check_name("checking performance database entries");
-    for (i, performance) in performance_db.performances.iter().enumerate() {
-        print_check_status(&format!("({}/{performance_count})", i + 1));
-        check_performance(
-            performance.as_ref(),
-            &player_db,
-            &match_db,
-            &performance_db,
-            &library_db,
-            &mut all_mainkey_uuids,
-        )
-        .map_err(|e| E::Performance {
-            uuid: performance.uuid(),
-            e,
-        })?;
-    }
+    // for (i, performance) in performance_db.performances.iter().enumerate() {
+    //     print_check_status(&format!("({}/{performance_count})", i + 1));
+    //     check_performance(performance.as_ref(), &mut all_mainkey_uuids).map_err(|e| E::Performance {
+    //         uuid: performance.uuid(),
+    //         e,
+    //     })?;
+    // }
     print_check_ok();
 
     print_check_name("checking match database entries");
-    for (i, match_data) in match_db.matches.iter().enumerate() {
-        print_check_status(&format!("({}/{match_count})", i + 1));
-        check_match(
-            match_data.as_ref(),
-            &player_db,
-            &match_db,
-            &performance_db,
-            &library_db,
-            &mut all_mainkey_uuids,
-        )
-        .map_err(|e| E::Match {
-            uuid: match_data.uuid(),
-            e,
-        })?;
-    }
+    // for (i, match_data) in match_db.matches.iter().enumerate() {
+    //     print_check_status(&format!("({}/{match_count})", i + 1));
+    //     check_match(match_data.as_ref(), &mut all_mainkey_uuids).map_err(|e| E::Match {
+    //         uuid: match_data.uuid(),
+    //         e,
+    //     })?;
+    // }
     print_check_ok();
 
     print_check_name("checking player database entries");
-    for (i, player) in player_db.players.iter().enumerate() {
-        print_check_status(&format!("({}/{player_count})", i + 1));
-        check_player(player, &mut all_mainkey_uuids).map_err(|e| E::Player {
-            uuid: player.player_uuid,
-            e,
-        })?;
-    }
+    // for (i, player) in player_db.players.iter().enumerate() {
+    //     print_check_status(&format!("({}/{player_count})", i + 1));
+    //     check_player(player, &mut all_mainkey_uuids).map_err(|e| E::Player {
+    //         uuid: player.player_uuid,
+    //         e,
+    //     })?;
+    // }
 
     // TODO: add:
     // * matches table,
@@ -542,7 +522,7 @@ pub fn check_all() -> Result<(), CmdError> {
     println!("log directory located at: {log_path:?}");
     result_wrapper(check_log_dir(&log_path));
 
-    let db = todo!();
+    let _db = todo!();
     /*
     result_wrapper(check_database(&db));
 

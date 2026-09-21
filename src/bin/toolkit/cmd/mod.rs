@@ -184,7 +184,6 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             _ => ctx.unknown_cmd(),
         },
         "scoreboard" => match ctx.cmd()? {
-            "init" => cmd::scoreboard::init(),
             "performance" => match ctx.cmd()? {
                 "add" => {
                     let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
