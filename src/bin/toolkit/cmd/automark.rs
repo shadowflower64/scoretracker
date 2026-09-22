@@ -3,7 +3,7 @@ use constcat::concat;
 use function_name::named;
 use regex::Regex;
 use relative_path::RelativePath;
-use scoretracker::data::library::entry::MediaCategory;
+use scoretracker::data::library::media_category::MediaCategory;
 use scoretracker::log_fn_name;
 use std::path::PathBuf;
 use std::sync::LazyLock;

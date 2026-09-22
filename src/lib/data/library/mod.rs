@@ -13,13 +13,21 @@
 //! * `library_database.json` ([`database`]) - permanently stores all of the data about all of the proofs globally.
 //!   This includes: URLs to the proof, comments, manually assigned categories, related performance UUIDs, etc.
 
+pub mod automatic_content_detection_information;
 pub mod aux_data;
 pub mod cache;
+pub mod content_description;
 pub mod entry;
+pub mod entry_kind;
+pub mod file_stat;
 pub mod index;
 pub mod info;
+pub mod media_category;
+pub mod media_metadata;
+pub mod quality_state;
 pub mod root;
 pub mod stpl_url;
+pub mod tag;
 
 use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::cache::LibraryCache;
