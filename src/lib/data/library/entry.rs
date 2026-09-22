@@ -3,13 +3,23 @@
 //! A library database file is a file shared globally across libraries, that maps "proof UUIDs" to actual information and metadata about the proof.
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
 //! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
-use crate::data::library::stpl_url::StplUrl;
-use crate::util::timestamp::{NsDuration, NsLocalTimestamp, NsTimestamp};
-use crate::util::uuid::UuidString;
+use crate::{
+    data::{library::stpl_url::StplUrl, scoreboard::metadata::ArbitraryMetadata},
+    util::{
+        timestamp::{NsDuration, NsLocalTimestamp, NsTimestamp},
+        uuid::UuidString,
+    },
+};
+use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::path::Path;
+use sha256::Sha256Digest;
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    fs,
+    ops::{Deref, DerefMut},
+    path::Path,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -61,8 +71,9 @@ impl FileStat {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq, FromSql, ToSql)]
 #[serde(rename_all = "snake_case")]
+#[postgres(rename_all = "snake_case")]
 pub enum MediaCategory {
     /// Default value - value not selected by user yet.
     #[default]
@@ -136,6 +147,32 @@ pub enum ContentDescription {
     Other { description: Option<String> },
 }
 
+impl<'a> FromSql<'a> for ContentDescription {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <serde_json::Value as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        Ok(serde_json::from_value(value)?)
+    }
+}
+
+impl ToSql for ContentDescription {
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <serde_json::Value as ToSql>::accepts(ty)
+    }
+    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        serde_json::value::to_value(self.clone())?.to_sql(ty, out)
+    }
+    to_sql_checked! {}
+}
+
 /// The quality state of the proof file.
 ///
 /// Videos that are "raw" can be transcoded and lossily compressed to save space.
@@ -160,8 +197,9 @@ pub enum ContentDescription {
 ///
 /// These actions are traditionally applied to the "raw" video only, but in practice more destructive actions can also be used on already messy, folded or crumpled videos.
 ///
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, FromSql, ToSql)]
 #[serde(rename_all = "snake_case")]
+#[postgres(rename_all = "snake_case")]
 pub enum QualityState {
     /// Default value - value not selected by user yet.
     #[default]
@@ -243,8 +281,9 @@ pub enum QualityState {
 }
 
 /// Kind of the library entry - is it a proof of a performance or something else?
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, FromSql, ToSql)]
 #[serde(rename_all = "snake_case")]
+#[postgres(rename_all = "snake_case")]
 pub enum LibraryEntryKind {
     /// Default value - value not selected by user yet.
     #[default]
@@ -264,9 +303,7 @@ pub enum LibraryEntryKind {
     Linked,
 }
 
-pub type MediaMetadata = HashMap<String, String>;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromSql, ToSql)]
 pub struct ClothInfo {
     /// UUID of the cloth proof file.
     pub uuid: UuidString,
@@ -307,6 +344,170 @@ pub struct AutomaticContentDetectionInformation {
     notes_total: AutomaticallyDetected<u64>,
 }
 
+impl<'a> FromSql<'a> for AutomaticContentDetectionInformation {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <serde_json::Value as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        Ok(serde_json::from_value(value)?)
+    }
+}
+
+impl ToSql for AutomaticContentDetectionInformation {
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <serde_json::Value as ToSql>::accepts(ty)
+    }
+    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        serde_json::value::to_value(self.clone())?.to_sql(ty, out)
+    }
+    to_sql_checked! {}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Tags(pub HashSet<Tag>);
+
+impl Tags {
+    pub fn new() -> Self {
+        Self(HashSet::new())
+    }
+}
+
+impl Deref for Tags {
+    type Target = HashSet<Tag>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> FromSql<'a> for Tags {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <Vec<Tag> as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let vec: Vec<Tag> = Vec::from_sql(ty, raw)?;
+        Ok(Self(HashSet::from_iter(vec)))
+    }
+}
+
+impl ToSql for Tags {
+    fn to_sql(
+        &self,
+        ty: &postgres_types::Type,
+        out: &mut actix_web::web::BytesMut,
+    ) -> Result<postgres_types::IsNull, Box<dyn std::error::Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        let vec: Vec<&Tag> = self.0.iter().collect();
+        vec.to_sql(ty, out)
+    }
+
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <Vec<Tag> as ToSql>::accepts(ty)
+    }
+
+    to_sql_checked! {}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct MediaMetadata(pub HashMap<String, String>);
+
+impl Deref for MediaMetadata {
+    type Target = HashMap<String, String>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for MediaMetadata {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'a> FromSql<'a> for MediaMetadata {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <serde_json::Value as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        Ok(Self(serde_json::from_value(value)?))
+    }
+}
+
+impl ToSql for MediaMetadata {
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <serde_json::Value as ToSql>::accepts(ty)
+    }
+    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        serde_json::value::to_value(self.0.clone())?.to_sql(ty, out)
+    }
+    to_sql_checked! {}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct FileStats(pub HashMap<StplUrl, FileStat>);
+
+impl FileStats {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl Deref for FileStats {
+    type Target = HashMap<StplUrl, FileStat>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for FileStats {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'a> FromSql<'a> for FileStats {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <serde_json::Value as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        Ok(Self(serde_json::from_value(value)?))
+    }
+}
+
+impl ToSql for FileStats {
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <serde_json::Value as ToSql>::accepts(ty)
+    }
+    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        serde_json::value::to_value(self.0.clone())?.to_sql(ty, out)
+    }
+    to_sql_checked! {}
+}
+
 /// An entry in the library database, containing information about proof videos and images, and other files inside of the library.
 ///
 /// Every unique file inside of the library should have exactly one library entry.
@@ -315,7 +516,7 @@ pub struct AutomaticContentDetectionInformation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryEntry {
     /// UUID of the library entry / proof.
-    pub uuid: UuidString,
+    pub proof_uuid: UuidString,
 
     /// SHA256 hash of the file.
     ///
@@ -336,13 +537,13 @@ pub struct LibraryEntry {
     /// Since there may be multiple files on disk with the same sha256 hash and different file `stat`s, this is stored as a dictionary.
     /// Each file gets an entry.
     /// Note that even if a file may be present in `library_urls`, it doesn't have to be present here.
-    pub file_stat: HashMap<StplUrl, FileStat>,
+    pub file_stat: FileStats,
 
     /// Metadata inside of the media file (creation_date, android version, video/audio stream count, other similar metadata).
     /// The exact contents depends on the type of the file.
     ///
     /// Currently, this is not used, and the metadata will always be empty.
-    pub metadata: Option<MediaMetadata>,
+    pub media_metadata: Option<MediaMetadata>,
 
     /// Category of the media that this entry describes - is it a screenshot, a video from a camera, a mobile screen recording, something else?
     #[serde(alias = "category")] // temp alias for migration while testing, can be removed later
@@ -401,18 +602,44 @@ pub struct LibraryEntry {
 
     /// List of tags that are assigned to this library entry by the user.
     #[serde(default)]
-    pub tags: HashSet<Tag>,
-
-    /// User-added comment for this library entry.
-    pub comment: Option<String>,
+    pub tags: Tags,
 
     /// Timestamp (in nanoseconds) of when this file was added/scanned into the library.
     pub timestamp_added: NsTimestamp,
+
+    /// Arbitrary user-added metadata.
+    pub metadata: ArbitraryMetadata,
 }
 
 impl LibraryEntry {
     pub fn update_stat(&mut self, url: StplUrl, path: impl AsRef<Path>) {
         self.file_stat.insert(url, FileStat::from_path(path));
+    }
+
+    pub fn from_postgres_row(row: &postgres::Row) -> Result<Self, postgres::Error> {
+        Ok(Self {
+            proof_uuid: row.try_get("proof_uuid")?,
+            sha256: row.try_get("sha256")?,
+            library_urls: row.try_get("library_urls")?,
+            youtube_id: row.try_get("youtube_id")?,
+            entry_kind: row.try_get("entry_kind")?,
+            file_stat: row.try_get("file_stat")?,
+            media_metadata: row.try_get("media_metadata")?,
+            media_category: row.try_get("media_category")?,
+            content_description: row.try_get("content_description")?,
+            cut: row.try_get("cut")?,
+            quality: row.try_get("quality")?,
+            cloth: row.try_get("cloth")?,
+            dry: row.try_get("dry")?,
+            clips: row.try_get("clips")?,
+            timestamp_start: row.try_get("timestamp_start")?,
+            timestamp_end: row.try_get("timestamp_end")?,
+            duration: row.try_get("duration")?,
+            automatic_content_detection_information: row.try_get("automatic_content_detection_information")?,
+            tags: row.try_get("tags")?,
+            timestamp_added: row.try_get("timestamp_added")?,
+            metadata: row.try_get("metadata")?,
+        })
     }
 }
 
@@ -420,7 +647,7 @@ impl Default for LibraryEntry {
     fn default() -> Self {
         Self {
             // Explicitly set custom values
-            uuid: Uuid::now_v7().into(),
+            proof_uuid: Uuid::now_v7().into(),
             timestamp_added: NsTimestamp::now(),
 
             // Default values for other fields
@@ -428,8 +655,8 @@ impl Default for LibraryEntry {
             sha256: None,
             library_urls: Vec::new(),
             entry_kind: LibraryEntryKind::default(),
-            file_stat: HashMap::new(),
-            metadata: None,
+            file_stat: FileStats::new(),
+            media_metadata: None,
             media_category: MediaCategory::default(),
             content_description: ContentDescription::default(),
             cut: None,
@@ -437,12 +664,12 @@ impl Default for LibraryEntry {
             cloth: None,
             dry: None,
             clips: None,
-            tags: HashSet::new(),
-            comment: None,
+            tags: Tags::new(),
             timestamp_start: None,
             timestamp_end: None,
             duration: None,
             automatic_content_detection_information: None,
+            metadata: ArbitraryMetadata::new(),
         }
     }
 }

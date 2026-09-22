@@ -1,7 +1,9 @@
 use crate::config::toml::TomlConfigError;
 use crate::data::library::root::LibraryRoot;
+use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fmt::{self, Display};
 use std::path::Path;
 use std::str::FromStr;
@@ -175,32 +177,56 @@ impl Serialize for StplUrl {
     }
 }
 
-struct StplUrlVisitor;
-
-impl<'de> Visitor<'de> for StplUrlVisitor {
-    type Value = StplUrl;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a properly-formed 'stpl://' url string")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
-    }
-
-    // fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
-    // where
-    //     E: serde::de::Error,
-    // {
-    //     v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
-    // }
-}
-
 impl<'de> Deserialize<'de> for StplUrl {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_string(StplUrlVisitor)
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = StplUrl;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "a properly-formed 'stpl://' url string")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
+            }
+
+            // fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            // where
+            //     E: serde::de::Error,
+            // {
+            //     v.to_owned().try_into().map_err(|_x| E::invalid_value(Unexpected::Str(v), &Self))
+            // }
+        }
+        deserializer.deserialize_string(V)
     }
+}
+
+impl<'a> FromSql<'a> for StplUrl {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <String as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let string = String::from_sql(ty, raw)?;
+        Ok(StplUrl::try_from(string)?)
+    }
+}
+
+impl ToSql for StplUrl {
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <String as ToSql>::accepts(ty)
+    }
+    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        self.to_string().to_sql(ty, out)
+    }
+    to_sql_checked! {}
 }

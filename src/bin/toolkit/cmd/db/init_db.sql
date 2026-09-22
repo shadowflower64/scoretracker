@@ -19,8 +19,8 @@
 -- SCHEMA: $SCHEMA_NAME
 -- DROP SCHEMA IF EXISTS $SCHEMA_NAME;
 -- CREATE SCHEMA IF NOT EXISTS $SCHEMA_NAME AUTHORIZATION scoretracker_dev;
-COMMENT ON SCHEMA $SCHEMA_NAME IS 'scoretracker schema created by scoretracker-toolkit';
-SET search_path TO $SCHEMA_NAME;
+-- COMMENT ON SCHEMA $SCHEMA_NAME IS 'scoretracker schema created by scoretracker-toolkit';
+-- SET search_path TO $SCHEMA_NAME;
 
 
 

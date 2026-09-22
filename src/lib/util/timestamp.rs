@@ -1,6 +1,7 @@
 //! Module for nanosecond timestamp and duration structures: [`Nanoseconds`] and [`NsDuration`].
 use chrono::{DateTime, Local, SecondsFormat, TimeZone, Utc};
 use postgres::types::FromSql;
+use postgres_types::{ToSql, to_sql_checked};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, MapAccess};
 use serde::{Deserialize, Serialize, de::Visitor};
@@ -260,13 +261,35 @@ impl JsonSchema for NsTimestamp {
 }
 
 impl<'a> FromSql<'a> for NsTimestamp {
+    fn accepts(ty: &postgres::types::Type) -> bool {
+        <chrono::DateTime<Utc> as FromSql>::accepts(ty)
+    }
     fn from_sql(ty: &postgres::types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         Ok(NsTimestamp::from(chrono::DateTime::<Utc>::from_sql(ty, raw)?))
     }
+}
 
-    fn accepts(ty: &postgres::types::Type) -> bool {
-        chrono::DateTime::<Utc>::accepts(ty)
+impl ToSql for NsTimestamp {
+    fn to_sql(
+        &self,
+        ty: &postgres_types::Type,
+        out: &mut actix_web::web::BytesMut,
+    ) -> Result<postgres_types::IsNull, Box<dyn std::error::Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        let date_time: chrono::DateTime<Utc> = self.to_owned().try_into()?;
+        date_time.to_sql(ty, out)
     }
+
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <chrono::DateTime<Utc> as ToSql>::accepts(ty)
+    }
+
+    to_sql_checked! {}
 }
 
 /// A timestamp relative to some local zero value.
@@ -519,6 +542,38 @@ impl<'de> Deserialize<'de> for NsDuration {
         // }
         Nanoseconds::deserialize(deserializer).map(Self)
     }
+}
+
+impl<'a> FromSql<'a> for NsDuration {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <f64 as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(NsDuration::from_secs_f64(f64::from_sql(ty, raw)?))
+    }
+}
+
+impl ToSql for NsDuration {
+    fn to_sql(
+        &self,
+        ty: &postgres_types::Type,
+        out: &mut actix_web::web::BytesMut,
+    ) -> Result<postgres_types::IsNull, Box<dyn std::error::Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        let f = self.as_secs_f64();
+        f.to_sql(ty, out)
+    }
+
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <f64 as ToSql>::accepts(ty)
+    }
+
+    to_sql_checked! {}
 }
 
 impl fmt::Display for NsDuration {

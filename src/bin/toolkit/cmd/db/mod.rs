@@ -1,45 +1,60 @@
-use std::{str::FromStr, sync::LazyLock};
+pub mod performance;
+pub mod player;
+
+use std::{borrow::Cow, fs, path::Path};
 
 use crate::toolkit::error::CmdError;
+use chrono::Local;
 use function_name::named;
-use postgres::{Client, NoTls};
-use regex::Regex;
-use scoretracker::{config::toolkit::ToolkitConfig, log_fn_name, success};
+use scoretracker::{
+    config::toolkit::ToolkitConfig,
+    db::{Database, DbError, schema_name::SafeSchemaName},
+    log_fn_name, success,
+};
 
 pub const INIT_DB_SCRIPT: &str = include_str!("init_db.sql");
 
 #[named]
-pub fn connect_to_db_sync(database_connection: &Option<String>) -> Result<Client, postgres::Error> {
+pub fn init(schema_name: SafeSchemaName) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    let params = database_connection.as_ref().map(String::as_str).unwrap_or("");
-    // info!("params: {params}");
-    let config = postgres::Config::from_str(params)?;
-    // info!("config: {config:?}");
+    smol::block_on(async {
+        let config = ToolkitConfig::global().map_err(CmdError::ToolkitConfigError)?;
+        let db = Database::connect_with_tokio(
+            &config
+                .database_connection
+                .as_ref()
+                .ok_or(DbError::ToolkitConfigNoDbConnectionString)?,
+            &schema_name,
+        )
+        .await?;
 
-    let client = config.connect(NoTls)?;
-    success!("connected to database");
-    Ok(client)
+        db.client.batch_execute(INIT_DB_SCRIPT).await?;
+        success!("successfully executed `init_db.sql` script");
+
+        Ok(())
+    })
+}
+
+pub fn current_time_condensed_string() -> String {
+    let current_time = Local::now();
+    current_time.format("%Y%m%d%H%M%S").to_string()
 }
 
 #[named]
-pub fn init(schema_name: String) -> Result<(), CmdError> {
-    log_fn_name!(auto);
+pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
+    let export_dir = if export_dir.exists() {
+        Cow::Owned(export_dir.join(format!("export_{}", current_time_condensed_string())))
+    } else {
+        Cow::Borrowed(export_dir)
+    };
+    fs::create_dir_all(&export_dir)?;
 
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z_]{1,64}$").expect("could not compile regex"));
-    if !REGEX.is_match(&schema_name) {
-        // TODO: pretty error handling
-        panic!("invalid schema name: '{schema_name}' (needs to be use [a-z_] only)");
-    }
+    smol::block_on(async {
+        let mut db = Database::connect_with_tokio_for_toolkit().await?;
+        let export = db.export_all().await?;
+        serde_jsonlines::write_json_lines(export_dir.join("players.jsonl"), export.players.iter())?;
 
-    let config = ToolkitConfig::global().map_err(CmdError::SecretsConfigError)?;
-    // info!("config: {config:?}");
-
-    let mut client = connect_to_db_sync(&config.database_connection)?;
-
-    let init_db_script_replaced = INIT_DB_SCRIPT.replace("$SCHEMA_NAME", &schema_name);
-    client.batch_execute(&init_db_script_replaced)?;
-    success!("successfully executed `init_db.sql` script");
-
-    Ok(())
+        Ok(())
+    })
 }

@@ -53,7 +53,7 @@ impl Get {
     }
 
     pub fn uuid(&self) -> UuidString {
-        self.entry().uuid
+        self.entry().proof_uuid
     }
 
     pub fn read_only_path(&self) -> &Path {

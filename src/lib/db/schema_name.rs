@@ -4,30 +4,40 @@ use serde::{
     de::{Unexpected, Visitor},
 };
 use std::{fmt, str::FromStr, sync::LazyLock};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("invalid schema name: '{0}' (needs to be use [a-z_] only)")]
+pub struct InvalidSchemaName(String);
 
 #[derive(Debug, Clone)]
 pub struct SafeSchemaName(String);
 
+impl SafeSchemaName {
+    pub fn inner_owned(self) -> String {
+        self.0
+    }
+    pub fn inner(&self) -> &String {
+        &self.0
+    }
+}
+
 pub static SAFE_SCHEMA_NAME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z_]{1,64}$").expect("could not compile regex"));
 
 impl FromStr for SafeSchemaName {
-    type Err = ();
+    type Err = InvalidSchemaName;
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        if SAFE_SCHEMA_NAME_REGEX.is_match(string) {
-            Ok(Self(string.to_owned()))
-        } else {
-            Err(())
-        }
+        string.to_owned().try_into()
     }
 }
 
 impl TryFrom<String> for SafeSchemaName {
-    type Error = ();
-    fn try_from(string: String) -> Result<SafeSchemaName, ()> {
+    type Error = InvalidSchemaName;
+    fn try_from(string: String) -> Result<SafeSchemaName, Self::Error> {
         if SAFE_SCHEMA_NAME_REGEX.is_match(&string) {
             Ok(Self(string))
         } else {
-            Err(())
+            Err(InvalidSchemaName(string))
         }
     }
 }

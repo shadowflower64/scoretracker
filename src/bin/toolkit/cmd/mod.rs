@@ -7,6 +7,7 @@ use scoretracker::config::LegacyConfig;
 use scoretracker::config::library_tab::LibraryTab;
 use scoretracker::config::toml::TomlConfig;
 use scoretracker::data::library::stpl_url::{LibraryDomain, StplUrl};
+use scoretracker::db::schema_name::SafeSchemaName;
 use scoretracker::hive::jobs::cut_library_video::CutLibraryVideoJob;
 use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryVideoJob};
 use scoretracker::util::timestamp::NsLocalTimestamp;
@@ -20,8 +21,6 @@ pub mod hive;
 pub mod library;
 pub mod log;
 pub mod paths;
-pub mod performance;
-pub mod player;
 pub mod schema;
 pub mod spreadsheet;
 pub mod version;
@@ -30,10 +29,6 @@ pub mod vitals;
 pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
     let mut ctx = context.with_error_type::<CmdError>();
     match ctx.cmd()? {
-        "hello" => {
-            info_npr!("hello world!");
-            Ok(())
-        }
         "automark" => {
             let library_dir: Option<PathBuf> = ctx.pull_arg_opt("library_dir", "path of the library directory")?;
             let library_dir = library_dir
@@ -53,10 +48,28 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             _ => ctx.unknown_cmd(),
         },
         "db" => match ctx.cmd()? {
+            "export" => {
+                let export_dir: PathBuf = ctx.pull_arg("export_dir", "directory to export to")?;
+                cmd::db::export_jsonl(&export_dir)
+            }
             "init" => {
-                let schema_name: String = ctx.pull_arg("schema_name", "name for the new schema to create in the database")?;
+                let schema_name: SafeSchemaName = ctx.pull_arg("schema_name", "name for the new schema to create in the database")?;
                 cmd::db::init(schema_name)
             }
+            "performance" => match ctx.cmd()? {
+                "add" => {
+                    let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
+                    cmd::db::performance::add(game_id)
+                }
+                _ => ctx.unknown_cmd(),
+            },
+            "player" => match ctx.cmd()? {
+                "add" => {
+                    let name: String = ctx.pull_arg("name", "name of the player")?;
+                    cmd::db::player::add(name)
+                }
+                _ => ctx.unknown_cmd(),
+            },
             _ => ctx.unknown_cmd(),
         },
         "hive" => match ctx.cmd()? {
@@ -183,20 +196,6 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
         "logs" => cmd::log::open(),
         "paths" => match ctx.cmd_opt()? {
             None | Some("show") => cmd::paths::show(),
-            _ => ctx.unknown_cmd(),
-        },
-        "performance" => match ctx.cmd()? {
-            "add" => {
-                let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
-                cmd::performance::add(game_id)
-            }
-            _ => ctx.unknown_cmd(),
-        },
-        "player" => match ctx.cmd()? {
-            "add" => {
-                let name: String = ctx.pull_arg("name", "name of the player")?;
-                cmd::player::add(name)
-            }
             _ => ctx.unknown_cmd(),
         },
         "schema" => match ctx.cmd()? {

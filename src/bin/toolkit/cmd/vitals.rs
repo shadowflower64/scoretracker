@@ -236,8 +236,8 @@ fn check_library_entry(
 ) -> Result<(), LibraryEntryCheckError> {
     type E = LibraryEntryCheckError;
 
-    if !uuids.insert(entry.uuid) {
-        return Err(E::ReusedUuid(entry.uuid));
+    if !uuids.insert(entry.proof_uuid) {
+        return Err(E::ReusedUuid(entry.proof_uuid));
     }
 
     static SHA256_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{64}$").expect("could not compile regex"));

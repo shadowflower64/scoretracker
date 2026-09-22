@@ -3,11 +3,8 @@ use constcat::concat;
 use function_name::named;
 use regex::Regex;
 use relative_path::RelativePath;
-use scoretracker::config::LegacyConfig;
 use scoretracker::data::library::entry::MediaCategory;
-use scoretracker::data::library::index::LibraryIndex;
-use scoretracker::util::filelocked::FileLockableData;
-use scoretracker::{info, log_fn_name, success};
+use scoretracker::log_fn_name;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 

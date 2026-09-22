@@ -42,6 +42,13 @@ pub struct Pagination {
     offset: u32,
 }
 
+pub struct DbExport {
+    pub players: Vec<Player>,
+    pub matches: Vec<Match>,
+    pub performances: Vec<Performance>,
+    pub proofs: Vec<LibraryEntry>,
+}
+
 /// Usually Vecs that contain database results use the pagination limit as their capacity,
 /// but that's bad if someone puts a "no limit" value (like 9999) as the pagination limit.
 /// We don't want to over-allocate an insane number of bytes if we know we don't have this many records in the database.
@@ -196,11 +203,46 @@ impl Database {
                     &[&player_uuid, &player_name],
                 )
                 .await?;
-            info_npr!("testing3");
             transaction.commit().await?;
 
             success!("added new player successfully ({count} rows affected)");
             Ok((player_uuid, true))
         }
+    }
+
+    #[named]
+    pub async fn export_all(&mut self) -> DbResult<DbExport> {
+        log_fn_name!(auto);
+
+        let transaction = self.client.transaction().await?;
+
+        let records = transaction.query("SELECT player_uuid, name FROM players", &[]).await?;
+        let mut players = Vec::with_capacity(records.len());
+        for record in records {
+            let player = Player::from_postgres_row(&record)?;
+            players.push(player);
+        }
+
+        let records = transaction.query("SELECT proof_uuid, sha256, library_urls, youtube_id, entry_kind, file_stat, media_metadata, media_category, content_description, cut, quality, cloth, dry, clips, timestamp_start, timestamp_end, duration, automatic_content_detection_information, tags, timestamp_added, metadata FROM library", &[]).await?;
+        let mut proofs = Vec::with_capacity(records.len());
+        for record in records {
+            let proof = LibraryEntry::from_postgres_row(&record)?;
+            proofs.push(proof);
+        }
+
+        let export = DbExport {
+            players,
+            matches: Vec::new(),
+            performances: Vec::new(),
+            proofs: Vec::new(),
+        };
+        success!(
+            "fetched {} players, {} matches, {} performances, {} proofs",
+            export.players.len(),
+            export.matches.len(),
+            export.performances.len(),
+            export.proofs.len()
+        );
+        Ok(export)
     }
 }

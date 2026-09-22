@@ -56,7 +56,7 @@ impl Put {
     }
 
     pub fn uuid(&self) -> UuidString {
-        self.entry().uuid
+        self.entry().proof_uuid
     }
 
     /// Returns the path that still points to a valid file that can be read.

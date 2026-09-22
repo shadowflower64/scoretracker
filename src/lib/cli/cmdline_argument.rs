@@ -1,5 +1,6 @@
 use crate::cli::cmdline_error::CmdlineError;
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
+use crate::db::schema_name::SafeSchemaName;
 use crate::hive::jobs::process_library_video::Operation;
 use std::{fmt, path::PathBuf, str::FromStr};
 
@@ -104,5 +105,11 @@ impl CmdlineArgument for StplUrl {
 impl CmdlineArgument for Operation {
     fn arg_type() -> &'static str {
         "video compression preset type"
+    }
+}
+
+impl CmdlineArgument for SafeSchemaName {
+    fn arg_type() -> &'static str {
+        "safe schema name"
     }
 }
