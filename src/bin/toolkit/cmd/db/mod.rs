@@ -54,6 +54,9 @@ pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
         let mut db = Database::connect_with_tokio_for_toolkit().await?;
         let export = db.export_all().await?;
         serde_jsonlines::write_json_lines(export_dir.join("players.jsonl"), export.players.iter())?;
+        serde_jsonlines::write_json_lines(export_dir.join("proofs.jsonl"), export.proofs.iter())?;
+        serde_jsonlines::write_json_lines(export_dir.join("performances.jsonl"), export.performances.iter())?;
+        serde_jsonlines::write_json_lines(export_dir.join("matches.jsonl"), export.matches.iter())?;
 
         Ok(())
     })

@@ -154,7 +154,7 @@ impl Job for ProcessLibraryVideoJob {
         let wet = worker
             .move_or_upload_proof_file(&destination_path, &self.destination, |entry| {
                 entry.dry = Some(dry.uuid());
-                entry.quality = self.operation.resulting_quality_state()
+                entry.quality = Some(self.operation.resulting_quality_state())
             })
             .await?;
 

@@ -28,14 +28,10 @@ use serde::{Deserialize, Serialize};
 /// Please note that videos originally recorded in low quality (like 360p) will still be classified as "raw",
 /// so this value does not correspond directly to the "perceptual quality" of the proof file.
 ///
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, FromSql, ToSql)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, FromSql, ToSql)]
 #[serde(rename_all = "snake_case")]
-#[postgres(rename_all = "snake_case")]
+#[postgres(name = "quality_state", rename_all = "snake_case")]
 pub enum QualityState {
-    /// Default value - value not selected by user yet.
-    #[default]
-    Unspecified,
-
     /// Raw unprocessed recording or replay file or stream vod, which may or may not have been cut using `ffmpeg` with with `-c copy`, or LosslessCut. Largest file and best quality.
     /// Not recommended to store for a long time.
     Raw,

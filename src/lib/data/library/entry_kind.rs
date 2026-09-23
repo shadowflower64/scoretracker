@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 /// Kind of the library entry - is it a proof of a performance or something else?
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, FromSql, ToSql)]
 #[serde(rename_all = "snake_case")]
-#[postgres(rename_all = "snake_case")]
+#[postgres(name = "library_entry_kind", rename_all = "snake_case")]
 pub enum LibraryEntryKind {
     /// Default value - value not selected by user yet.
     #[default]
-    #[serde(alias = "unset")] // temp alias for migration while testing, can be removed later (TODO)
+    // #[serde(alias = "unset")] // temp alias for migration while testing, can be removed later (TODO)
     Unspecified,
 
     /// Video not showing a performance, unrelated to proof stuff but still in library for some reason.

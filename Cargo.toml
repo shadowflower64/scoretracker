@@ -78,3 +78,4 @@ tokio-postgres = { version = "0.7.18", features = [
 ] }
 tokio = { version = "1.53.1", features = ["full"] }
 postgres-types = { version = "0.2.14", features = ["derive"] }
+hex = "0.4.3"

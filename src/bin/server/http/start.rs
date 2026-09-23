@@ -9,7 +9,6 @@ use crate::server::{
     },
 };
 use actix_web::{App, HttpServer, Scope};
-use chrono::Utc;
 use function_name::named;
 use scoretracker::{config::toml::TomlConfig, info, log_fn_name, success, util::relative_path_from_segments, warn};
 use smol::lock::Mutex;
@@ -20,7 +19,6 @@ use std::{
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use uuid::Uuid;
 
 pub const WEB_FRONTEND_DIR_PATH_SEGMENTS: &[&str] = &["web-frontend"];
 pub fn web_frontend_dir_path() -> PathBuf {

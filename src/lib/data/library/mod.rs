@@ -16,6 +16,7 @@
 pub mod automatic_content_detection_information;
 pub mod aux_data;
 pub mod cache;
+pub mod cloth_info;
 pub mod content_description;
 pub mod entry;
 pub mod entry_kind;
@@ -26,6 +27,7 @@ pub mod media_category;
 pub mod media_metadata;
 pub mod quality_state;
 pub mod root;
+pub mod sha256;
 pub mod stpl_url;
 pub mod tag;
 

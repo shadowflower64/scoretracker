@@ -234,7 +234,7 @@ impl Database {
             players,
             matches: Vec::new(),
             performances: Vec::new(),
-            proofs: Vec::new(),
+            proofs,
         };
         success!(
             "fetched {} players, {} matches, {} performances, {} proofs",

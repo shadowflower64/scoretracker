@@ -2185,6 +2185,7 @@ dependencies = [
  "dyn-clone",
  "fs_extra",
  "function_name",
+ "hex",
  "indexmap",
  "iso8601-duration",
  "linkme",

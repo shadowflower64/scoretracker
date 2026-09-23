@@ -5,7 +5,7 @@ use scoretracker::{
     config::LegacyConfig,
     data::{
         game::game_instance_from_id,
-        library::entry::LibraryEntry,
+        library::{entry::LibraryEntry, sha256::Sha256Hash},
         scoreboard::{r#match::MatchDetails, performance::Performance, player::Player},
     },
     db::Database,
@@ -211,9 +211,9 @@ pub enum LibraryEntryCheckError {
     #[error("reused uuid: {0}")]
     ReusedUuid(UuidString),
     #[error("invalid sha256 hash: {0}")]
-    InvalidSHA256Hash(String),
+    InvalidSha256Hash(Sha256Hash),
     #[error("duplicate sha256 hash: {0}")]
-    DuplicateSHA256Hash(String),
+    DuplicateSha256Hash(Sha256Hash),
     #[error("invalid youtube id: {0}")]
     InvalidYouTubeId(String),
     #[error("duplicate youtube id: {0}")]
@@ -231,7 +231,7 @@ pub enum LibraryEntryCheckError {
 fn check_library_entry(
     entry: &LibraryEntry,
     uuids: &mut HashSet<UuidString>,
-    sha256_hashes: &mut HashSet<String>,
+    sha256_hashes: &mut HashSet<Sha256Hash>,
     youtube_ids: &mut HashSet<String>,
 ) -> Result<(), LibraryEntryCheckError> {
     type E = LibraryEntryCheckError;
@@ -243,11 +243,11 @@ fn check_library_entry(
     static SHA256_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{64}$").expect("could not compile regex"));
     static YOUTUBE_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9A-Za-z-_]{11}$").expect("could not compile regex"));
     if let Some(sha256) = &entry.sha256 {
-        if !SHA256_REGEX.is_match(sha256) {
-            Err(E::InvalidSHA256Hash(sha256.clone()))?;
+        if !SHA256_REGEX.is_match(&sha256.to_string()) {
+            Err(E::InvalidSha256Hash(sha256.clone()))?;
         }
         if !sha256_hashes.insert(sha256.clone()) {
-            return Err(E::DuplicateSHA256Hash(sha256.clone()));
+            return Err(E::DuplicateSha256Hash(sha256.clone()));
         }
     } else if let Some(youtube_id) = &entry.youtube_id {
         if !YOUTUBE_ID_REGEX.is_match(youtube_id) {

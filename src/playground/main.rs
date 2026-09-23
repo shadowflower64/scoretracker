@@ -2,7 +2,6 @@ use ctrlc::{self};
 use function_name::named;
 use scoretracker::config::LegacyConfig;
 use scoretracker::data::game::game_instance_from_id;
-use scoretracker::data::library::library_scan_full;
 use scoretracker::hive::job::Job;
 use scoretracker::hive::jobs::display_message_and_sleep::DisplayMessageAndSleepJob;
 use scoretracker::hive::queue::TaskQueue;

@@ -7,67 +7,31 @@ use crate::{
     data::{
         library::{
             automatic_content_detection_information::AutomaticContentDetectionInformation,
+            cloth_info::ClothInfo,
             content_description::ContentDescription,
             entry_kind::LibraryEntryKind,
             file_stat::{FileStat, FileStats},
             media_category::MediaCategory,
             media_metadata::MediaMetadata,
             quality_state::QualityState,
+            sha256::Sha256Hash,
             stpl_url::StplUrl,
             tag::Tags,
         },
         scoreboard::metadata::ArbitraryMetadata,
     },
     util::{
-        timestamp::{NsDuration, NsLocalTimestamp, NsTimestamp},
+        timestamp::{NsDuration, NsTimestamp},
         uuid::UuidString,
     },
 };
-use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::{Deserialize, Serialize};
-use std::{error::Error, path::Path};
+use std::path::Path;
 use thiserror::Error;
 use uuid::Uuid;
 
 pub type GameId = String;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromSql, ToSql)]
-pub struct ClothInfo {
-    /// UUID of the cloth proof file.
-    pub uuid: UuidString,
-
-    /// Start point of the cut-out video within the cloth, in nanoseconds.
-    pub start_point: Option<NsLocalTimestamp>,
-
-    /// End point of the cut-out video within the cloth, in nanoseconds.
-    pub end_point: Option<NsLocalTimestamp>,
-}
-
-impl<'a> FromSql<'a> for AutomaticContentDetectionInformation {
-    fn accepts(ty: &postgres_types::Type) -> bool {
-        <serde_json::Value as FromSql>::accepts(ty)
-    }
-    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let value = serde_json::Value::from_sql(ty, raw)?;
-        Ok(serde_json::from_value(value)?)
-    }
-}
-
-impl ToSql for AutomaticContentDetectionInformation {
-    fn accepts(ty: &postgres_types::Type) -> bool
-    where
-        Self: Sized,
-    {
-        <serde_json::Value as ToSql>::accepts(ty)
-    }
-    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
-    where
-        Self: Sized,
-    {
-        serde_json::value::to_value(self.clone())?.to_sql(ty, out)
-    }
-    to_sql_checked! {}
-}
 /// An entry in the library database, containing information about proof videos and images, and other files inside of the library.
 ///
 /// Every unique file inside of the library should have exactly one library entry.
@@ -81,7 +45,7 @@ pub struct LibraryEntry {
     /// SHA256 hash of the file.
     ///
     /// [`None`] for YouTube proofs (for now at least).
-    pub sha256: Option<String>,
+    pub sha256: Option<Sha256Hash>,
 
     /// Known library locations of the file. Updated on rescan.
     pub library_urls: Vec<StplUrl>,
@@ -121,7 +85,9 @@ pub struct LibraryEntry {
     pub cut: Option<bool>,
 
     /// Is the video raw, compressed, crumpled, or shredded?
-    pub quality: QualityState,
+    ///
+    /// Set this to [`None`] if the quality state has not been selected by the user yet.
+    pub quality: Option<QualityState>,
 
     /// An entry UUID of the source media file that this file was cut out from. Files cut out from the same file are said to be "cut from the same cloth".
     ///
@@ -220,7 +186,7 @@ impl Default for LibraryEntry {
             media_category: MediaCategory::default(),
             content_description: ContentDescription::default(),
             cut: None,
-            quality: QualityState::default(),
+            quality: None,
             cloth: None,
             dry: None,
             clips: None,

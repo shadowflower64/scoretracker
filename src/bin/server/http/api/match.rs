@@ -4,10 +4,7 @@ use actix_web::{HttpRequest, get, put, web};
 use chrono::Utc;
 use function_name::named;
 use scoretracker::data::scoreboard::r#match::AnyMatchDetails;
-use scoretracker::{
-    info, log_fn_name,
-    util::{filelocked::FileLockableData, uuid::UuidString},
-};
+use scoretracker::{info, log_fn_name, util::uuid::UuidString};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;

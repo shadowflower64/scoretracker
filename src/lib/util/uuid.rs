@@ -70,27 +70,26 @@ impl Display for UuidString {
     }
 }
 
-struct UuidVisitor;
-
-impl<'de> Visitor<'de> for UuidVisitor {
-    type Value = UuidString;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a uuid string")
-    }
-
-    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-        Ok(UuidString(Uuid::from_str(v).unwrap()))
-    }
-
-    fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
-        self.visit_str(&v)
-    }
-}
-
 impl<'de> Deserialize<'de> for UuidString {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_str(UuidVisitor)
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = UuidString;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a uuid string")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(UuidString(Uuid::from_str(v).unwrap()))
+            }
+
+            fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
+                self.visit_str(&v)
+            }
+        }
+
+        deserializer.deserialize_str(V)
     }
 }
 

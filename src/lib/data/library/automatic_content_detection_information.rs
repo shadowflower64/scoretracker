@@ -1,3 +1,6 @@
+use std::error::Error;
+
+use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::{Deserialize, Serialize};
 
 use crate::util::timestamp::NsTimestamp;
@@ -29,4 +32,30 @@ pub struct AutomaticContentDetectionInformation {
     note_streak: AutomaticallyDetected<u64>,
     note_hits: AutomaticallyDetected<u64>,
     notes_total: AutomaticallyDetected<u64>,
+}
+
+impl<'a> FromSql<'a> for AutomaticContentDetectionInformation {
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        <serde_json::Value as FromSql>::accepts(ty)
+    }
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        Ok(serde_json::from_value(value)?)
+    }
+}
+
+impl ToSql for AutomaticContentDetectionInformation {
+    fn accepts(ty: &postgres_types::Type) -> bool
+    where
+        Self: Sized,
+    {
+        <serde_json::Value as ToSql>::accepts(ty)
+    }
+    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        serde_json::value::to_value(self.clone())?.to_sql(ty, out)
+    }
+    to_sql_checked! {}
 }
