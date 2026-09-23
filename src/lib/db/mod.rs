@@ -13,7 +13,7 @@ use crate::{
         scoreboard::{r#match::Match, performance::Performance, player::Player},
     },
     db::schema_name::SafeSchemaName,
-    info, info_npr, log_fn_name, success,
+    info, log_fn_name, success,
 };
 
 /// Asynchronous database connection.
@@ -230,10 +230,29 @@ impl Database {
             proofs.push(proof);
         }
 
+        let records = transaction.query("SELECT performance_uuid, player_uuid, match_uuid, game, chartset_id, instrument, difficulty, details, metadata, legit_fc, array_agg(proof_uuid) AS proofs FROM performances LEFT JOIN performance_proofs USING (performance_uuid) GROUP BY performance_uuid", &[]).await?;
+        let mut performances = Vec::with_capacity(records.len());
+        for record in records {
+            let performance = Performance::from_postgres_row(&record)?;
+            performances.push(performance);
+        }
+
+        let records = transaction
+            .query(
+                "SELECT match_uuid, timestamp, game, chartset_id, proof, details, metadata FROM matches",
+                &[],
+            )
+            .await?;
+        let mut matches = Vec::with_capacity(records.len());
+        for record in records {
+            let match_info = Match::from_postgres_row(&record)?;
+            matches.push(match_info);
+        }
+
         let export = DbExport {
             players,
-            matches: Vec::new(),
-            performances: Vec::new(),
+            matches,
+            performances,
             proofs,
         };
         success!(

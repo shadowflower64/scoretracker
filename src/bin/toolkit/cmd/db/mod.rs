@@ -43,6 +43,8 @@ pub fn current_time_condensed_string() -> String {
 
 #[named]
 pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
+    log_fn_name!(auto);
+
     let export_dir = if export_dir.exists() {
         Cow::Owned(export_dir.join(format!("export_{}", current_time_condensed_string())))
     } else {
@@ -57,6 +59,8 @@ pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
         serde_jsonlines::write_json_lines(export_dir.join("proofs.jsonl"), export.proofs.iter())?;
         serde_jsonlines::write_json_lines(export_dir.join("performances.jsonl"), export.performances.iter())?;
         serde_jsonlines::write_json_lines(export_dir.join("matches.jsonl"), export.matches.iter())?;
+
+        success!("exported database to: {export_dir:?}");
 
         Ok(())
     })

@@ -15,14 +15,20 @@ pub struct Match {
     /// UUID of the match.
     pub match_uuid: UuidString,
 
-    /// Timestamp of the match - specifically, the timestamp of the first frame of the end screen. Can be approximate.
+    /// Timestamp of the match.
+    ///
+    /// This value can be approximate.
+    /// If you want to be really specific and consistent, use the timestamp of the first frame of the end screen.
     pub timestamp: NsTimestamp,
+
+    /// Game ID.
+    pub game: String,
 
     /// Named ID of the chartset.
     pub chartset_id: String,
 
     /// List of library entry UUIDs that are proof of this match.
-    pub proof: Vec<UuidString>,
+    pub proofs: Vec<UuidString>,
 
     /// Game-specific details of the match.
     pub details: Box<AnyMatchDetails>,
@@ -36,8 +42,9 @@ impl Match {
         Ok(Self {
             match_uuid: row.try_get("match_uuid")?,
             timestamp: row.try_get("timestamp")?,
+            game: row.try_get("game")?,
             chartset_id: row.try_get("chartset_id")?,
-            proof: row.try_get("proof")?,
+            proofs: row.try_get("proof")?,
             details: row.try_get("details")?,
             metadata: row.try_get("metadata")?,
         })

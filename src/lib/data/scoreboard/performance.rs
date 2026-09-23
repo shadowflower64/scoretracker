@@ -21,8 +21,28 @@ pub struct Performance {
     /// Match UUID.
     pub match_uuid: UuidString,
 
+    /// Game ID. Has to match the game ID in the referenced match.
+    pub game: String,
+
+    /// Chartset ID. Has to match the chartset ID in the referenced match.
+    pub chartset_id: String,
+
+    /// Snake-case name of the instrument/play mode of the played chart.
+    ///
+    /// Examples:
+    /// * for osu! this is either `standard`, `taiko`, `mania`, or `catch`.
+    /// * for Guitar Hero this is either `guitar`, `bass`, `drums`, or `vocals`.
+    /// * for DJMAX RESPECT V this is `4k`, `5k`, `6k`, `8k`, `4b`, `5b`, `6b`, or `8b`.
+    /// * for Duolingo Music this is always `piano`.
+    ///
+    /// etc.
+    pub instrument: String,
+
+    /// Snake-case name of the difficulty of the played chart. (`easy`, `hard`, `insane`, etc...)
+    pub difficulty: String,
+
     /// List of library entry UUIDs that are proof of this performance.
-    pub proof: Vec<UuidString>,
+    pub proofs: Vec<UuidString>,
 
     /// Game-specific details of the performance.
     pub details: Box<AnyPerformanceDetails>,
@@ -37,7 +57,11 @@ impl Performance {
             performance_uuid: row.try_get("performance_uuid")?,
             player_uuid: row.try_get("player_uuid")?,
             match_uuid: row.try_get("match_uuid")?,
-            proof: row.try_get("proof")?,
+            game: row.try_get("game")?,
+            chartset_id: row.try_get("chartset_id")?,
+            instrument: row.try_get("instrument")?,
+            difficulty: row.try_get("difficulty")?,
+            proofs: row.try_get("proofs")?,
             details: row.try_get("details")?,
             metadata: row.try_get("metadata")?,
         })

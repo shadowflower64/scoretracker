@@ -299,8 +299,9 @@ fn parse_org_spreadsheet_matches(
             let match_data = Match {
                 match_uuid: Uuid::now_v7().into(),
                 timestamp: record.timestamp("timestamp", ctx.tz).or_skip()?,
+                game: game_id.to_string(),
                 chartset_id: record.string("song_id")?.to_owned(),
-                proof: Vec::new(),
+                proofs: Vec::new(),
                 metadata: ArbitraryMetadata::new(),
                 details: match_details,
             };

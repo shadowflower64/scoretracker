@@ -32,6 +32,7 @@ pub mod in_falsus;
 pub mod osu;
 pub mod phigros;
 pub mod pjd_megamix_plus;
+pub mod placeholder;
 pub mod rb3;
 pub mod rb4;
 pub mod rd;
