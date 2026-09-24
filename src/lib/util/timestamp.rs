@@ -1,7 +1,6 @@
 //! Module for nanosecond timestamp and duration structures: [`Nanoseconds`] and [`NsDuration`].
 use chrono::{DateTime, Local, SecondsFormat, TimeZone, Utc};
-use postgres::types::FromSql;
-use postgres_types::{ToSql, to_sql_checked};
+use postgres_types::{FromSql, ToSql, to_sql_checked};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, MapAccess};
 use serde::{Deserialize, Serialize, de::Visitor};
@@ -261,10 +260,10 @@ impl JsonSchema for NsTimestamp {
 }
 
 impl<'a> FromSql<'a> for NsTimestamp {
-    fn accepts(ty: &postgres::types::Type) -> bool {
+    fn accepts(ty: &postgres_types::Type) -> bool {
         <chrono::DateTime<Utc> as FromSql>::accepts(ty)
     }
-    fn from_sql(ty: &postgres::types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         Ok(NsTimestamp::from(chrono::DateTime::<Utc>::from_sql(ty, raw)?))
     }
 }

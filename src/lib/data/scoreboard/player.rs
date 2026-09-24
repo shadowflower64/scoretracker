@@ -8,7 +8,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn from_postgres_row(row: &postgres::Row) -> Result<Self, postgres::Error> {
+    pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
         Ok(Self {
             player_uuid: row.try_get("player_uuid")?,
             name: row.try_get("name")?,

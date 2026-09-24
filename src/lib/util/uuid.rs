@@ -1,6 +1,5 @@
 //! Module for [`UuidString`], a (de)serializable wrapper for [`Uuid`].
-use postgres::types::FromSql;
-use postgres_types::ToSql;
+use postgres_types::{FromSql, ToSql};
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::borrow::Cow;

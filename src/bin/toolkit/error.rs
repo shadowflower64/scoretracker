@@ -83,7 +83,7 @@ pub enum CmdError {
     #[error("spreadsheet import error: {0}")]
     SpreadsheetImportError(#[from] SpreadsheetImportError),
     #[error("postgres error: {0:?} {0}")]
-    PostgresError(#[from] postgres::Error),
+    PostgresError(#[from] tokio_postgres::Error),
     #[error("db error: {0}")]
     DbError(#[from] DbError),
 

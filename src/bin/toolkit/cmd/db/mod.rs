@@ -59,6 +59,7 @@ pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
         serde_jsonlines::write_json_lines(export_dir.join("proofs.jsonl"), export.proofs.iter())?;
         serde_jsonlines::write_json_lines(export_dir.join("performances.jsonl"), export.performances.iter())?;
         serde_jsonlines::write_json_lines(export_dir.join("matches.jsonl"), export.matches.iter())?;
+        serde_jsonlines::write_json_lines(export_dir.join("songs.jsonl"), export.songs.iter())?;
 
         success!("exported database to: {export_dir:?}");
 

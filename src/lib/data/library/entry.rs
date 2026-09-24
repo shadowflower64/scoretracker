@@ -143,7 +143,7 @@ impl Proof {
         self.file_stat.insert(url, FileStat::from_path(path));
     }
 
-    pub fn from_postgres_row(row: &postgres::Row) -> Result<Self, postgres::Error> {
+    pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
         Ok(Self {
             proof_uuid: row.try_get("proof_uuid")?,
             sha256: row.try_get("sha256")?,

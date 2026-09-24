@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use function_name::named;
 use thiserror::Error;
+use tokio_postgres::Transaction;
 use uuid::Uuid;
 
 use crate::{
@@ -11,6 +12,7 @@ use crate::{
     data::{
         library::{entry::Proof, stpl_url::LibraryDomain},
         scoreboard::{r#match::Match, performance::Performance, player::Player},
+        song::song::Song,
     },
     db::schema_name::SafeSchemaName,
     info, log_fn_name, success,
@@ -47,6 +49,7 @@ pub struct DbExport {
     pub matches: Vec<Match>,
     pub performances: Vec<Performance>,
     pub proofs: Vec<Proof>,
+    pub songs: Vec<Song>,
 }
 
 /// Usually Vecs that contain database results use the pagination limit as their capacity,
@@ -211,10 +214,8 @@ impl Database {
     }
 
     #[named]
-    pub async fn export_all(&mut self) -> DbResult<DbExport> {
+    pub async fn export_players<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Player>> {
         log_fn_name!(auto);
-
-        let transaction = self.client.transaction().await?;
 
         let records = transaction.query("SELECT player_uuid, name FROM players", &[]).await?;
         let mut players = Vec::with_capacity(records.len());
@@ -222,6 +223,12 @@ impl Database {
             let player = Player::from_postgres_row(&record)?;
             players.push(player);
         }
+        Ok(players)
+    }
+
+    #[named]
+    pub async fn export_proofs<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Proof>> {
+        log_fn_name!(auto);
 
         let records = transaction.query("SELECT proof_uuid, sha256, library_urls, youtube_id, entry_kind, file_stat, media_metadata, media_category, content_description, cut, quality, cloth, dry, clips, timestamp_start, timestamp_end, duration, automatic_content_detection_information, tags, timestamp_added, metadata FROM proofs", &[]).await?;
         let mut proofs = Vec::with_capacity(records.len());
@@ -229,6 +236,12 @@ impl Database {
             let proof = Proof::from_postgres_row(&record)?;
             proofs.push(proof);
         }
+        Ok(proofs)
+    }
+
+    #[named]
+    pub async fn export_performances<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Performance>> {
+        log_fn_name!(auto);
 
         let records = transaction.query("SELECT performance_uuid, player_uuid, match_uuid, game, chartset_id, instrument, difficulty, details, metadata, legit_fc, array_agg(proof_uuid) AS proofs FROM performances LEFT JOIN performance_proofs USING (performance_uuid) GROUP BY performance_uuid", &[]).await?;
         let mut performances = Vec::with_capacity(records.len());
@@ -236,6 +249,12 @@ impl Database {
             let performance = Performance::from_postgres_row(&record)?;
             performances.push(performance);
         }
+        Ok(performances)
+    }
+
+    #[named]
+    pub async fn export_matches<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Match>> {
+        log_fn_name!(auto);
 
         let records = transaction
             .query(
@@ -248,19 +267,48 @@ impl Database {
             let match_info = Match::from_postgres_row(&record)?;
             matches.push(match_info);
         }
+        Ok(matches)
+    }
+
+    #[named]
+    pub async fn export_songs<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Song>> {
+        log_fn_name!(auto);
+
+        let records = transaction.query("SELECT song_id, title, artist, year FROM songs", &[]).await?;
+        let mut songs = Vec::with_capacity(records.len());
+        for record in records {
+            let song = Song::from_postgres_row(&record)?;
+            songs.push(song);
+        }
+        Ok(songs)
+    }
+
+    #[named]
+    pub async fn export_all(&mut self) -> DbResult<DbExport> {
+        log_fn_name!(auto);
+
+        let transaction = self.client.transaction().await?;
+
+        let players = Self::export_players(&transaction).await?;
+        let proofs = Self::export_proofs(&transaction).await?;
+        let performances = Self::export_performances(&transaction).await?;
+        let matches = Self::export_matches(&transaction).await?;
+        let songs = Self::export_songs(&transaction).await?;
 
         let export = DbExport {
             players,
             matches,
             performances,
             proofs,
+            songs,
         };
         success!(
-            "fetched {} players, {} matches, {} performances, {} proofs",
+            "fetched {} players, {} matches, {} performances, {} proofs, {} songs from the database",
             export.players.len(),
             export.matches.len(),
             export.performances.len(),
-            export.proofs.len()
+            export.proofs.len(),
+            export.songs.len()
         );
         Ok(export)
     }

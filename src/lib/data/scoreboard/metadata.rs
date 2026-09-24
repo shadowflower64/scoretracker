@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use postgres::types::FromSql;
+use postgres_types::FromSql;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -20,12 +20,12 @@ impl ArbitraryMetadata {
 }
 
 impl<'a> FromSql<'a> for ArbitraryMetadata {
-    fn from_sql(ty: &postgres::types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         let value = serde_json::Value::from_sql(ty, raw)?;
         let index_map = serde_json::from_value(value)?;
         Ok(Self(index_map))
     }
-    fn accepts(ty: &postgres::types::Type) -> bool {
+    fn accepts(ty: &postgres_types::Type) -> bool {
         serde_json::Value::accepts(ty)
     }
 }

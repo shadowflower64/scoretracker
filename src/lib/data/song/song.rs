@@ -1,8 +1,11 @@
+use serde::{Deserialize, Serialize};
+
 /// This structure holds information about music.
 ///
 /// This struct contains data such as the song title, song artist, etc.
 /// Keep in mind that "song" means the music itself, and not a song within the context of a rhythm game (those are called [`Chartset`]s).
 /// Therefore, songs do not have information about charts.
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Song {
     /// Named ID of the song, most often follows the convention `lowercase_artist-lowercase_title[-lowercase_song_version]`.
     ///
@@ -25,5 +28,16 @@ pub struct Song {
     pub artist: String,
 
     /// Release year.
-    pub year: Option<u32>,
+    pub year: Option<i32>,
+}
+
+impl Song {
+    pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
+        Ok(Self {
+            song_id: row.try_get("song_id")?,
+            title: row.try_get("title")?,
+            artist: row.try_get("artist")?,
+            year: row.try_get("year")?,
+        })
+    }
 }

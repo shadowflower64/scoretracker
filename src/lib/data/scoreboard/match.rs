@@ -2,7 +2,7 @@ use crate::data::scoreboard::metadata::ArbitraryMetadata;
 use crate::util::timestamp::{NsDuration, NsTimestamp};
 use crate::util::{command_line::AskError, uuid::UuidString};
 use dyn_clone::{DynClone, clone_trait_object};
-use postgres::types::FromSql;
+use postgres_types::FromSql;
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -38,7 +38,7 @@ pub struct Match {
 }
 
 impl Match {
-    pub fn from_postgres_row(row: &postgres::Row) -> Result<Self, postgres::Error> {
+    pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
         Ok(Self {
             match_uuid: row.try_get("match_uuid")?,
             timestamp: row.try_get("timestamp")?,
@@ -68,13 +68,13 @@ clone_trait_object! {MatchDetails}
 pub type AnyMatchDetails = dyn MatchDetails + 'static;
 
 impl<'a> FromSql<'a> for Box<AnyMatchDetails> {
-    fn from_sql(ty: &postgres::types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         let value = serde_json::Value::from_sql(ty, raw)?;
         let details = serde_json::from_value(value)?;
         Ok(details)
     }
 
-    fn accepts(ty: &postgres::types::Type) -> bool {
+    fn accepts(ty: &postgres_types::Type) -> bool {
         serde_json::Value::accepts(ty)
     }
 }

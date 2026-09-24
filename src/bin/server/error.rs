@@ -11,7 +11,7 @@ pub enum ServerError {
     #[error("http server error: {0}")]
     HttpServerError(#[from] io::Error),
     #[error("postgres error: {0:?} {0}")]
-    DbError(#[from] postgres::Error),
+    DbError(#[from] tokio_postgres::Error),
 }
 
 impl ServerError {
