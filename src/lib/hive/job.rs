@@ -3,7 +3,7 @@
 //! A job is one action that has to be done by a [`crate::hive::worker`].
 //! One worker may take on a job, and then report a success, or a failure.
 use crate::data::library::cloth_info::ClothInfo;
-use crate::data::library::entry::LibraryEntry;
+use crate::data::library::entry::Proof;
 use crate::data::library::stpl_url::StplUrl;
 use crate::ffmpeg::FFmpegError;
 use crate::hive::jobs::cut_library_video::CutLibraryVideoJob;
@@ -52,7 +52,7 @@ pub enum Fail {
     #[error("could not find library entry with uuid: {0}")]
     EntryNotFound(UuidString),
     #[error("proof url is not present in the provided library entry: {expected_url}, {entry:?}")]
-    FileUrlNotFoundInLibraryEntry { expected_url: StplUrl, entry: Box<LibraryEntry> },
+    FileUrlNotFoundInLibraryEntry { expected_url: StplUrl, entry: Box<Proof> },
     #[error("cannot find path to file witin library dir: library: {library_dir:?}; target file: {target_file_path:?}")]
     CannotFindPathWithinLibraryDir { library_dir: PathBuf, target_file_path: PathBuf },
     #[error(

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     config::{toml::TomlConfigError, toolkit::ToolkitConfig},
     data::{
-        library::{entry::LibraryEntry, stpl_url::LibraryDomain},
+        library::{entry::Proof, stpl_url::LibraryDomain},
         scoreboard::{r#match::Match, performance::Performance, player::Player},
     },
     db::schema_name::SafeSchemaName,
@@ -46,7 +46,7 @@ pub struct DbExport {
     pub players: Vec<Player>,
     pub matches: Vec<Match>,
     pub performances: Vec<Performance>,
-    pub proofs: Vec<LibraryEntry>,
+    pub proofs: Vec<Proof>,
 }
 
 /// Usually Vecs that contain database results use the pagination limit as their capacity,
@@ -146,11 +146,11 @@ impl Database {
         todo!()
     }
 
-    pub async fn find_proof_by_youtube_id(&mut self, _youtube_id: &str) -> DbResult<Option<LibraryEntry>> {
+    pub async fn find_proof_by_youtube_id(&mut self, _youtube_id: &str) -> DbResult<Option<Proof>> {
         todo!()
     }
 
-    pub async fn find_proofs_by_youtube_id(&mut self, _youtube_ids: &[&str]) -> DbResult<Vec<LibraryEntry>> {
+    pub async fn find_proofs_by_youtube_id(&mut self, _youtube_ids: &[&str]) -> DbResult<Vec<Proof>> {
         todo!()
     }
 
@@ -223,10 +223,10 @@ impl Database {
             players.push(player);
         }
 
-        let records = transaction.query("SELECT proof_uuid, sha256, library_urls, youtube_id, entry_kind, file_stat, media_metadata, media_category, content_description, cut, quality, cloth, dry, clips, timestamp_start, timestamp_end, duration, automatic_content_detection_information, tags, timestamp_added, metadata FROM library", &[]).await?;
+        let records = transaction.query("SELECT proof_uuid, sha256, library_urls, youtube_id, entry_kind, file_stat, media_metadata, media_category, content_description, cut, quality, cloth, dry, clips, timestamp_start, timestamp_end, duration, automatic_content_detection_information, tags, timestamp_added, metadata FROM proofs", &[]).await?;
         let mut proofs = Vec::with_capacity(records.len());
         for record in records {
-            let proof = LibraryEntry::from_postgres_row(&record)?;
+            let proof = Proof::from_postgres_row(&record)?;
             proofs.push(proof);
         }
 

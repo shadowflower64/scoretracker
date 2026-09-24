@@ -5,7 +5,7 @@ use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::game_impl;
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::ParseSongRecordResult;
+use crate::spreadsheet::ParseChartsetRecordResult;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
 use crate::util::command_line::AskError;
@@ -116,7 +116,7 @@ impl Game for Beatstar {
         "beatstar"
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseChartsetRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 

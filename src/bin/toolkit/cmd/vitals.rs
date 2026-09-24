@@ -5,7 +5,7 @@ use scoretracker::{
     config::LegacyConfig,
     data::{
         game::game_instance_from_id,
-        library::{entry::LibraryEntry, sha256::Sha256Hash},
+        library::{entry::Proof, sha256::Sha256Hash},
         scoreboard::{r#match::MatchDetails, performance::Performance, player::Player},
     },
     db::Database,
@@ -229,7 +229,7 @@ pub enum LibraryEntryCheckError {
 }
 
 fn check_library_entry(
-    entry: &LibraryEntry,
+    entry: &Proof,
     uuids: &mut HashSet<UuidString>,
     sha256_hashes: &mut HashSet<Sha256Hash>,
     youtube_ids: &mut HashSet<String>,

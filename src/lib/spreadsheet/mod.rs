@@ -5,11 +5,11 @@ pub mod record;
 
 use crate::config::toml::TomlConfigError;
 use crate::config::toolkit::ToolkitConfig;
-use crate::data::game::song::AnySong;
 use crate::data::game::{AnyGame, Game, game_instance_from_id};
 use crate::data::scoreboard::r#match::{AnyMatchDetails, Match};
 use crate::data::scoreboard::metadata::ArbitraryMetadata;
 use crate::data::scoreboard::performance::AnyPerformanceDetails;
+use crate::data::song::chartset::AnyChartsetDetails;
 use crate::db::{Database, DbError};
 use crate::spreadsheet::ContinueOrQuit::{Continue, Quit};
 use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
@@ -61,7 +61,7 @@ impl From<BadRecordError> for ContinueOrQuit<BadRecordError> {
 }
 
 pub type ParseMatchRecordResult = ParseRecordResult<(Box<AnyMatchDetails>, Vec<Box<AnyPerformanceDetails>>)>;
-pub type ParseSongRecordResult = ParseRecordResult<Box<AnySong>>;
+pub type ParseChartsetRecordResult = ParseRecordResult<Box<AnyChartsetDetails>>;
 
 #[derive(Debug, Error)]
 pub enum BadRecordError {
@@ -334,7 +334,7 @@ fn parse_org_spreadsheet_matches(
     )
 }
 
-type SongList = Vec<Box<AnySong>>;
+type SongList = Vec<Box<AnyChartsetDetails>>;
 
 fn parse_org_spreadsheet_songs(
     game: AnyGame,

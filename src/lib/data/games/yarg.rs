@@ -1,7 +1,7 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
 use crate::data::game::Game;
-use crate::data::game::song::{Chartset, SongAlbumInfo};
 use crate::data::scoreboard::performance::{self, PerformanceDetails};
+use crate::data::song::chartset::ChartsetDetails;
 use crate::util::command_line::{AskError, ask_string, ask_u64, ask_yn};
 use crate::util::normalize_unsigned_to_unit_range;
 use crate::util::percentage::Percentage;
@@ -123,31 +123,13 @@ impl PerformanceDetails for YARGPerformanceDetails {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct YARGChartset {
-    pub global_song_id: Option<UuidString>,
-    pub title: String,
-    pub artist: String,
-    pub album: SongAlbumInfo,
+pub struct YARGChartsetDetails {
+    pub album: String,
     pub year: String,
 }
 
-impl Chartset for YARGChartset {
-    fn global_song_id(&self) -> Option<Uuid> {
-        self.global_song_id.map(|x| x.0)
-    }
-    fn title(&self) -> String {
-        self.title.clone()
-    }
-    fn artist(&self) -> String {
-        self.artist.clone()
-    }
-    fn album(&self) -> Option<SongAlbumInfo> {
-        Some(self.album.clone())
-    }
-    fn year(&self) -> Option<i64> {
-        self.year.parse().ok()
-    }
-}
+#[typetag::serde(name = "yarg")]
+impl ChartsetDetails for YARGChartsetDetails {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct YARG;

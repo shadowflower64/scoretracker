@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use function_name::named;
 
 use crate::{
-    data::library::entry::LibraryEntry, debug, hive::worker::DEBUG_WORKER_TEMP_FILE_CLEANUP, log_fn_name, log_should_print_debug,
+    data::library::entry::Proof, debug, hive::worker::DEBUG_WORKER_TEMP_FILE_CLEANUP, log_fn_name, log_should_print_debug,
     util::uuid::UuidString, warn,
 };
 
@@ -17,7 +17,7 @@ pub enum Put {
     ///
     /// Modifying this file *will not* modify the upload.
     Uploaded {
-        library_entry: LibraryEntry,
+        library_entry: Proof,
         original_path: PathBuf,
         delete_on_drop: bool,
     },
@@ -26,14 +26,14 @@ pub enum Put {
     ///
     /// Modifying this file *will* modify the upload.
     Moved {
-        library_entry: LibraryEntry,
+        library_entry: Proof,
         original_path: PathBuf,
         destination_path: PathBuf,
     },
 }
 
 impl Put {
-    pub fn new_uploaded(library_entry: LibraryEntry, original_path: PathBuf) -> Self {
+    pub fn new_uploaded(library_entry: Proof, original_path: PathBuf) -> Self {
         Self::Uploaded {
             library_entry,
             original_path,
@@ -41,7 +41,7 @@ impl Put {
         }
     }
 
-    pub fn new_moved(library_entry: LibraryEntry, original_path: PathBuf, destination_path: PathBuf) -> Self {
+    pub fn new_moved(library_entry: Proof, original_path: PathBuf, destination_path: PathBuf) -> Self {
         Self::Moved {
             library_entry,
             original_path,
@@ -49,7 +49,7 @@ impl Put {
         }
     }
 
-    pub fn entry(&self) -> &LibraryEntry {
+    pub fn entry(&self) -> &Proof {
         match self {
             Self::Uploaded { library_entry, .. } | Self::Moved { library_entry, .. } => library_entry,
         }

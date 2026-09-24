@@ -8,7 +8,7 @@ use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::ParseMatchRecordResult;
-use crate::spreadsheet::ParseSongRecordResult;
+use crate::spreadsheet::ParseChartsetRecordResult;
 use crate::spreadsheet::SkipOrQuit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
@@ -164,7 +164,7 @@ impl Game for ADOFAI {
         Ok((Box::new(match_details), vec![Box::new(performance_details)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseChartsetRecordResult {
         // Err(Critical(RecordError::NotImplemented))
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }

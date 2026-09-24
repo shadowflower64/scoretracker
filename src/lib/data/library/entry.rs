@@ -3,6 +3,7 @@
 //! A library database file is a file shared globally across libraries, that maps "proof UUIDs" to actual information and metadata about the proof.
 //! Every entry in a library database file contains information about the SHA256 hash of the proof file, the type of the file (recording, screenshot etc.),
 //! the modification timestamps of the file, the state of the file (is it linked to any score? is it uploaded?), as well as other information.
+
 use crate::{
     data::{
         library::{
@@ -32,13 +33,13 @@ use uuid::Uuid;
 
 pub type GameId = String;
 
-/// An entry in the library database, containing information about proof videos and images, and other files inside of the library.
+/// An entry in the proofs table, containing information about proof videos and images, and other files inside of libraries.
 ///
 /// Every unique file inside of the library should have exactly one library entry.
 /// Old files, which have been deleted, moved, or transcoded into other files, should *not* have their entries removed from the library.
 /// This is to preserve information about the source files for processed and cut files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LibraryEntry {
+pub struct Proof {
     /// UUID of the library entry / proof.
     pub proof_uuid: UuidString,
 
@@ -137,7 +138,7 @@ pub struct LibraryEntry {
     pub metadata: ArbitraryMetadata,
 }
 
-impl LibraryEntry {
+impl Proof {
     pub fn update_stat(&mut self, url: StplUrl, path: impl AsRef<Path>) {
         self.file_stat.insert(url, FileStat::from_path(path));
     }
@@ -169,7 +170,7 @@ impl LibraryEntry {
     }
 }
 
-impl Default for LibraryEntry {
+impl Default for Proof {
     fn default() -> Self {
         Self {
             // Explicitly set custom values

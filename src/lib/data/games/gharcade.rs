@@ -4,7 +4,7 @@ use crate::data::game::Game;
 use crate::data::scoreboard::r#match::{Match, MatchDetails};
 use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{BadRecordError, ContinueOrQuit::Continue, ParseSongRecordResult, context::Context};
+use crate::spreadsheet::{BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, context::Context};
 use crate::util::command_line::AskError;
 use crate::{game_impl, register_game};
 use schemars::JsonSchema;
@@ -166,7 +166,7 @@ impl Game for GuitarHeroArcade {
         "gharcade"
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseChartsetRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 

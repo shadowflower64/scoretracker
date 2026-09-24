@@ -12,7 +12,7 @@ pub mod ws;
 
 use crate::config::library_tab::{InternalLibraryAccessPath, InternalLibraryConnections, LibraryTab};
 use crate::config::toml::{TomlConfig, TomlConfigError};
-use crate::data::library::entry::LibraryEntry;
+use crate::data::library::entry::Proof;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::root::LibraryRoot;
@@ -454,7 +454,7 @@ impl Worker {
     }
 
     /// Fetches information about a library entry from the server.
-    pub async fn fetch_library_entry_by_uuid(&self, proof_uuid: Uuid) -> Result<Option<LibraryEntry>, WorkerError> {
+    pub async fn fetch_library_entry_by_uuid(&self, proof_uuid: Uuid) -> Result<Option<Proof>, WorkerError> {
         todo!()
     }
 
@@ -492,7 +492,7 @@ impl Worker {
         &self,
         file_to_upload: &Path,
         target_location: &StplUrl,
-        entry_mutator: impl Fn(&mut LibraryEntry),
+        entry_mutator: impl Fn(&mut Proof),
     ) -> Result<Put, WorkerError> {
         todo!()
     }

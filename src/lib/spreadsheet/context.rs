@@ -1,14 +1,14 @@
 use calamine::Hyperlink;
 use chrono_tz::Tz;
 
-use crate::data::library::entry::LibraryEntry;
+use crate::data::library::entry::Proof;
 use crate::data::scoreboard::player::Player;
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, BadRecordErrorWithContext, ParseRecordResult, SkipOrQuit};
 use crate::util::youtube_id;
 
 pub struct Context {
-    pub proofs_to_insert: Vec<LibraryEntry>,
+    pub proofs_to_insert: Vec<Proof>,
     pub tz: Tz,
     pub ok_match_record_count: u32,
     pub ok_song_record_count: u32,

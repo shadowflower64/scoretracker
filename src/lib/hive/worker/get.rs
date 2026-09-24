@@ -1,7 +1,7 @@
 use function_name::named;
 
 use crate::{
-    data::library::entry::LibraryEntry, debug, hive::worker::DEBUG_WORKER_TEMP_FILE_CLEANUP, log_fn_name, log_should_print_debug,
+    data::library::entry::Proof, debug, hive::worker::DEBUG_WORKER_TEMP_FILE_CLEANUP, log_fn_name, log_should_print_debug,
     util::uuid::UuidString, warn,
 };
 use std::path::{Path, PathBuf};
@@ -16,7 +16,7 @@ pub enum Get {
     ///
     /// Modifying this file *will not* modify the original.
     Downloaded {
-        library_entry: LibraryEntry,
+        library_entry: Proof,
         downloaded_file: PathBuf,
         delete_on_drop: bool,
     },
@@ -24,14 +24,11 @@ pub enum Get {
     /// The file is just a reference to an existing file on the filesystem. It should be treated as read-only.
     ///
     /// Modifying this file *will* modify the original.
-    Referenced {
-        library_entry: LibraryEntry,
-        referenced_file: PathBuf,
-    },
+    Referenced { library_entry: Proof, referenced_file: PathBuf },
 }
 
 impl Get {
-    pub fn new_downloaded(library_entry: LibraryEntry, downloaded_file: PathBuf) -> Self {
+    pub fn new_downloaded(library_entry: Proof, downloaded_file: PathBuf) -> Self {
         Self::Downloaded {
             library_entry,
             downloaded_file,
@@ -39,14 +36,14 @@ impl Get {
         }
     }
 
-    pub fn new_referenced(library_entry: LibraryEntry, referenced_file: PathBuf) -> Self {
+    pub fn new_referenced(library_entry: Proof, referenced_file: PathBuf) -> Self {
         Self::Referenced {
             library_entry,
             referenced_file,
         }
     }
 
-    pub fn entry(&self) -> &LibraryEntry {
+    pub fn entry(&self) -> &Proof {
         match self {
             Self::Downloaded { library_entry, .. } | Self::Referenced { library_entry, .. } => library_entry,
         }

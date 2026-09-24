@@ -4,7 +4,7 @@ use crate::data::scoreboard::r#match::{Match, MatchDetails};
 use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{BadRecordError, ParseSongRecordResult};
+use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult};
 use crate::util::command_line::AskError;
 use crate::{data::game::Game, spreadsheet::context::Context};
 use crate::{game_impl, register_game};
@@ -132,7 +132,7 @@ impl Game for Phigros {
         "phigros"
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseChartsetRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 

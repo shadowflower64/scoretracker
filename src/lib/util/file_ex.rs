@@ -1,4 +1,6 @@
 //! Extra file input/output functions.
+//!
+//! FIXME: this entire module has bad APIs and shouldn't really be used anymore.
 use serde::{Deserialize, Serialize};
 use std::fs::{self};
 use std::path::{Path, PathBuf};
@@ -34,9 +36,12 @@ impl Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
+#[deprecated]
 pub trait FileEx {
+    #[deprecated]
     fn file_path(&self) -> &Path;
 
+    #[deprecated]
     fn read_to_string(&self) -> io::Result<Option<String>> {
         match fs::read_to_string(self.file_path()) {
             Ok(content) => Ok(Some(content)),
@@ -50,6 +55,7 @@ pub trait FileEx {
         }
     }
 
+    #[deprecated]
     fn read_from_json<D: for<'a> Deserialize<'a>>(&self) -> Result<Option<D>> {
         let content = self.read_to_string().map_err(|e| Error::CannotReadFile {
             path: self.file_path().to_path_buf(),
@@ -66,6 +72,7 @@ pub trait FileEx {
         }
     }
 
+    #[deprecated]
     fn read_from_jsonlines<D: for<'a> Deserialize<'a>>(&self) -> Result<Option<Vec<D>>> {
         let result = serde_jsonlines::json_lines(self.file_path());
         match result {
@@ -88,10 +95,12 @@ pub trait FileEx {
         }
     }
 
+    #[deprecated]
     fn write<C: AsRef<[u8]>>(&self, contents: C) -> io::Result<()> {
         fs::write(self.file_path(), contents)
     }
 
+    #[deprecated]
     fn write_as_json<S: Serialize>(&self, serializable: S) -> Result<()> {
         let json = serde_json::to_string(&serializable).map_err(|e| Error::CannotSerializeJSON {
             path: self.file_path().to_path_buf(),
@@ -104,6 +113,7 @@ pub trait FileEx {
         Ok(())
     }
 
+    #[deprecated]
     fn write_as_json_pretty<S: Serialize>(&self, serializable: S) -> Result<()> {
         let json = serde_json::to_string_pretty(&serializable).map_err(|e| Error::CannotSerializeJSON {
             path: self.file_path().to_path_buf(),
@@ -116,6 +126,7 @@ pub trait FileEx {
         Ok(())
     }
 
+    #[deprecated]
     fn write_as_jsonlines<S: Serialize>(&self, serializable: &[S]) -> Result<()> {
         serde_jsonlines::write_json_lines(self.file_path(), serializable).map_err(|e| Error::CannotSerializeJSONLines {
             path: self.file_path().to_path_buf(),

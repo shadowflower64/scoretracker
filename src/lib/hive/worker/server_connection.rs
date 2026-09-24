@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    data::library::{entry::LibraryEntry, stpl_url::StplUrl},
+    data::library::{entry::Proof, stpl_url::StplUrl},
     hive::task::{Task, TaskResult},
     util::timestamp::NsTimestamp,
 };
@@ -21,7 +21,7 @@ impl ServerConnection {
         todo!()
     }
 
-    pub async fn get_library_entry_by_url(self: &Arc<Self>, url: &StplUrl) -> Result<LibraryEntry, ServerError> {
+    pub async fn get_library_entry_by_url(self: &Arc<Self>, url: &StplUrl) -> Result<Proof, ServerError> {
         todo!()
     }
 

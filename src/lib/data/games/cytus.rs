@@ -8,7 +8,7 @@ use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
-use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult, SkipOrQuit};
+use crate::spreadsheet::{ParseMatchRecordResult, ParseChartsetRecordResult, SkipOrQuit};
 use crate::util::command_line::AskError;
 use crate::util::percentage::Percentage;
 use crate::{game_impl, register_game};
@@ -151,7 +151,7 @@ impl Game for Cytus {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseChartsetRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 

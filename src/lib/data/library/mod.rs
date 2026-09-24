@@ -33,7 +33,7 @@ pub mod tag;
 
 use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::cache::LibraryCache;
-use crate::data::library::entry::LibraryEntry;
+use crate::data::library::entry::Proof;
 use crate::data::library::index::LibraryIndex;
 use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
@@ -295,7 +295,7 @@ pub fn scan_register_added_files(
     library_dir: &Path,
     library_db_path: &Path,
     file_paths: &[&Path],
-    entry_mutator: impl Fn(&mut LibraryEntry),
+    entry_mutator: impl Fn(&mut Proof),
     worker_info: Option<&WorkerInfo>,
 ) -> Result<HashMap<RelativePathBuf, Uuid>, LibraryScanError> {
     type E = LibraryScanError;
@@ -435,7 +435,7 @@ pub fn scan_register_added_file(
     library_dir: &Path,
     library_db_path: &Path,
     file_path: &Path,
-    entry_mutator: impl Fn(&mut LibraryEntry),
+    entry_mutator: impl Fn(&mut Proof),
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(RelativePathBuf, Uuid), LibraryScanError> {
     let pairs = scan_register_added_files(library_dir, library_db_path, &vec![file_path], entry_mutator, worker_info)?;

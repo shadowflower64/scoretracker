@@ -8,7 +8,7 @@ use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::data::scoreboard::{r#match::Match, performance::Performance};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseRecordResult, ParseSongRecordResult, SkipOrQuit};
+use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseRecordResult, ParseChartsetRecordResult, SkipOrQuit};
 use crate::util::percentage::Percentage;
 use crate::{game_impl, register_game};
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
@@ -241,7 +241,7 @@ impl Game for GuitarHeroWarriorsOfRock {
         Ok((Box::new(match_data), vec![Box::new(performance_data)]))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseChartsetRecordResult {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 

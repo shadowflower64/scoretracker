@@ -1,11 +1,9 @@
-pub mod song;
-
 use crate::data::games::registered_games;
 use crate::data::scoreboard::performance::AnyPerformanceDetails;
 use crate::spreadsheet::ContinueOrQuit::Quit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
-use crate::spreadsheet::{ParseMatchRecordResult, ParseSongRecordResult};
+use crate::spreadsheet::{ParseMatchRecordResult, ParseChartsetRecordResult};
 use crate::util::command_line::AskError;
 use schemars::Schema;
 use std::fmt::Debug;
@@ -26,7 +24,7 @@ pub trait Game: Debug {
         Err(Quit(BadRecordError::NotImplemented))
     }
 
-    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseSongRecordResult {
+    fn create_song_from_spreadsheet_record(&self, _record: &Record, _ctx: &mut Context) -> ParseChartsetRecordResult {
         Err(Quit(BadRecordError::NotImplemented))
     }
 
