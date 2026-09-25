@@ -20,7 +20,7 @@ npx tsc --watch
 ### Typescript type generation
 to generate typescript code from rust types run:
 ```sh
-cargo run schema gen
+cargo run gen all
 ```
 
 # Database setup
