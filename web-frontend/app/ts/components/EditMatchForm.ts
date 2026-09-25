@@ -1,26 +1,27 @@
 import { ComponentTemplate, place, select, type ComponentMadeFrom } from "../Component.js";
-import { Nanoseconds, type CommonMatchInfo, type MatchMetadata, type NsTimestamp } from "../scoretracker/DataStructures.js";
+import { Nanoseconds, type ArbitraryMetadata, type Match, type NsTimestamp } from "../scoretracker/DataStructures.js";
 import { MetadataTableEditor } from "./MetadataTableEditor.js";
 import { PerformanceTableEditor } from "./PerformanceTableEditor.js";
 import { ProofTableEditor } from "./ProofTableEditor.js";
 
 
-export function commonMatchInfoFromParts(genericPartTop: ComponentMadeFrom<typeof EditMatchDialogGenericPartTop>, genericPartBottom: ComponentMadeFrom<typeof EditMatchDialogGenericPartBottom>): CommonMatchInfo {
+export function commonMatchInfoFromParts(genericPartTop: ComponentMadeFrom<typeof EditMatchDialogGenericPartTop>, genericPartBottom: ComponentMadeFrom<typeof EditMatchDialogGenericPartBottom>): Match<null> {
     return {
         ...genericPartTop.component.getFormValues(),
-        ...genericPartBottom.component.getFormValues()
+        ...genericPartBottom.component.getFormValues(),
+        details: null,
     };
 }
 
 
-export const EditMatchDialogGenericPartTop = ComponentTemplate.named("edit-match-dialog-generic-part-top", (f, params: { uuid: string, timestamp: NsTimestamp, song_id: string; }) => {
+export const EditMatchDialogGenericPartTop = ComponentTemplate.named("edit-match-dialog-generic-part-top", (f, params: { match_uuid: string, timestamp: NsTimestamp, song_id: string; }) => {
     const uuid = select(f, "input", "#uuid");
     const timestampDate = select(f, "input", "#timestamp-date");
     const timestampTime = select(f, "input", "#timestamp-time");
     const timestampNanos = select(f, "input", "#timestamp-nanos");
     const songId = select(f, "input", "#song-id");
 
-    uuid.value = params.uuid;
+    uuid.value = params.match_uuid;
     const [date, nanosFrac] = Nanoseconds.dateParts(params.timestamp);
     timestampDate.valueAsDate = date;
     timestampTime.valueAsDate = date;
@@ -32,14 +33,14 @@ export const EditMatchDialogGenericPartTop = ComponentTemplate.named("edit-match
             const timestamp = Nanoseconds.fromMillisParts(Date.parse(`${timestampDate.value}T${timestampTime.value}`), timestampNanos.valueAsNumber);
             console.log(timestamp);
             return {
-                uuid: uuid.value,
+                match_uuid: uuid.value,
                 timestamp,
                 song_id: songId.value
             };
         }
     };
 });
-export const EditMatchDialogGenericPartBottom = ComponentTemplate.named("edit-match-dialog-generic-part-bottom", (f, params: { proof: string[], comment?: string | null, metadata: MatchMetadata; }) => {
+export const EditMatchDialogGenericPartBottom = ComponentTemplate.named("edit-match-dialog-generic-part-bottom", (f, params: { proofs: string[], comment?: string | null, metadata: ArbitraryMetadata; }) => {
     const comment = select(f, "textarea", "#comment");
     // const performanceTableEditor = place(f, "performance-table-editor", PerformanceTableEditor.create({ performanceIds: [] })); // TODO
     const proofTableEditor = place(f, "proof-table-editor", ProofTableEditor.create({ performanceIds: [] }));
@@ -48,7 +49,7 @@ export const EditMatchDialogGenericPartBottom = ComponentTemplate.named("edit-ma
         metadataTableEditor: metadataTableEditor.component,
         getFormValues() {
             return {
-                proof: proofTableEditor.component.getData(),
+                proofs: proofTableEditor.component.getData(),
                 comment: comment.value,
                 metadata: metadataTableEditor.component.getData()
             };

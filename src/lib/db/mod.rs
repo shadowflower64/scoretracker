@@ -15,7 +15,7 @@ use crate::{
         song::song::Song,
     },
     db::schema_name::SafeSchemaName,
-    info, log_fn_name, success,
+    debug, info, log_fn_name, log_should_print_debug, success,
 };
 
 /// Asynchronous database connection.
@@ -40,8 +40,8 @@ pub enum DbError {
 pub type DbResult<T> = Result<T, DbError>;
 
 pub struct Pagination {
-    limit: u32,
-    offset: u32,
+    pub limit: u32,
+    pub offset: u32,
 }
 
 pub struct DbExport {
@@ -60,13 +60,15 @@ const PREALLOCATE_CAPACITY_LIMIT: u32 = 100;
 
 impl Database {
     #[named]
-    pub async fn connect_with_actix_web(connection_string: &str, schema_name: &str) -> DbResult<Self> {
+    pub async fn connect_with_actix_web(connection_string: &str, schema_name: &SafeSchemaName) -> DbResult<Self> {
         log_fn_name!(auto);
+        log_should_print_debug!(false);
 
         let config = tokio_postgres::Config::from_str(connection_string)?;
-        // info!("config: {config:?}");
+        debug!("config: {config:?}");
 
         let (client, connection) = config.connect(tokio_postgres::NoTls).await?;
+        debug!("client");
 
         actix_web::rt::spawn(async move {
             if let Err(e) = connection.await {
@@ -84,11 +86,13 @@ impl Database {
     #[named]
     pub async fn connect_with_tokio(connection_string: &str, schema_name: &SafeSchemaName) -> DbResult<Self> {
         log_fn_name!(auto);
+        log_should_print_debug!(false);
 
         let config = tokio_postgres::Config::from_str(connection_string)?;
-        // info!("config: {config:?}");
+        debug!("config: {config:?}");
 
         let (client, connection) = config.connect(tokio_postgres::NoTls).await?;
+        debug!("client");
 
         tokio::task::spawn(async move {
             if let Err(e) = connection.await {

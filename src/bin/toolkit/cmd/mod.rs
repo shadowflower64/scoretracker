@@ -13,6 +13,7 @@ use scoretracker::hive::jobs::process_library_video::{Operation, ProcessLibraryV
 use scoretracker::util::timestamp::NsLocalTimestamp;
 use scoretracker::{info_npr, success_npr};
 use std::path::PathBuf;
+use tokio::runtime::Runtime;
 
 pub mod automark;
 pub mod config;
@@ -47,31 +48,38 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             }
             _ => ctx.unknown_cmd(),
         },
-        "db" => match ctx.cmd()? {
-            "export" => {
-                let export_dir: PathBuf = ctx.pull_arg("export_dir", "directory to export to")?;
-                cmd::db::export_jsonl(&export_dir)
-            }
-            "init" => {
-                let schema_name: SafeSchemaName = ctx.pull_arg("schema_name", "name for the new schema to create in the database")?;
-                cmd::db::init(schema_name)
-            }
-            "performance" => match ctx.cmd()? {
-                "add" => {
-                    let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
-                    cmd::db::performance::add(game_id)
+        "db" => {
+            // Database access requires tokio
+            let rt = Runtime::new()?;
+            rt.block_on(async {
+                match ctx.cmd()? {
+                    "export" => {
+                        let export_dir: PathBuf = ctx.pull_arg("export_dir", "directory to export to")?;
+                        cmd::db::export_jsonl(&export_dir)
+                    }
+                    "init" => {
+                        let schema_name: SafeSchemaName =
+                            ctx.pull_arg("schema_name", "name for the new schema to create in the database")?;
+                        cmd::db::init(schema_name)
+                    }
+                    "performance" => match ctx.cmd()? {
+                        "add" => {
+                            let game_id: String = ctx.pull_arg("game_id", "id of the game to add a performance for")?;
+                            cmd::db::performance::add(game_id)
+                        }
+                        _ => ctx.unknown_cmd(),
+                    },
+                    "player" => match ctx.cmd()? {
+                        "add" => {
+                            let name: String = ctx.pull_arg("name", "name of the player")?;
+                            cmd::db::player::add(name)
+                        }
+                        _ => ctx.unknown_cmd(),
+                    },
+                    _ => ctx.unknown_cmd(),
                 }
-                _ => ctx.unknown_cmd(),
-            },
-            "player" => match ctx.cmd()? {
-                "add" => {
-                    let name: String = ctx.pull_arg("name", "name of the player")?;
-                    cmd::db::player::add(name)
-                }
-                _ => ctx.unknown_cmd(),
-            },
-            _ => ctx.unknown_cmd(),
-        },
+            })
+        }
         "hive" => match ctx.cmd()? {
             "worker" => match ctx.cmd()? {
                 // TODO: rename to "start", "spawn" implies spawning a background process

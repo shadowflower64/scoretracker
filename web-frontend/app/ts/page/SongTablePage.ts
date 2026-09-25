@@ -20,12 +20,12 @@ export class SongTablePage extends AbstractPage {
         const editMatchBtn = EditMatchBtnInFalsus.create({
             // TODO: this is just an example button
             match: {
-                uuid: UUID7.generate().toString(),
+                match_uuid: UUID7.generate().toString(),
                 timestamp: Nanoseconds.fromMillisParts(Date.now(), 123456789),
                 song_id: "xi-freedom_dive",
-                proof: [],
-                comment: "Example user comment",
-                metadata: { abc: "def", ghi: 123, jkl: true }
+                proofs: [],
+                details: {},
+                metadata: { comment: "Example user comment", abc: "def", ghi: 123, jkl: true }
             }
         });
         screenDiv.append(editMatchBtn);

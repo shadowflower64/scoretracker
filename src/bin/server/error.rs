@@ -1,4 +1,4 @@
-use scoretracker::{cli::cmdline_error::CmdlineError, config::toml::TomlConfigError};
+use scoretracker::{cli::cmdline_error::CmdlineError, config::toml::TomlConfigError, db::DbError};
 use std::io;
 use thiserror::Error;
 
@@ -11,7 +11,9 @@ pub enum ServerError {
     #[error("http server error: {0}")]
     HttpServerError(#[from] io::Error),
     #[error("postgres error: {0:?} {0}")]
-    DbError(#[from] tokio_postgres::Error),
+    PostgresError(#[from] tokio_postgres::Error),
+    #[error("db error: {0}")]
+    DbError(#[from] DbError),
 }
 
 impl ServerError {

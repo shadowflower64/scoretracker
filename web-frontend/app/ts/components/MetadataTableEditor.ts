@@ -1,5 +1,5 @@
 import { ComponentTemplate, place, select, selectAll } from "../Component.js";
-import type { GenericMetadata, MetadataValue } from "../scoretracker/DataStructures.js";
+import type { ArbitraryMetadata, MetadataValue } from "../scoretracker/DataStructures.js";
 
 export function getMetadataValueType(value: MetadataValue) {
     if (typeof value === "boolean") {
@@ -61,7 +61,7 @@ export const MetadataTableEditorRow = ComponentTemplate.named("metadata-table-ed
     });
 });
 
-export const MetadataTableEditor = ComponentTemplate.named("metadata-table-editor", (f, params: { metadata: GenericMetadata; }) => {
+export const MetadataTableEditor = ComponentTemplate.named("metadata-table-editor", (f, params: { metadata: ArbitraryMetadata; }) => {
     const addRowBtn = select(f, "button", "#add-row-btn");
     const tbody = select(f, "tbody", "tbody");
     addRowBtn.addEventListener("click", () => {

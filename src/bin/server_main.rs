@@ -2,7 +2,7 @@ use function_name::named;
 use scoretracker::{error, info, log_fn_name, util::log};
 use std::process::ExitCode;
 
-use crate::server::http::start::http_server_start;
+use crate::server::http::start::http_server_start_runtime;
 
 mod server;
 
@@ -13,7 +13,7 @@ fn main() -> ExitCode {
     log_fn_name!(auto);
 
     info!("starting server");
-    match http_server_start() {
+    match http_server_start_runtime() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             error!("critical server error: {}", error);

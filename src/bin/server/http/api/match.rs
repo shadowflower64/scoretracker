@@ -4,6 +4,7 @@ use actix_web::{HttpRequest, get, put, web};
 use chrono::Utc;
 use function_name::named;
 use scoretracker::data::scoreboard::r#match::{AnyMatchDetails, Match};
+use scoretracker::db::Pagination;
 use scoretracker::{info, log_fn_name, util::uuid::UuidString};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -36,24 +37,14 @@ pub async fn list_matches(req: HttpRequest) -> ApiResult<ListRes, ()> {
     info!("received get request for match list");
 
     let globals = req.app_data::<ServerGlobals>().expect("app data should be present");
-    let db = globals.db.lock().await;
+    let mut db = globals.db.lock().await;
 
-    for row in db
-        .query(
-            "SELECT match_uuid, timestamp, game, chartset_id, proof, details, metadata FROM matches",
-            &[],
-        )
+    for match_info in db
+        .list_matches(Pagination { limit: 50, offset: 0 })
         .await
         .expect("sql statement could not be executed")
     {
-        let match_uuid: Uuid = row.get("match_uuid");
-        let timestamp: chrono::DateTime<Utc> = row.get("timestamp");
-        let game: String = row.get("game");
-        let chartset_id: String = row.get("chartset_id");
-        let proof: Vec<Uuid> = row.get("proof");
-        let details: serde_json::Value = row.get("details");
-        let metadata: serde_json::Value = row.get("metadata");
-        println!("match_uuid: {match_uuid}, chartset_id: {chartset_id}")
+        println!("match_uuid: {}, chartset_id: {}", match_info.match_uuid, match_info.chartset_id)
     }
     todo!()
     // TODO: remove the thing below, use the real db

@@ -14,8 +14,8 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), ServerError> {
             Ok(())
         }
         "start" => {
-            use crate::server::http::start::http_server_start;
-            http_server_start()?;
+            use crate::server::http::start::http_server_start_runtime;
+            http_server_start_runtime()?;
             Ok(())
         }
         _ => ctx.unknown_cmd(),

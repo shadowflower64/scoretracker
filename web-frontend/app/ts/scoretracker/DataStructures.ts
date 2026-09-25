@@ -90,16 +90,16 @@ export namespace Nanoseconds {
 export type NsTimestamp = Nanoseconds;
 export type NsDuration = Nanoseconds;
 
-export type MetadataValue = string | number | boolean;
-export type GenericMetadata = { [key: string]: MetadataValue; };
-export type MatchMetadata = { [key: string]: MetadataValue; };
-export type PerformanceMetadata = { [key: string]: MetadataValue; };
+export type MetadataValue = boolean | string | number | null | MetadataObject | MetadataArray;
+export type MetadataObject = { [key: string]: MetadataValue; };
+export type MetadataArray = MetadataValue[];
+export type ArbitraryMetadata = MetadataObject;
 
-export type CommonPerformanceInfo = {
+export type Performance<Details> = {
     /**
      * UUID of the performance.
      */
-    uuid: UuidString,
+    performance_uuid: UuidString,
 
     /**
      * Player UUID.
@@ -112,26 +112,31 @@ export type CommonPerformanceInfo = {
     match_uuid: UuidString,
 
     /**
-     * List of library entry UUIDs that are proof of this performance.
+     * Chart ID.
      */
-    proof: UuidString[],
+    chart_id: String,
 
     /**
-     * Optional user comment.
+     * List of library entry UUIDs that are proof of this performance.
      */
-    comment?: string | null,
+    proofs: UuidString[],
+
+    /**
+     * Game-specific details of the performance.
+     */
+    details: Details,
 
     /** 
      * Any additional performance metadata.
      */
-    metadata: PerformanceMetadata,
+    metadata: ArbitraryMetadata,
 };
 
-export type CommonMatchInfo = {
+export type Match<Details> = {
     /**
      * UUID of the match.
      */
-    uuid: UuidString,
+    match_uuid: UuidString,
 
     /** 
      * Timestamp of the match - specifically, the timestamp of the first frame of the end screen. Can be approximate.
@@ -139,22 +144,22 @@ export type CommonMatchInfo = {
     timestamp: NsTimestamp,
 
     /**
-     * Named ID of the song.
+     * Named ID of the chartset.
      */
     song_id: string,
 
     /**
      * List of library entry UUIDs that are proof of this match.
      */
-    proof: UuidString[],
+    proofs: UuidString[],
 
     /**
-     * Optional user comment.
+     * Game-specific details of the match.
      */
-    comment?: string | null,
+    details: Details,
 
     /**
      * Any additional match metadata.
      */
-    metadata: MatchMetadata,
+    metadata: ArbitraryMetadata,
 };
