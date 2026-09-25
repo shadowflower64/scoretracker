@@ -57,20 +57,6 @@ ALTER TYPE media_category OWNER TO scoretracker_dev;
 
 
 
--- Table: albums
--- DROP TABLE IF EXISTS albums;
-CREATE TABLE IF NOT EXISTS albums
-(
-    album_id text NOT NULL PRIMARY KEY,
-    title text,
-    artist text,
-    year integer
-)
-TABLESPACE pg_default;
-ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
-
-
-
 -- Table: songs
 -- DROP TABLE IF EXISTS songs;
 CREATE TABLE IF NOT EXISTS songs
@@ -78,23 +64,11 @@ CREATE TABLE IF NOT EXISTS songs
     song_id text NOT NULL PRIMARY KEY,
     title text,
     artist text,
+    album text,
     year integer
 )
 TABLESPACE pg_default;
-ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
-
-
-
--- Table: album_songs
--- DROP TABLE IF EXISTS album_songs;
-CREATE TABLE IF NOT EXISTS album_songs
-(
-    album_id text NOT NULL REFERENCES albums (album_id),
-    position integer NOT NULL,
-    song_id text NOT NULL REFERENCES songs (song_id)
-)
-TABLESPACE pg_default;
-ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
+ALTER TABLE IF EXISTS songs OWNER TO scoretracker_dev;
 
 
 
@@ -117,6 +91,7 @@ ALTER TABLE IF EXISTS chartsets OWNER TO scoretracker_dev;
 -- DROP TABLE IF EXISTS charts;
 CREATE TABLE IF NOT EXISTS charts
 (
+    chart_id text NOT NULL,
     game text NOT NULL,
     chartset_id text NOT NULL,
     instrument text NOT NULL,
@@ -124,7 +99,7 @@ CREATE TABLE IF NOT EXISTS charts
     details jsonb NOT NULL,
     chart_group text NOT NULL,
     song_id_override text REFERENCES songs (song_id),
-    PRIMARY KEY (game, chartset_id, instrument, difficulty),
+    PRIMARY KEY (chart_id),
     FOREIGN KEY (game, chartset_id) REFERENCES chartsets
 )
 TABLESPACE pg_default;
@@ -163,24 +138,6 @@ ALTER TABLE IF EXISTS library OWNER TO scoretracker_dev;
 
 
 
--- Table: matches
--- DROP TABLE IF EXISTS matches;
-CREATE TABLE IF NOT EXISTS matches
-(
-    match_uuid uuid NOT NULL PRIMARY KEY,
-    "timestamp" timestamp(6) with time zone NOT NULL,
-    game text NOT NULL,
-    chartset_id text NOT NULL,
-    proof uuid[] NOT NULL,
-    details jsonb NOT NULL,
-    metadata jsonb,
-    FOREIGN KEY (game, chartset_id) REFERENCES chartsets
-)
-TABLESPACE pg_default;
-ALTER TABLE IF EXISTS matches OWNER TO scoretracker_dev;
-
-
-
 -- Table: players
 -- DROP TABLE IF EXISTS players;
 CREATE TABLE IF NOT EXISTS players
@@ -193,6 +150,36 @@ ALTER TABLE IF EXISTS players OWNER TO scoretracker_dev;
 
 
 
+-- Table: matches
+-- DROP TABLE IF EXISTS matches;
+CREATE TABLE IF NOT EXISTS matches
+(
+    match_uuid uuid NOT NULL PRIMARY KEY,
+    "timestamp" timestamp(6) with time zone NOT NULL,
+    game text NOT NULL,
+    chartset_id text NOT NULL,
+    details jsonb NOT NULL,
+    metadata jsonb,
+    FOREIGN KEY (game, chartset_id) REFERENCES chartsets
+)
+TABLESPACE pg_default;
+ALTER TABLE IF EXISTS matches OWNER TO scoretracker_dev;
+
+
+
+-- Table: match_proofs
+-- DROP TABLE IF EXISTS match_proofs;
+CREATE TABLE IF NOT EXISTS match_proofs
+(
+    match_uuid uuid NOT NULL REFERENCES matches,
+    proof_uuid uuid NOT NULL REFERENCES library,
+    UNIQUE (match_uuid, proof_uuid)
+)
+TABLESPACE pg_default;
+ALTER TABLE IF EXISTS match_proofs OWNER TO scoretracker_dev;
+
+
+
 -- Table: performances
 -- DROP TABLE IF EXISTS performances;
 CREATE TABLE IF NOT EXISTS performances
@@ -200,14 +187,11 @@ CREATE TABLE IF NOT EXISTS performances
     performance_uuid uuid NOT NULL PRIMARY KEY,
     player_uuid uuid NOT NULL REFERENCES players,
     match_uuid uuid NOT NULL REFERENCES matches,
-    game text NOT NULL,
-    chartset_id text NOT NULL,
-    instrument text NOT NULL,
-    difficulty text NOT NULL,
+    chart_id text NOT NULL REFERENCES charts,
     details jsonb NOT NULL,
     metadata jsonb,
     legit_fc boolean,
-    FOREIGN KEY (game, chartset_id, instrument, difficulty) REFERENCES charts
+    FOREIGN KEY (chart_id) REFERENCES charts
 )
 TABLESPACE pg_default;
 ALTER TABLE IF EXISTS performances OWNER TO scoretracker_dev;

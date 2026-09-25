@@ -7,7 +7,7 @@ use std::{fmt, str::FromStr, sync::LazyLock};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-#[error("invalid schema name: '{0}' (needs to be use [a-z_] only)")]
+#[error("invalid schema name: '{0}' (needs to be use [a-zA-Z0-9_] only)")]
 pub struct InvalidSchemaName(String);
 
 #[derive(Debug, Clone)]
@@ -22,7 +22,8 @@ impl SafeSchemaName {
     }
 }
 
-pub static SAFE_SCHEMA_NAME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z_]{1,64}$").expect("could not compile regex"));
+pub static SAFE_SCHEMA_NAME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]{1,64}$").expect("could not compile regex"));
 
 impl FromStr for SafeSchemaName {
     type Err = InvalidSchemaName;

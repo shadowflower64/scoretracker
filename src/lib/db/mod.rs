@@ -75,7 +75,7 @@ impl Database {
         });
 
         success!("connected to database");
-        client.execute(&format!("SET search_path TO {schema_name}"), &[]).await?;
+        client.execute(&format!("SET search_path TO '{schema_name}'"), &[]).await?;
 
         success!("set database search path to '{schema_name}'");
         Ok(Self { client: client })
@@ -97,7 +97,7 @@ impl Database {
         });
 
         success!("connected to database");
-        client.execute(&format!("SET search_path TO {schema_name}"), &[]).await?;
+        client.execute(&format!("SET search_path TO '{schema_name}'"), &[]).await?;
 
         success!("set database search path to '{schema_name}'");
         Ok(Self { client: client })
