@@ -120,7 +120,7 @@ impl Game for Beatstar {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(BeatstarMatchDetails, BeatstarPerformanceDetails);
 }
 
 register_game!(Beatstar);

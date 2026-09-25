@@ -152,7 +152,7 @@ impl Game for Rizline {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(RizlineMatchDetails, RizlinePerformanceDetails);
 }
 
 register_game!(Rizline);

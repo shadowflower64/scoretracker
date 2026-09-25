@@ -132,7 +132,7 @@ impl Game for ProjectDIVAMegaMixPlus {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(PJDMegamixPlusMatchDetails, PJDMegamixPlusPerformanceDetails);
 }
 
 register_game!(ProjectDIVAMegaMixPlus);

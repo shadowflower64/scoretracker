@@ -8,7 +8,7 @@ use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::data::scoreboard::{r#match::Match, performance::Performance};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseChartsetRecordResult, SkipOrQuit};
+use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit};
 use crate::{game_impl, register_game};
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
 use schemars::JsonSchema;
@@ -184,7 +184,7 @@ impl Game for RockBand4 {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(RB4MatchDetails, RB4PerformanceDetails);
 }
 
 register_game!(RockBand4);

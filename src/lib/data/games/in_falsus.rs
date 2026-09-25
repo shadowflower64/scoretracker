@@ -193,7 +193,7 @@ impl Game for InFalsus {
         "in_falsus"
     }
 
-    game_impl!();
+    game_impl!(InFalsusMatchDetails, InFalsusPerformanceDetails);
 }
 
 register_game!(InFalsus);

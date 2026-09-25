@@ -1,0 +1,198 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "scoretracker",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/match": {
+      "get": {
+        "tags": [
+          "r#match"
+        ],
+        "operationId": "list_matches",
+        "responses": {
+          "200": {
+            "description": "TODO"
+          }
+        }
+      }
+    },
+    "/api/match/{uuid}": {
+      "get": {
+        "tags": [
+          "r#match"
+        ],
+        "operationId": "get_match",
+        "responses": {
+          "200": {
+            "description": "TODO"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "r#match"
+        ],
+        "operationId": "put_match",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnyMatchWrapper"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "TODO"
+          }
+        }
+      }
+    },
+    "/api/resolve_stpl_url": {
+      "get": {
+        "tags": [],
+        "operationId": "resolve_stpl_url",
+        "responses": {
+          "200": {
+            "description": "Domain resolved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The requested domain exists but it requires authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The requested domain exists but the requester has insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResult"
+                },
+                "example": {
+                  "status": "error",
+                  "message": "no permission to access this domain",
+                  "error_kind": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested domain is not known to the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResult"
+                },
+                "example": {
+                  "status": "error",
+                  "message": "domain name not known",
+                  "error_kind": "not_known"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnyMatchWrapper": {
+        "type": "object",
+        "description": "`ToSchema`-compatible wrapper for [`AnyMatch`]."
+      },
+      "ApiResult": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "result",
+              "status"
+            ],
+            "properties": {
+              "result": {
+                "$ref": "#/components/schemas/DomainResolved"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "result",
+              "status"
+            ],
+            "properties": {
+              "result": {
+                "$ref": "#/components/schemas/DomainResolved"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok_with_status"
+                ]
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DomainResolveError"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "error"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

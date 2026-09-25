@@ -138,7 +138,7 @@ impl Game for Deemo2 {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(Deemo2MatchDetails, Deemo2PerformanceDetails);
 }
 
 register_game!(Deemo2);

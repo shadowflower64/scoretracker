@@ -8,7 +8,7 @@ use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
-use crate::spreadsheet::{ParseMatchRecordResult, ParseChartsetRecordResult, SkipOrQuit};
+use crate::spreadsheet::{ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit};
 use crate::util::command_line::AskError;
 use crate::util::percentage::Percentage;
 use crate::{game_impl, register_game};
@@ -155,7 +155,7 @@ impl Game for Cytus {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(CytusMatchDetails, CytusPerformanceDetails);
 }
 
 register_game!(Cytus);

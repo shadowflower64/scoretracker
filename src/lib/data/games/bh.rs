@@ -14,7 +14,7 @@ use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::SkipOrQuit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{ParseMatchRecordResult, ParseChartsetRecordResult};
+use crate::spreadsheet::{ParseChartsetRecordResult, ParseMatchRecordResult};
 use crate::util::command_line::AskError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -179,7 +179,7 @@ impl Game for BandHero {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(BandHeroMatchDetails, BandHeroPerformanceDetails);
 }
 
 register_game!(BandHero);

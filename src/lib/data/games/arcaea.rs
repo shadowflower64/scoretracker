@@ -9,7 +9,7 @@ use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{ParseMatchRecordResult, ParseChartsetRecordResult};
+use crate::spreadsheet::{ParseChartsetRecordResult, ParseMatchRecordResult};
 use crate::util::command_line::AskError;
 use crate::{game_impl, register_game};
 use schemars::JsonSchema;
@@ -163,7 +163,7 @@ impl Game for Arcaea {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(ArcaeaMatchDetails, ArcaeaPerformanceDetails);
 }
 
 register_game!(Arcaea);

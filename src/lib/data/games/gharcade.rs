@@ -170,7 +170,7 @@ impl Game for GuitarHeroArcade {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(GHArcadeMatchDetails, GHArcadePerformanceDetails);
 }
 
 register_game!(GuitarHeroArcade);

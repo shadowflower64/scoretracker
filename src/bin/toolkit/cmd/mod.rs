@@ -17,11 +17,11 @@ use std::path::PathBuf;
 pub mod automark;
 pub mod config;
 pub mod db;
+pub mod r#gen;
 pub mod hive;
 pub mod library;
 pub mod log;
 pub mod paths;
-pub mod schema;
 pub mod spreadsheet;
 pub mod version;
 pub mod vitals;
@@ -198,15 +198,15 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             None | Some("show") => cmd::paths::show(),
             _ => ctx.unknown_cmd(),
         },
-        "schema" => match ctx.cmd()? {
-            "gen" => cmd::schema::gen_full(),
-            "gen-json" => cmd::schema::gen_json(),
-            "gen-types" => cmd::schema::gen_types(),
+        "gen" => match ctx.cmd()? {
+            "all" => cmd::r#gen::gen_all(),
+            "json-schema" => cmd::r#gen::gen_json_schema(),
+            "types" => cmd::r#gen::gen_typescript_type_definitions(),
 
             #[cfg(feature = "include-server-in-toolkit")]
-            "gen-api" => cmd::schema::gen_api(),
+            "api" => cmd::r#gen::gen_api(),
 
-            "clean" => cmd::schema::clean(),
+            "clean" => cmd::r#gen::clean(),
             _ => ctx.unknown_cmd(),
         },
         "server" => {

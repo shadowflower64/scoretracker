@@ -3,7 +3,7 @@ use crate::data::scoreboard::performance::AnyPerformanceDetails;
 use crate::spreadsheet::ContinueOrQuit::Quit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
-use crate::spreadsheet::{ParseMatchRecordResult, ParseChartsetRecordResult};
+use crate::spreadsheet::{ParseChartsetRecordResult, ParseMatchRecordResult};
 use crate::util::command_line::AskError;
 use schemars::Schema;
 use std::fmt::Debug;
@@ -75,15 +75,19 @@ macro_rules! game_impl {
         game_impl!(self);
     };
     ($module:tt) => {
+        game_impl!($module::MatchDetails, $module::PerformanceDetails);
+    };
+    ($match_details:path, $performance_details:path) => {
         /// Generate a [`schemars::Schema`] for this game's types.
         fn schema(&self) -> schemars::Schema {
             use schemars::{JsonSchema, schema_for};
             // Dummy struct for generating a schema with multiple types at once
             #[derive(JsonSchema)]
             struct __ {
-                __performance: $module::Performance,
-                __match: $module::Match,
-                //__song: $module::Song,
+                //__chartset_details: $chartset_details,
+                //__chart_details: $chart_details,
+                __match_details: $match_details,
+                __performance_details: $performance_details,
             }
             let schema = schema_for!(__);
             schema

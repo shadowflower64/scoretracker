@@ -8,7 +8,7 @@ use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::data::scoreboard::{r#match::Match, performance::Performance};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, ParseMatchRecordResult, ParseRecordResult, ParseChartsetRecordResult, SkipOrQuit};
+use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult, ParseMatchRecordResult, ParseRecordResult, SkipOrQuit};
 use crate::util::percentage::Percentage;
 use crate::{game_impl, register_game};
 use crate::{spreadsheet::record::Record, util::command_line::AskError};
@@ -245,7 +245,7 @@ impl Game for GuitarHeroWarriorsOfRock {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(GHWORMatchDetails, GHWORPerformanceDetails);
 }
 
 register_game!(GuitarHeroWarriorsOfRock);

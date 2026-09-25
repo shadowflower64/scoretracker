@@ -136,7 +136,7 @@ impl Game for Phigros {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(PhigrosMatchDetails, PhigrosPerformanceDetails);
 }
 
 register_game!(Phigros); // TODO

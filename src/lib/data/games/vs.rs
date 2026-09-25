@@ -8,7 +8,7 @@ use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::{BadRecordError, record::Record};
-use crate::spreadsheet::{ParseMatchRecordResult, ParseChartsetRecordResult};
+use crate::spreadsheet::{ParseChartsetRecordResult, ParseMatchRecordResult};
 use crate::util::command_line::AskError;
 use crate::{game_impl, register_game};
 use schemars::JsonSchema;
@@ -248,7 +248,7 @@ impl Game for VividStasis {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(VividStasisMatchDetails, VividStasisPerformanceDetails);
 }
 
 register_game!(VividStasis);

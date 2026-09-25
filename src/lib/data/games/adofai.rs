@@ -7,8 +7,8 @@ use crate::data::scoreboard::performance::Performance;
 use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::ParseMatchRecordResult;
 use crate::spreadsheet::ParseChartsetRecordResult;
+use crate::spreadsheet::ParseMatchRecordResult;
 use crate::spreadsheet::SkipOrQuit;
 use crate::spreadsheet::context::Context;
 use crate::spreadsheet::record::Record;
@@ -169,7 +169,7 @@ impl Game for ADOFAI {
         Err(Continue(BadRecordError::NotImplemented)) // TODO
     }
 
-    game_impl!();
+    game_impl!(ADOFAIMatchDetails, ADOFAIPerformanceDetails);
 }
 
 register_game!(ADOFAI);
