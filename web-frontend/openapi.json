@@ -43,7 +43,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnyMatchWrapper"
+                "$ref": "#/components/schemas/MatchWrapper"
               }
             }
           },
@@ -117,10 +117,6 @@
   },
   "components": {
     "schemas": {
-      "AnyMatchWrapper": {
-        "type": "object",
-        "description": "`ToSchema`-compatible wrapper for [`AnyMatch`]."
-      },
       "ApiResult": {
         "oneOf": [
           {
@@ -192,6 +188,10 @@
             ]
           }
         ]
+      },
+      "MatchWrapper": {
+        "type": "object",
+        "description": "`ToSchema`-compatible wrapper for [`Match`]."
       }
     }
   }

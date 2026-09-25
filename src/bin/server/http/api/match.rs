@@ -3,19 +3,19 @@ use crate::server::http::api::ApiResult;
 use actix_web::{HttpRequest, get, put, web};
 use chrono::Utc;
 use function_name::named;
-use scoretracker::data::scoreboard::r#match::AnyMatchDetails;
+use scoretracker::data::scoreboard::r#match::{AnyMatchDetails, Match};
 use scoretracker::{info, log_fn_name, util::uuid::UuidString};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// `ToSchema`-compatible wrapper for [`AnyMatch`].
-// TODO: make this generate an actually useful schema
+/// `ToSchema`-compatible wrapper for [`Match`].
+// TODO: delete this, Match should just implement ToSchema directly.
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct AnyMatchWrapper {
+pub struct MatchWrapper {
     #[serde(flatten)]
     #[schema(ignore = true)]
-    inner: Box<AnyMatchDetails>,
+    inner: Box<Match>,
 }
 
 #[derive(Serialize)]
@@ -99,7 +99,7 @@ pub async fn get_match(req: HttpRequest, path: web::Path<UuidString>) -> ApiResu
 pub async fn put_match(
     req: HttpRequest,
     path: web::Path<UuidString>,
-    body: web::Json<AnyMatchWrapper>,
+    body: web::Json<MatchWrapper>,
 ) -> ApiResult<Box<AnyMatchDetails>, ()> {
     log_fn_name!(auto);
 
