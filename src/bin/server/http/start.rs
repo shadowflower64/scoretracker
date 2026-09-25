@@ -14,7 +14,6 @@ use scoretracker::{config::toml::TomlConfig, db::Database, info, log_fn_name, su
 use smol::lock::Mutex;
 use std::{
     path::PathBuf,
-    str::FromStr,
     sync::{Arc, RwLock},
 };
 use utoipa::OpenApi;
@@ -24,24 +23,6 @@ pub const WEB_FRONTEND_DIR_PATH_SEGMENTS: &[&str] = &["web-frontend"];
 pub fn web_frontend_dir_path() -> PathBuf {
     relative_path_from_segments(WEB_FRONTEND_DIR_PATH_SEGMENTS).to_path(".")
 }
-
-// #[named]
-// async fn connect_to_db(database_connection_string: &str) -> Result<tokio_postgres::Client, tokio_postgres::Error> {
-//     log_fn_name!(auto);
-
-//     let config = tokio_postgres::Config::from_str(database_connection_string)?;
-//     // info!("config: {config:?}");
-
-//     let (client, connection) = config.connect(tokio_postgres::NoTls).await?;
-//     actix_web::rt::spawn(async move {
-//         if let Err(e) = connection.await {
-//             eprintln!("connection error: {}", e);
-//         }
-//     });
-
-//     success!("connected to database");
-//     Ok(client)
-// }
 
 #[tokio::main]
 #[named]
