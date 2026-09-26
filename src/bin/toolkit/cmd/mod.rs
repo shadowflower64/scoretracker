@@ -54,8 +54,12 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             rt.block_on(async {
                 match ctx.cmd()? {
                     "export" => {
-                        let export_dir: PathBuf = ctx.pull_arg("export_dir", "directory to export to")?;
+                        let export_dir: PathBuf = ctx.pull_arg("export_dir", "directory to export the jsonl files to")?;
                         cmd::db::export_jsonl(&export_dir)
+                    }
+                    "import" => {
+                        let import_dir: PathBuf = ctx.pull_arg("import_dir", "directory of jsonl files to import from")?;
+                        cmd::db::import_jsonl(&import_dir)
                     }
                     "init" => {
                         let schema_name: SafeSchemaName =

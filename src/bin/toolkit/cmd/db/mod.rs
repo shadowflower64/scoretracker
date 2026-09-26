@@ -8,8 +8,8 @@ use chrono::Local;
 use function_name::named;
 use scoretracker::{
     config::toolkit::ToolkitConfig,
-    db::{Database, DbError, schema_name::SafeSchemaName},
-    log_fn_name, success,
+    db::{Database, DbError, DbExport, schema_name::SafeSchemaName},
+    log_fn_name, success, warn,
 };
 
 pub const INIT_DB_SCRIPT: &str = include_str!("init_db.sql");
@@ -59,9 +59,37 @@ pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
         serde_jsonlines::write_json_lines(export_dir.join("proofs.jsonl"), export.proofs.iter())?;
         serde_jsonlines::write_json_lines(export_dir.join("performances.jsonl"), export.performances.iter())?;
         serde_jsonlines::write_json_lines(export_dir.join("matches.jsonl"), export.matches.iter())?;
+        // chartsets
+        // charts
         serde_jsonlines::write_json_lines(export_dir.join("songs.jsonl"), export.songs.iter())?;
 
         success!("exported database to: {export_dir:?}");
+
+        Ok(())
+    })
+}
+
+#[named]
+pub fn import_jsonl(import_dir: &Path) -> Result<(), CmdError> {
+    log_fn_name!(auto);
+
+    smol::block_on(async {
+        let mut db = Database::connect_with_tokio_for_toolkit().await?;
+        let import = DbExport {
+            players: serde_jsonlines::json_lines(import_dir.join("players.jsonl"))?
+                .enumerate()
+                .filter_map(|(i, result)| result.inspect_err(|e| warn!("invalid jsonl input data at line {i}: {e:?}")).ok())
+                .collect(),
+            proofs: Vec::new(),
+            performances: Vec::new(),
+            matches: Vec::new(),
+            songs: Vec::new(),
+            chartsets: Vec::new(),
+            charts: Vec::new(),
+        };
+        db.import_all(import).await?;
+
+        success!("imported database from: {import_dir:?}");
 
         Ok(())
     })

@@ -12,7 +12,7 @@ use crate::{
     data::{
         library::{entry::Proof, stpl_url::LibraryDomain},
         scoreboard::{r#match::Match, performance::Performance, player::Player},
-        song::song::Song,
+        song::{chart::Chart, chartset::Chartset, song::Song},
     },
     db::schema_name::SafeSchemaName,
     debug, info, log_fn_name, log_should_print_debug, success,
@@ -50,6 +50,8 @@ pub struct DbExport {
     pub performances: Vec<Performance>,
     pub proofs: Vec<Proof>,
     pub songs: Vec<Song>,
+    pub chartsets: Vec<Chartset>,
+    pub charts: Vec<Chart>,
 }
 
 /// Usually Vecs that contain database results use the pagination limit as their capacity,
@@ -299,13 +301,18 @@ impl Database {
         let matches = Self::export_matches(&transaction).await?;
         let songs = Self::export_songs(&transaction).await?;
 
+        transaction.commit().await?;
+
         let export = DbExport {
             players,
             matches,
             performances,
             proofs,
             songs,
+            chartsets: Vec::new(),
+            charts: Vec::new(),
         };
+
         success!(
             "fetched {} players, {} matches, {} performances, {} proofs, {} songs from the database",
             export.players.len(),
@@ -315,5 +322,44 @@ impl Database {
             export.songs.len()
         );
         Ok(export)
+    }
+
+    #[named]
+    pub async fn import_players<'a>(transaction: &Transaction<'a>, players: &[Player]) -> DbResult<()> {
+        log_fn_name!(auto);
+        info!("importing {} players", players.len());
+        for player in players {
+            transaction
+                .execute(
+                    "INSERT INTO players (player_uuid, name)
+                    VALUES ($1, $2)
+                    ON CONFLICT (player_uuid)
+                    DO UPDATE SET name = EXCLUDED.name",
+                    &[&player.player_uuid, &player.name],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    #[named]
+    pub async fn import_all(&mut self, import: DbExport) -> DbResult<()> {
+        log_fn_name!(auto);
+
+        let transaction = self.client.transaction().await?;
+
+        Self::import_players(&transaction, &import.players).await?;
+
+        transaction.commit().await?;
+
+        success!(
+            "imported {} players into the database",
+            import.players.len(),
+            // import.matches.len(),
+            // import.performances.len(),
+            // import.proofs.len(),
+            // import.songs.len()
+        );
+        Ok(())
     }
 }
