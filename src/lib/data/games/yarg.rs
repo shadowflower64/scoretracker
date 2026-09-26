@@ -2,13 +2,12 @@
 use crate::data::game::Game;
 use crate::data::scoreboard::performance::{self, PerformanceDetails};
 use crate::data::song::chartset::ChartsetDetails;
+use crate::register_game;
 use crate::util::command_line::{AskError, ask_string, ask_u64, ask_yn};
 use crate::util::normalize_unsigned_to_unit_range;
 use crate::util::percentage::Percentage;
-use crate::util::uuid::UuidString;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /// A playable part in the chart.
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
@@ -161,4 +160,4 @@ impl Game for YARG {
     }
 }
 
-// register_game!(YARG); // TODO
+register_game!(YARG);

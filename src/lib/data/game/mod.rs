@@ -45,10 +45,10 @@ pub type AnyGame = &'static (dyn Game + Send + Sync);
 /// ```
 /// use scoretracker::data::game::game_instance_from_id;
 ///
-/// let game = game_instance_from_id("yarg").unwrap();
+/// let game = game_instance_from_id("yarg").expect("game 'yarg' should be registered");
 /// assert_eq!(game.pretty_name(), "Yet Another Rhythm Game");
 ///
-/// let game = game_instance_from_id("gh3").unwrap();
+/// let game = game_instance_from_id("gh3").expect("game 'gh3' should be registered");
 /// assert_eq!(game.pretty_name(), "Guitar Hero III: Legends of Rock");
 ///
 /// let game = game_instance_from_id("nonexistent_game");
