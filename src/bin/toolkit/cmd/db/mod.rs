@@ -70,7 +70,9 @@ pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
     })
 }
 
+#[named]
 fn read_jsonl_file<T: DeserializeOwned>(path: &Path) -> Result<Vec<T>, io::Error> {
+    log_fn_name!(auto);
     Ok(serde_jsonlines::json_lines(path)?
         .enumerate()
         .filter_map(|(i, result)| result.inspect_err(|e| warn!("invalid jsonl input data at line {i}: {e:?}")).ok())
