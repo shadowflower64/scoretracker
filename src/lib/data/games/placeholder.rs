@@ -1,16 +1,36 @@
-//! Placeholder data structures for testing purposes only.
+//! Placeholder data structures for a non-existent game, for easy testing.
 
-use crate::data::game::Game;
-use crate::data::scoreboard::r#match::MatchDetails;
-use crate::data::scoreboard::performance::PerformanceDetails;
-use crate::data::scoreboard::{r#match::Match, performance::Performance};
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit};
-use crate::{game_impl, register_game};
-use crate::{spreadsheet::record::Record, util::command_line::AskError};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+        song::{chart::ChartDetails, chartset::ChartsetDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{
+        BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, ParseMatchRecordResult, context::Context, record::Record,
+    },
+    util::command_line::AskError,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+pub struct PlaceholderChartsetDetails {}
+
+#[typetag::serde(name = "placeholder")]
+impl ChartsetDetails for PlaceholderChartsetDetails {}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+pub struct PlaceholderChartDetails {}
+
+#[typetag::serde(name = "placeholder")]
+impl ChartDetails for PlaceholderChartDetails {
+    fn any_ref(&self) -> &dyn Any {
+        self
+    }
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct PlaceholderMatchDetails {}

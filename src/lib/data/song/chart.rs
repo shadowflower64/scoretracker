@@ -50,40 +50,67 @@ pub struct Chart {
 }
 
 impl Chart {
-    pub fn game_specific_details<T: ChartDetails + 'static>(&self) -> Option<&T> {
+    pub fn downcast_details<T: ChartDetails + 'static>(&self) -> Option<&T> {
         self.details.downcast_ref()
-    }
-
-    pub fn as_game_chart<'a, T: ChartDetails + 'static>(&'a self) -> Option<GameChart<'a, T>> {
-        let game_specific_details = self.game_specific_details();
-        game_specific_details.map(|x| GameChart {
-            game: &self.game,
-            chartset_id: &self.chartset_id,
-            instrument: &self.instrument,
-            difficulty: &self.difficulty,
-            chart_group: self.chart_group.as_ref().map(|x| x.as_str()),
-            details: x,
-        })
     }
 }
 
-// TODO: Testing
-// if this is ever necessary, it is possible to do... but i don't know if that's the best idea??
-// this is like "a view" into the chart that guarantees that the details field is of a given type
-// this can also be made for performance/match/chartset details
-//
-// but also you can just use fn `game_specific_details` and deal with the typed details struct by itself,
-// without carrying around references to every other field. and if you need other fields, you can just get a ref
-// to the original chart struct, instead of getting this GameChart borrow thing. i guess that only works if you have
-// shared refs, and not exclusive/mutable references but idk if having mutable references here would work anyway.
-#[derive(Debug, Clone)]
-pub struct GameChart<'a, Details: ChartDetails + 'static> {
-    pub game: &'a str,
-    pub chartset_id: &'a str,
-    pub instrument: &'a str,
-    pub difficulty: &'a str,
-    pub chart_group: Option<&'a str>,
-    pub details: &'a Details,
+#[cfg(test)]
+mod test {
+    use crate::data::{
+        games::placeholder::PlaceholderChartDetails,
+        song::chart::{Chart, ChartDetails},
+    };
+    use schemars::JsonSchema;
+    use serde::{Deserialize, Serialize};
+    use serde_json::json;
+    use std::any::Any;
+
+    #[test]
+    pub fn testing_downcast() {
+        // Some struct for testing
+        #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+        pub struct PlaceholderChartDetails2 {
+            pub note_count: Option<u32>,
+        }
+
+        #[typetag::serde(name = "placeholder2")]
+        impl ChartDetails for PlaceholderChartDetails2 {
+            fn any_ref(&self) -> &dyn Any {
+                self
+            }
+        }
+
+        // Identical structure, different type
+        #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+        pub struct PlaceholderChartDetails3 {
+            pub note_count: Option<u32>,
+        }
+
+        #[typetag::serde(name = "placeholder3")]
+        impl ChartDetails for PlaceholderChartDetails3 {
+            fn any_ref(&self) -> &dyn Any {
+                self
+            }
+        }
+
+        let cases = vec![
+            json!({"game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder"}}),
+            json!({"game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder2", "note_count": 1337}}),
+            json!({"game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder3", "note_count": 420}}),
+        ];
+        for json_data in cases {
+            println!("json data: {json_data}");
+            let chart: Chart = serde_json::from_value(json_data).unwrap();
+            println!("chart: {chart:?}");
+            let specific = chart.downcast_details::<PlaceholderChartDetails>();
+            println!("specific: {specific:?}");
+            let specific2 = chart.downcast_details::<PlaceholderChartDetails2>();
+            println!("specific2: {specific2:?}");
+            let specific3 = chart.downcast_details::<PlaceholderChartDetails3>();
+            println!("specific3: {specific3:?}");
+        }
+    }
 }
 
 #[typetag::serde(tag = "game")]
