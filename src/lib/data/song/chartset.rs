@@ -1,10 +1,12 @@
 use dyn_clone::{DynClone, clone_trait_object};
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 /// This structure represents a specific set of charts in one rhythm game.
 ///
 /// Pretty much osu!'s `beatmapset`, but for any game.
 /// Often these are called "songs", but in this repo "song" means the actual music, independent of any individual rhythm game.
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Chartset {
     /// Game ID - which game is this chartset in?
     pub game: String,
