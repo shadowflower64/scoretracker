@@ -2,12 +2,12 @@ use crate::toolkit::cmd::handle_command;
 use scoretracker::{cli::cmdline_context::CmdlineContext, error_npr, util::log};
 use std::{env::args, process::ExitCode};
 
-pub mod toolkit;
+mod toolkit;
 
 #[cfg(feature = "include-server-in-toolkit")]
-pub mod server;
+mod server;
 #[cfg(feature = "include-worker-in-toolkit")]
-pub mod worker;
+mod worker;
 
 fn main() -> ExitCode {
     let args: Vec<_> = args().collect();
