@@ -1,7 +1,8 @@
 use dyn_clone::{DynClone, clone_trait_object};
-use postgres_types::FromSql;
 use serde::{Deserialize, Serialize};
 use std::{any::Any, fmt::Debug};
+
+use crate::sql_json_impl;
 
 /// This structure represents a specific set of charts in one rhythm game.
 ///
@@ -45,7 +46,7 @@ impl Chartset {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait ChartsetDetails: Debug + DynClone + Any {
+pub trait ChartsetDetails: Debug + DynClone + Any + Send + Sync {
     fn game_id(&self) -> &'static str {
         self.typetag_name()
     }
@@ -62,15 +63,4 @@ impl dyn ChartsetDetails {
 
 clone_trait_object! {ChartsetDetails}
 pub type AnyChartsetDetails = dyn ChartsetDetails;
-
-impl<'a> FromSql<'a> for Box<AnyChartsetDetails> {
-    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let value = serde_json::Value::from_sql(ty, raw)?;
-        let details = serde_json::from_value(value)?;
-        Ok(details)
-    }
-
-    fn accepts(ty: &postgres_types::Type) -> bool {
-        serde_json::Value::accepts(ty)
-    }
-}
+sql_json_impl! {Box<AnyChartsetDetails>}

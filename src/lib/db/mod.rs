@@ -236,7 +236,9 @@ impl Database {
     pub async fn export_songs<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Song>> {
         log_fn_name!(auto);
         info!("exporting songs");
-        let records = transaction.query("SELECT song_id, title, artist, year FROM songs", &[]).await?;
+        let records = transaction
+            .query("SELECT song_id, title, artist, album, year FROM songs", &[])
+            .await?;
         let mut songs = Vec::with_capacity(records.len());
         for record in records {
             let song = Song::from_postgres_row(&record)?;
@@ -266,7 +268,7 @@ impl Database {
         info!("exporting charts");
         let records = transaction
             .query(
-                "SELECT chart_id, game, chartset_id, instrument, difficulty, chart_group, details FROM charts",
+                "SELECT chart_id, game, chartset_id, instrument, difficulty, chart_group, song_id_override, details FROM charts",
                 &[],
             )
             .await?;
@@ -298,7 +300,7 @@ impl Database {
         let records = transaction
             .query(
                 "
-                SELECT match_uuid, timestamp, game, chartset_id, details, metadata, array_agg(proof_uuid) AS proofs
+                SELECT match_uuid, timestamp, game, chartset_id, details, metadata, timestamp_added, array_remove(array_agg(proof_uuid), NULL) AS proofs
                 FROM matches
                 LEFT JOIN match_proofs USING (match_uuid)
                 GROUP BY match_uuid
@@ -321,7 +323,7 @@ impl Database {
         let records = transaction
             .query(
                 "
-            SELECT performance_uuid, player_uuid, match_uuid, chart_id, details, metadata, timestamp_added, legit_fc, array_agg(proof_uuid) AS proofs
+            SELECT performance_uuid, player_uuid, match_uuid, chart_id, details, metadata, timestamp_added, legit_fc, array_remove(array_agg(proof_uuid), NULL) AS proofs
             FROM performances
             LEFT JOIN performance_proofs USING (performance_uuid)
             GROUP BY performance_uuid
@@ -380,14 +382,253 @@ impl Database {
     pub async fn import_players<'a>(transaction: &Transaction<'a>, players: &[Player]) -> DbResult<()> {
         log_fn_name!(auto);
         info!("importing {} players", players.len());
+        let insert_statement = transaction
+            .prepare(
+                "INSERT INTO players (player_uuid, name)
+            VALUES ($1, $2)
+            ON CONFLICT (player_uuid)
+            DO UPDATE SET name = EXCLUDED.name",
+            )
+            .await?;
         for player in players {
+            transaction.execute(&insert_statement, &[&player.player_uuid, &player.name]).await?;
+        }
+        Ok(())
+    }
+
+    #[named]
+    pub async fn import_songs<'a>(transaction: &Transaction<'a>, songs: &[Song]) -> DbResult<()> {
+        log_fn_name!(auto);
+        info!("importing {} songs", songs.len());
+        let insert_statement = transaction
+            .prepare(
+                "INSERT INTO songs (song_id, title, artist, album, year)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (song_id)
+            DO UPDATE SET
+                title = EXCLUDED.title,
+                artist = EXCLUDED.artist,
+                album = EXCLUDED.album,
+                year = EXCLUDED.year",
+            )
+            .await?;
+        for song in songs {
             transaction
                 .execute(
-                    "INSERT INTO players (player_uuid, name)
-                    VALUES ($1, $2)
-                    ON CONFLICT (player_uuid)
-                    DO UPDATE SET name = EXCLUDED.name",
-                    &[&player.player_uuid, &player.name],
+                    &insert_statement,
+                    &[&song.song_id, &song.title, &song.artist, &song.album, &song.year],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    #[named]
+    pub async fn import_chartsets<'a>(transaction: &Transaction<'a>, chartsets: &[Chartset]) -> DbResult<()> {
+        log_fn_name!(auto);
+        info!("importing {} chartsets", chartsets.len());
+        let insert_statement = transaction
+            .prepare(
+                "INSERT INTO chartsets (game, chartset_id, song_id, title, artist, details)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (game, chartset_id)
+            DO UPDATE SET
+                song_id = EXCLUDED.song_id,
+                title = EXCLUDED.title,
+                artist = EXCLUDED.artist,
+                details = EXCLUDED.details",
+            )
+            .await?;
+        for chartset in chartsets {
+            transaction
+                .execute(
+                    &insert_statement,
+                    &[
+                        &chartset.game,
+                        &chartset.chartset_id,
+                        &chartset.song_id,
+                        &chartset.title,
+                        &chartset.artist,
+                        &chartset.details,
+                    ],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    #[named]
+    pub async fn import_charts<'a>(transaction: &Transaction<'a>, charts: &[Chart]) -> DbResult<()> {
+        log_fn_name!(auto);
+        info!("importing {} charts", charts.len());
+        let insert_statement = transaction
+            .prepare(
+                "INSERT INTO charts (chart_id, game, chartset_id, instrument, difficulty, chart_group, song_id_override, details)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (chart_id)
+            DO UPDATE SET
+                game = EXCLUDED.game,
+                chartset_id = EXCLUDED.chartset_id,
+                instrument = EXCLUDED.instrument,
+                difficulty = EXCLUDED.difficulty,
+                chart_group = EXCLUDED.chart_group,
+                song_id_override = EXCLUDED.song_id_override,
+                details = EXCLUDED.details",
+            )
+            .await?;
+        for chart in charts {
+            transaction
+                .execute(
+                    &insert_statement,
+                    &[
+                        &chart.chart_id,
+                        &chart.game,
+                        &chart.chartset_id,
+                        &chart.instrument,
+                        &chart.difficulty,
+                        &chart.chart_group,
+                        &chart.song_id_override,
+                        &chart.details,
+                    ],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    #[named]
+    pub async fn import_proofs<'a>(transaction: &Transaction<'a>, proofs: &[Proof]) -> DbResult<()> {
+        log_fn_name!(auto);
+        info!("importing {} proofs", proofs.len());
+        let insert_statement = transaction
+            .prepare(
+                "INSERT INTO proofs (proof_uuid, sha256, library_urls, youtube_id, entry_kind, file_stat, media_metadata, media_category, content_description, cut, quality, cloth, dry, clips, timestamp_start, timestamp_end, duration, automatic_content_detection_information, tags, timestamp_added, metadata)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+            ON CONFLICT (proof_uuid)
+            DO UPDATE SET
+                sha256 = EXCLUDED.sha256, 
+                library_urls = EXCLUDED.library_urls, 
+                youtube_id = EXCLUDED.youtube_id, 
+                entry_kind = EXCLUDED.entry_kind, 
+                file_stat = EXCLUDED.file_stat, 
+                media_metadata = EXCLUDED.media_metadata, 
+                media_category = EXCLUDED.media_category, 
+                content_description = EXCLUDED.content_description, 
+                cut = EXCLUDED.cut, 
+                quality = EXCLUDED.quality, 
+                cloth = EXCLUDED.cloth, 
+                dry = EXCLUDED.dry, 
+                clips = EXCLUDED.clips, 
+                timestamp_start = EXCLUDED.timestamp_start, 
+                timestamp_end = EXCLUDED.timestamp_end, 
+                duration = EXCLUDED.duration, 
+                automatic_content_detection_information = EXCLUDED.automatic_content_detection_information, 
+                tags = EXCLUDED.tags, 
+                timestamp_added = EXCLUDED.timestamp_added, 
+                metadata = EXCLUDED.metadata",
+            )
+            .await?;
+        for proof in proofs {
+            transaction
+                .execute(
+                    &insert_statement,
+                    &[
+                        &proof.proof_uuid,
+                        &proof.sha256,
+                        &proof.library_urls,
+                        &proof.youtube_id,
+                        &proof.entry_kind,
+                        &proof.file_stat,
+                        &proof.media_metadata,
+                        &proof.media_category,
+                        &proof.content_description,
+                        &proof.cut,
+                        &proof.quality,
+                        &proof.cloth,
+                        &proof.dry,
+                        &proof.clips,
+                        &proof.timestamp_start,
+                        &proof.timestamp_end,
+                        &proof.duration,
+                        &proof.automatic_content_detection_information,
+                        &proof.tags,
+                        &proof.timestamp_added,
+                        &proof.metadata,
+                    ],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    #[named]
+    pub async fn import_matches<'a>(transaction: &Transaction<'a>, matches: &[Match]) -> DbResult<()> {
+        log_fn_name!(auto);
+        info!("importing {} matches", matches.len());
+        let insert_statement = transaction
+            .prepare(
+                "INSERT INTO matches (match_uuid, timestamp, game, chartset_id, details, metadata, timestamp_added)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (match_uuid)
+            DO UPDATE SET
+                timestamp = EXCLUDED.timestamp,
+                game = EXCLUDED.game,
+                chartset_id = EXCLUDED.chartset_id,
+                details = EXCLUDED.details,
+                metadata = EXCLUDED.metadata,
+                timestamp_added = EXCLUDED.timestamp_added",
+            )
+            .await?;
+        for match_info in matches {
+            transaction
+                .execute(
+                    &insert_statement,
+                    &[
+                        &match_info.match_uuid,
+                        &match_info.timestamp,
+                        &match_info.game,
+                        &match_info.chartset_id,
+                        &match_info.details,
+                        &match_info.metadata,
+                        &match_info.timestamp_added,
+                    ],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    #[named]
+    pub async fn import_performances<'a>(transaction: &Transaction<'a>, performances: &[Performance]) -> DbResult<()> {
+        log_fn_name!(auto);
+        info!("importing {} performances", performances.len());
+        let insert_statement = transaction
+            .prepare(
+                "INSERT INTO performances (performance_uuid, player_uuid, match_uuid, chart_id, details, metadata, timestamp_added)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (performance_uuid)
+            DO UPDATE SET
+                player_uuid = EXCLUDED.player_uuid,
+                match_uuid = EXCLUDED.match_uuid,
+                chart_id = EXCLUDED.chart_id,
+                details = EXCLUDED.details,
+                metadata = EXCLUDED.metadata,
+                timestamp_added = EXCLUDED.timestamp_added",
+            )
+            .await?;
+        for performance in performances {
+            transaction
+                .execute(
+                    &insert_statement,
+                    &[
+                        &performance.performance_uuid,
+                        &performance.player_uuid,
+                        &performance.match_uuid,
+                        &performance.chart_id,
+                        &performance.details,
+                        &performance.metadata,
+                        &performance.timestamp_added,
+                    ],
                 )
                 .await?;
         }
@@ -401,6 +642,12 @@ impl Database {
         let transaction = self.client.transaction().await?;
 
         Self::import_players(&transaction, &import.players).await?;
+        Self::import_songs(&transaction, &import.songs).await?;
+        Self::import_chartsets(&transaction, &import.chartsets).await?;
+        Self::import_charts(&transaction, &import.charts).await?;
+        Self::import_proofs(&transaction, &import.proofs).await?;
+        Self::import_matches(&transaction, &import.matches).await?;
+        Self::import_performances(&transaction, &import.performances).await?;
 
         transaction.commit().await?;
 

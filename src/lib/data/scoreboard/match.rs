@@ -1,8 +1,8 @@
 use crate::data::metadata::ArbitraryMetadata;
+use crate::sql_json_impl;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::{command_line::AskError, uuid::UuidString};
 use dyn_clone::{DynClone, clone_trait_object};
-use postgres_types::FromSql;
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -58,7 +58,7 @@ impl Match {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait MatchDetails: Debug + DynClone + Any {
+pub trait MatchDetails: Debug + DynClone + Any + Send + Sync {
     fn game_id(&self) -> &'static str {
         self.typetag_name()
     }
@@ -82,18 +82,7 @@ impl dyn MatchDetails {
 
 clone_trait_object! {MatchDetails}
 pub type AnyMatchDetails = dyn MatchDetails;
-
-impl<'a> FromSql<'a> for Box<AnyMatchDetails> {
-    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let value = serde_json::Value::from_sql(ty, raw)?;
-        let details = serde_json::from_value(value)?;
-        Ok(details)
-    }
-
-    fn accepts(ty: &postgres_types::Type) -> bool {
-        serde_json::Value::accepts(ty)
-    }
-}
+sql_json_impl! {Box<AnyMatchDetails>}
 
 impl JsonSchema for Box<AnyMatchDetails> {
     fn schema_name() -> Cow<'static, str> {

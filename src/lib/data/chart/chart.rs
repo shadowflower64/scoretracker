@@ -1,7 +1,8 @@
 use dyn_clone::{DynClone, clone_trait_object};
-use postgres_types::FromSql;
 use serde::{Deserialize, Serialize};
 use std::{any::Any, fmt::Debug};
+
+use crate::sql_json_impl;
 
 /// This structure represents a single chart (one difficulty, one instrument).
 ///
@@ -49,6 +50,9 @@ pub struct Chart {
     /// If not present, the implicit value is: `game/chartset_id/instrument/difficulty`.
     pub chart_group: Option<String>,
 
+    /// Song ID for this chart specifically. Only present if it is different from the parent chartset's music ID.
+    pub song_id_override: Option<String>,
+
     /// Game-specific details about the chart (total note count etc.)
     pub details: Box<AnyChartDetails>,
 }
@@ -65,6 +69,7 @@ impl Chart {
             instrument: row.try_get("instrument")?,
             difficulty: row.try_get("difficulty")?,
             chart_group: row.try_get("chart_group")?,
+            song_id_override: row.try_get("song_id_override")?,
             details: row.try_get("details")?,
         })
     }
@@ -120,7 +125,7 @@ mod test {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait ChartDetails: Debug + DynClone + Any {
+pub trait ChartDetails: Debug + DynClone + Any + Send + Sync {
     fn game_id(&self) -> &'static str {
         self.typetag_name()
     }
@@ -137,15 +142,4 @@ impl dyn ChartDetails {
 
 clone_trait_object! {ChartDetails}
 pub type AnyChartDetails = dyn ChartDetails;
-
-impl<'a> FromSql<'a> for Box<AnyChartDetails> {
-    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let value = serde_json::Value::from_sql(ty, raw)?;
-        let details = serde_json::from_value(value)?;
-        Ok(details)
-    }
-
-    fn accepts(ty: &postgres_types::Type) -> bool {
-        serde_json::Value::accepts(ty)
-    }
-}
+sql_json_impl! {Box<AnyChartDetails>}

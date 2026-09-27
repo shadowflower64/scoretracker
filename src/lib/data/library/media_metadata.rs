@@ -1,12 +1,11 @@
 use std::{
     collections::HashMap,
-    error::Error,
     ops::{Deref, DerefMut},
 };
 
-use actix_web::web::BytesMut;
-use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::{Deserialize, Serialize};
+
+use crate::sql_json_impl;
 
 /// This type represents the internal metadata of a media file (creation_date, android version, video/audio stream count, other similar metadata).
 ///
@@ -36,28 +35,4 @@ impl DerefMut for MediaMetadata {
     }
 }
 
-impl<'a> FromSql<'a> for MediaMetadata {
-    fn accepts(ty: &postgres_types::Type) -> bool {
-        <serde_json::Value as FromSql>::accepts(ty)
-    }
-    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let value = serde_json::Value::from_sql(ty, raw)?;
-        Ok(Self(serde_json::from_value(value)?))
-    }
-}
-
-impl ToSql for MediaMetadata {
-    fn accepts(ty: &postgres_types::Type) -> bool
-    where
-        Self: Sized,
-    {
-        <serde_json::Value as ToSql>::accepts(ty)
-    }
-    fn to_sql(&self, ty: &postgres_types::Type, out: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
-    where
-        Self: Sized,
-    {
-        serde_json::value::to_value(self.0.clone())?.to_sql(ty, out)
-    }
-    to_sql_checked! {}
-}
+sql_json_impl! {MediaMetadata}

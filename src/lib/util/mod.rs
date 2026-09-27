@@ -18,6 +18,7 @@ pub mod lockfile;
 pub mod log;
 pub mod lossless_cut_project;
 pub mod percentage;
+pub mod sql_json;
 pub mod terminal_colors;
 pub mod timestamp;
 pub mod uuid;

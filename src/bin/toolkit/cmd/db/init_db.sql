@@ -57,6 +57,17 @@ ALTER TYPE media_category OWNER TO scoretracker_dev;
 
 
 
+-- Table: players
+-- DROP TABLE IF EXISTS players;
+CREATE TABLE IF NOT EXISTS players
+(
+    player_uuid uuid NOT NULL PRIMARY KEY,
+    name character varying(32)
+);
+ALTER TABLE IF EXISTS players OWNER TO scoretracker_dev;
+
+
+
 -- Table: songs
 -- DROP TABLE IF EXISTS songs;
 CREATE TABLE IF NOT EXISTS songs
@@ -96,9 +107,9 @@ CREATE TABLE IF NOT EXISTS charts
     chartset_id text NOT NULL,
     instrument text NOT NULL,
     difficulty text NOT NULL,
-    details jsonb NOT NULL,
-    chart_group text NOT NULL,
+    chart_group text,
     song_id_override text REFERENCES songs (song_id),
+    details jsonb NOT NULL,
     FOREIGN KEY (game, chartset_id) REFERENCES chartsets,
     UNIQUE (game, chartset_id, instrument, difficulty)
 );
@@ -111,9 +122,9 @@ ALTER TABLE IF EXISTS charts OWNER TO scoretracker_dev;
 CREATE TABLE IF NOT EXISTS proofs
 (
     proof_uuid uuid NOT NULL PRIMARY KEY,
-    sha256 bytea CHECK (bit_length(sha256) = 256),
+    sha256 bytea CHECK (bit_length(sha256) = 256) UNIQUE,
     library_urls text[] NOT NULL,
-    youtube_id character(11),
+    youtube_id character(11) UNIQUE,
     entry_kind library_entry_kind NOT NULL,
     file_stat jsonb,
     media_metadata jsonb,
@@ -133,17 +144,6 @@ CREATE TABLE IF NOT EXISTS proofs
     metadata jsonb
 );
 ALTER TABLE IF EXISTS proofs OWNER TO scoretracker_dev;
-
-
-
--- Table: players
--- DROP TABLE IF EXISTS players;
-CREATE TABLE IF NOT EXISTS players
-(
-    player_uuid uuid NOT NULL PRIMARY KEY,
-    name character varying(32)
-);
-ALTER TABLE IF EXISTS players OWNER TO scoretracker_dev;
 
 
 

@@ -18,14 +18,15 @@ pub struct Song {
     /// The title of the song. This may be different to how it appears in rhythm games.
     ///
     /// TODO: should this include information such as (blank Cover) or (blank Remix)? or should that be separate
-    pub title: String,
+    pub title: Option<String>,
 
     /// Song artist.
     ///
     /// Artist string - who made the song.
-    ///
-    /// TODO: maybe we should have this be an array with artist IDs?
-    pub artist: String,
+    pub artist: Option<String>,
+
+    /// Album name.
+    pub album: Option<String>,
 
     /// Release year.
     pub year: Option<i32>,
@@ -37,6 +38,7 @@ impl Song {
             song_id: row.try_get("song_id")?,
             title: row.try_get("title")?,
             artist: row.try_get("artist")?,
+            album: row.try_get("album")?,
             year: row.try_get("year")?,
         })
     }

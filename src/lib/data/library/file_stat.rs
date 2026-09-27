@@ -1,15 +1,13 @@
 use std::{
     collections::HashMap,
-    error::Error,
     fs,
     ops::{Deref, DerefMut},
     path::Path,
 };
 
-use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::{Deserialize, Serialize};
 
-use crate::{data::library::stpl_url::StplUrl, util::timestamp::NsTimestamp};
+use crate::{data::library::stpl_url::StplUrl, sql_json_impl, util::timestamp::NsTimestamp};
 
 /// Basic metadata about the file from the `stat` command.
 ///
@@ -82,28 +80,4 @@ impl DerefMut for FileStats {
     }
 }
 
-impl<'a> FromSql<'a> for FileStats {
-    fn accepts(ty: &postgres_types::Type) -> bool {
-        <serde_json::Value as FromSql>::accepts(ty)
-    }
-    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let value = serde_json::Value::from_sql(ty, raw)?;
-        Ok(Self(serde_json::from_value(value)?))
-    }
-}
-
-impl ToSql for FileStats {
-    fn accepts(ty: &postgres_types::Type) -> bool
-    where
-        Self: Sized,
-    {
-        <serde_json::Value as ToSql>::accepts(ty)
-    }
-    fn to_sql(&self, ty: &postgres_types::Type, out: &mut actix_web::web::BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
-    where
-        Self: Sized,
-    {
-        serde_json::value::to_value(self.0.clone())?.to_sql(ty, out)
-    }
-    to_sql_checked! {}
-}
+sql_json_impl! {FileStats}
