@@ -579,6 +579,14 @@ impl Database {
                 timestamp_added = EXCLUDED.timestamp_added",
             )
             .await?;
+        let insert_proof_statement = transaction
+            .prepare(
+                "INSERT INTO match_proofs (match_uuid, proof_uuid)
+            VALUES ($1, $2)
+            ON CONFLICT (match_uuid, proof_uuid)
+            DO NOTHING",
+            )
+            .await?;
         for match_info in matches {
             transaction
                 .execute(
@@ -594,6 +602,12 @@ impl Database {
                     ],
                 )
                 .await?;
+
+            for proof_uuid in &match_info.proofs {
+                transaction
+                    .execute(&insert_proof_statement, &[&match_info.match_uuid, &proof_uuid])
+                    .await?;
+            }
         }
         Ok(())
     }
@@ -616,6 +630,14 @@ impl Database {
                 timestamp_added = EXCLUDED.timestamp_added",
             )
             .await?;
+        let insert_proof_statement = transaction
+            .prepare(
+                "INSERT INTO performance_proofs (performance_uuid, proof_uuid)
+            VALUES ($1, $2)
+            ON CONFLICT (performance_uuid, proof_uuid)
+            DO NOTHING",
+            )
+            .await?;
         for performance in performances {
             transaction
                 .execute(
@@ -631,6 +653,12 @@ impl Database {
                     ],
                 )
                 .await?;
+
+            for proof_uuid in &performance.proofs {
+                transaction
+                    .execute(&insert_proof_statement, &[&performance.performance_uuid, &proof_uuid])
+                    .await?;
+            }
         }
         Ok(())
     }
