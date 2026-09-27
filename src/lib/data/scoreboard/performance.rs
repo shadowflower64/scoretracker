@@ -1,5 +1,5 @@
 use crate::data::metadata::ArbitraryMetadata;
-use crate::util::timestamp::NsDuration;
+use crate::util::timestamp::{NsDuration, NsTimestamp};
 use crate::util::{command_line::AskError, uuid::UuidString};
 use dyn_clone::{DynClone, clone_trait_object};
 use postgres_types::FromSql;
@@ -32,6 +32,9 @@ pub struct Performance {
 
     /// Any additional performance metadata.
     pub metadata: ArbitraryMetadata,
+
+    /// Timestamp of when this performance was added to the database.
+    pub timestamp_added: NsTimestamp,
 }
 
 impl Performance {
@@ -44,6 +47,7 @@ impl Performance {
             proofs: row.try_get("proofs")?,
             details: row.try_get("details")?,
             metadata: row.try_get("metadata")?,
+            timestamp_added: row.try_get("timestamp_added")?,
         })
     }
 }

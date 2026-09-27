@@ -141,3 +141,16 @@ impl FileEx for Path {
         self
     }
 }
+
+pub fn read_from_jsonlines<D: for<'a> Deserialize<'a>>(path: impl AsRef<Path>) -> Result<Vec<D>> {
+    serde_jsonlines::json_lines(path.as_ref())
+        .map_err(|e| Error::CannotReadFile {
+            path: path.as_ref().to_path_buf(),
+            e,
+        })?
+        .collect::<io::Result<Vec<D>>>()
+        .map_err(|e| Error::CannotDeserializeJSONLines {
+            path: path.as_ref().to_path_buf(),
+            e,
+        })
+}

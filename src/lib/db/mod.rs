@@ -46,12 +46,12 @@ pub struct Pagination {
 
 pub struct DbExport {
     pub players: Vec<Player>,
-    pub matches: Vec<Match>,
-    pub performances: Vec<Performance>,
-    pub proofs: Vec<Proof>,
     pub songs: Vec<Song>,
     pub chartsets: Vec<Chartset>,
     pub charts: Vec<Chart>,
+    pub proofs: Vec<Proof>,
+    pub matches: Vec<Match>,
+    pub performances: Vec<Performance>,
 }
 
 /// Usually Vecs that contain database results use the pagination limit as their capacity,
@@ -222,7 +222,7 @@ impl Database {
     #[named]
     pub async fn export_players<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Player>> {
         log_fn_name!(auto);
-
+        info!("exporting players");
         let records = transaction.query("SELECT player_uuid, name FROM players", &[]).await?;
         let mut players = Vec::with_capacity(records.len());
         for record in records {
@@ -233,9 +233,55 @@ impl Database {
     }
 
     #[named]
+    pub async fn export_songs<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Song>> {
+        log_fn_name!(auto);
+        info!("exporting songs");
+        let records = transaction.query("SELECT song_id, title, artist, year FROM songs", &[]).await?;
+        let mut songs = Vec::with_capacity(records.len());
+        for record in records {
+            let song = Song::from_postgres_row(&record)?;
+            songs.push(song);
+        }
+        Ok(songs)
+    }
+
+    #[named]
+    pub async fn export_chartsets<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Chartset>> {
+        log_fn_name!(auto);
+        info!("exporting chartsets");
+        let records = transaction
+            .query("SELECT game, chartset_id, song_id, title, artist, details FROM chartsets", &[])
+            .await?;
+        let mut chartsets = Vec::with_capacity(records.len());
+        for record in records {
+            let chartset = Chartset::from_postgres_row(&record)?;
+            chartsets.push(chartset);
+        }
+        Ok(chartsets)
+    }
+
+    #[named]
+    pub async fn export_charts<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Chart>> {
+        log_fn_name!(auto);
+        info!("exporting charts");
+        let records = transaction
+            .query(
+                "SELECT chart_id, game, chartset_id, instrument, difficulty, chart_group, details FROM charts",
+                &[],
+            )
+            .await?;
+        let mut charts = Vec::with_capacity(records.len());
+        for record in records {
+            let chart = Chart::from_postgres_row(&record)?;
+            charts.push(chart);
+        }
+        Ok(charts)
+    }
+
+    #[named]
     pub async fn export_proofs<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Proof>> {
         log_fn_name!(auto);
-
+        info!("exporting proofs");
         let records = transaction.query("SELECT proof_uuid, sha256, library_urls, youtube_id, entry_kind, file_stat, media_metadata, media_category, content_description, cut, quality, cloth, dry, clips, timestamp_start, timestamp_end, duration, automatic_content_detection_information, tags, timestamp_added, metadata FROM proofs", &[]).await?;
         let mut proofs = Vec::with_capacity(records.len());
         for record in records {
@@ -246,25 +292,17 @@ impl Database {
     }
 
     #[named]
-    pub async fn export_performances<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Performance>> {
-        log_fn_name!(auto);
-
-        let records = transaction.query("SELECT performance_uuid, player_uuid, match_uuid, game, chartset_id, instrument, difficulty, details, metadata, legit_fc, array_agg(proof_uuid) AS proofs FROM performances LEFT JOIN performance_proofs USING (performance_uuid) GROUP BY performance_uuid", &[]).await?;
-        let mut performances = Vec::with_capacity(records.len());
-        for record in records {
-            let performance = Performance::from_postgres_row(&record)?;
-            performances.push(performance);
-        }
-        Ok(performances)
-    }
-
-    #[named]
     pub async fn export_matches<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Match>> {
         log_fn_name!(auto);
-
+        info!("exporting matches");
         let records = transaction
             .query(
-                "SELECT match_uuid, timestamp, game, chartset_id, proof, details, metadata FROM matches",
+                "
+                SELECT match_uuid, timestamp, game, chartset_id, details, metadata, array_agg(proof_uuid) AS proofs
+                FROM matches
+                LEFT JOIN match_proofs USING (match_uuid)
+                GROUP BY match_uuid
+            ",
                 &[],
             )
             .await?;
@@ -277,16 +315,26 @@ impl Database {
     }
 
     #[named]
-    pub async fn export_songs<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Song>> {
+    pub async fn export_performances<'a>(transaction: &Transaction<'a>) -> DbResult<Vec<Performance>> {
         log_fn_name!(auto);
-
-        let records = transaction.query("SELECT song_id, title, artist, year FROM songs", &[]).await?;
-        let mut songs = Vec::with_capacity(records.len());
+        info!("exporting performances");
+        let records = transaction
+            .query(
+                "
+            SELECT performance_uuid, player_uuid, match_uuid, chart_id, details, metadata, timestamp_added, legit_fc, array_agg(proof_uuid) AS proofs
+            FROM performances
+            LEFT JOIN performance_proofs USING (performance_uuid)
+            GROUP BY performance_uuid
+        ",
+                &[],
+            )
+            .await?;
+        let mut performances = Vec::with_capacity(records.len());
         for record in records {
-            let song = Song::from_postgres_row(&record)?;
-            songs.push(song);
+            let performance = Performance::from_postgres_row(&record)?;
+            performances.push(performance);
         }
-        Ok(songs)
+        Ok(performances)
     }
 
     #[named]
@@ -296,30 +344,34 @@ impl Database {
         let transaction = self.client.transaction().await?;
 
         let players = Self::export_players(&transaction).await?;
+        let songs = Self::export_songs(&transaction).await?;
+        let chartsets = Self::export_chartsets(&transaction).await?;
+        let charts = Self::export_charts(&transaction).await?;
         let proofs = Self::export_proofs(&transaction).await?;
         let performances = Self::export_performances(&transaction).await?;
         let matches = Self::export_matches(&transaction).await?;
-        let songs = Self::export_songs(&transaction).await?;
 
         transaction.commit().await?;
 
         let export = DbExport {
             players,
+            songs,
+            chartsets,
+            charts,
+            proofs,
             matches,
             performances,
-            proofs,
-            songs,
-            chartsets: Vec::new(),
-            charts: Vec::new(),
         };
 
         success!(
-            "fetched {} players, {} matches, {} performances, {} proofs, {} songs from the database",
+            "fetched {} players, {} songs, {} chartsets, {} charts, {} proofs, {} matches, {} performances from the database",
             export.players.len(),
+            export.songs.len(),
+            export.chartsets.len(),
+            export.charts.len(),
+            export.proofs.len(),
             export.matches.len(),
             export.performances.len(),
-            export.proofs.len(),
-            export.songs.len()
         );
         Ok(export)
     }

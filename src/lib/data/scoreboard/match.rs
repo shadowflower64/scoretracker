@@ -1,5 +1,5 @@
 use crate::data::metadata::ArbitraryMetadata;
-use crate::util::timestamp::{NsDuration, NsTimestamp};
+use crate::util::timestamp::NsTimestamp;
 use crate::util::{command_line::AskError, uuid::UuidString};
 use dyn_clone::{DynClone, clone_trait_object};
 use postgres_types::FromSql;
@@ -7,8 +7,6 @@ use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
-use thiserror::Error;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Match {
@@ -35,6 +33,9 @@ pub struct Match {
 
     /// Any additional match metadata.
     pub metadata: ArbitraryMetadata,
+
+    /// Timestamp of when this performance was added to the database.
+    pub timestamp_added: NsTimestamp,
 }
 
 impl Match {
@@ -44,9 +45,10 @@ impl Match {
             timestamp: row.try_get("timestamp")?,
             game: row.try_get("game")?,
             chartset_id: row.try_get("chartset_id")?,
-            proofs: row.try_get("proof")?,
+            proofs: row.try_get("proofs")?,
             details: row.try_get("details")?,
             metadata: row.try_get("metadata")?,
+            timestamp_added: row.try_get("timestamp_added")?,
         })
     }
 }
@@ -91,44 +93,5 @@ impl JsonSchema for Box<AnyMatchDetails> {
     }
 }
 
-pub const ADD_TOO_CLOSE_THRESHOLD_SECONDS: f64 = 60.0;
-
-#[derive(Debug, Error)]
-pub enum MatchInsertError {
-    #[error("match is too close to an existing match: {0} (time difference: {1})")]
-    TooClose(Uuid, NsDuration),
-    #[error("match is already in the database: {0}")]
-    ExistsAlready(Uuid),
-}
-
-// pub fn find_other_close_matches(
-//     &self,
-//     req_m: &dyn MatchDetails,
-//     threshold: NsDuration,
-// ) -> Vec<(&(dyn MatchDetails + 'static), NsDuration)> {
-//     let mut search_results = self
-//         .matches
-//         .iter()
-//         .filter_map(|m| {
-//             let difference = (m.timestamp() - req_m.timestamp()).abs();
-//             (m.uuid() != req_m.uuid() && m.game_id() == req_m.game_id() && difference <= threshold).then_some((m.as_ref(), difference))
-//         })
-//         .collect::<Vec<_>>();
-//     search_results.sort_by_key(|(_, how_close)| *how_close);
-//     search_results
-// }
-
-// pub fn insert_new(&mut self, match_data: Match) -> Result<Uuid, MatchInsertError> {
-//     let threshold = NsDuration::from_secs_f64(Self::ADD_TOO_CLOSE_THRESHOLD_SECONDS);
-//     if let Some((close_match, how_close)) = self.find_other_close_matches(match_data.as_ref(), threshold).first() {
-//         return Err(MatchInsertError::TooClose(close_match.uuid().0, *how_close));
-//     }
-
-//     if let Some(existing_match) = self.find_match_by_uuid(match_data.match_uuid()) {
-//         return Err(MatchInsertError::ExistsAlready(existing_match.uuid().0));
-//     }
-
-//     let uuid = match_data.match_uuid();
-//     self.matches.push(match_data);
-//     Ok(uuid.0)
-// }
+// TODO: implement warning when two very close matches are added.
+const ADD_TOO_CLOSE_THRESHOLD_SECONDS: f64 = 60.0;

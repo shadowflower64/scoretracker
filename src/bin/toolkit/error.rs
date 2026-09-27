@@ -33,6 +33,8 @@ pub enum CmdError {
     AskError(#[from] AskError),
     #[error("generic input/output error: {0}")]
     IoError(#[from] io::Error),
+    #[error("generic file input/output error: {0}")]
+    FileExIoError(#[from] file_ex::Error),
     // ---
     #[error("could not read config: {0}")]
     ConfigReadError(&'static file_ex::Error),
@@ -123,7 +125,7 @@ impl CmdError {
             Self::CmdlineError(_) => 3,
             Self::NoGameWithId(..) | Self::InvalidConfigKey(..) => 4,
             Self::AskError(..) => 5,
-            Self::IoError(..) => 6,
+            Self::IoError(..) | Self::FileExIoError(..) => 6,
             // ---
             Self::ConfigReadError(..) | Self::ConfigOpenError(..) => 11,
             Self::ConfigWriteError(..) => 12,

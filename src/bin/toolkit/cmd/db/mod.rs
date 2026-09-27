@@ -1,7 +1,7 @@
 pub mod performance;
 pub mod player;
 
-use std::{borrow::Cow, fs, io, path::Path};
+use std::{borrow::Cow, fs, path::Path};
 
 use crate::toolkit::error::CmdError;
 use chrono::Local;
@@ -9,9 +9,9 @@ use function_name::named;
 use scoretracker::{
     config::toolkit::ToolkitConfig,
     db::{Database, DbError, DbExport, schema_name::SafeSchemaName},
-    log_fn_name, success, warn,
+    log_fn_name, success,
+    util::file_ex::read_from_jsonlines,
 };
-use serde::de::DeserializeOwned;
 
 pub const INIT_DB_SCRIPT: &str = include_str!("init_db.sql");
 
@@ -71,28 +71,19 @@ pub fn export_jsonl(export_dir: &Path) -> Result<(), CmdError> {
 }
 
 #[named]
-fn read_jsonl_file<T: DeserializeOwned>(path: &Path) -> Result<Vec<T>, io::Error> {
-    log_fn_name!(auto);
-    Ok(serde_jsonlines::json_lines(path)?
-        .enumerate()
-        .filter_map(|(i, result)| result.inspect_err(|e| warn!("invalid jsonl input data at line {i}: {e:?}")).ok())
-        .collect())
-}
-
-#[named]
 pub fn import_jsonl(import_dir: &Path) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
     smol::block_on(async {
         let mut db = Database::connect_with_tokio_for_toolkit().await?;
         let import = DbExport {
-            players: read_jsonl_file(&import_dir.join("players.jsonl"))?,
-            songs: read_jsonl_file(&import_dir.join("songs.jsonl"))?,
-            chartsets: read_jsonl_file(&import_dir.join("chartsets.jsonl"))?,
-            charts: read_jsonl_file(&import_dir.join("charts.jsonl"))?,
-            proofs: read_jsonl_file(&import_dir.join("proofs.jsonl"))?,
-            matches: read_jsonl_file(&import_dir.join("matches.jsonl"))?,
-            performances: read_jsonl_file(&import_dir.join("performances.jsonl"))?,
+            players: read_from_jsonlines(&import_dir.join("players.jsonl"))?,
+            songs: read_from_jsonlines(&import_dir.join("songs.jsonl"))?,
+            chartsets: read_from_jsonlines(&import_dir.join("chartsets.jsonl"))?,
+            charts: read_from_jsonlines(&import_dir.join("charts.jsonl"))?,
+            proofs: read_from_jsonlines(&import_dir.join("proofs.jsonl"))?,
+            matches: read_from_jsonlines(&import_dir.join("matches.jsonl"))?,
+            performances: read_from_jsonlines(&import_dir.join("performances.jsonl"))?,
         };
         db.import_all(import).await?;
 

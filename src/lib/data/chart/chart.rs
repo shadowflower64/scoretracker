@@ -1,4 +1,5 @@
 use dyn_clone::{DynClone, clone_trait_object};
+use postgres_types::FromSql;
 use serde::{Deserialize, Serialize};
 use std::{any::Any, fmt::Debug};
 
@@ -55,6 +56,17 @@ pub struct Chart {
 impl Chart {
     pub fn downcast_details<T: ChartDetails + 'static>(&self) -> Option<&T> {
         self.details.downcast_ref()
+    }
+    pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
+        Ok(Self {
+            chart_id: row.try_get("chart_id")?,
+            game: row.try_get("game")?,
+            chartset_id: row.try_get("chartset_id")?,
+            instrument: row.try_get("instrument")?,
+            difficulty: row.try_get("difficulty")?,
+            chart_group: row.try_get("chart_group")?,
+            details: row.try_get("details")?,
+        })
     }
 }
 
@@ -132,3 +144,15 @@ impl dyn ChartDetails {
 
 clone_trait_object! {ChartDetails}
 pub type AnyChartDetails = dyn ChartDetails + 'static;
+
+impl<'a> FromSql<'a> for Box<AnyChartDetails> {
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        let details = serde_json::from_value(value)?;
+        Ok(details)
+    }
+
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        serde_json::Value::accepts(ty)
+    }
+}

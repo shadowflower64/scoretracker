@@ -25,7 +25,7 @@ use crate::{
         record::{Record, parse_records},
     },
     success,
-    util::{dirs::project_temp_dir, lockfile, uuid::UuidString},
+    util::{dirs::project_temp_dir, lockfile, timestamp::NsTimestamp, uuid::UuidString},
     warn,
 };
 use calamine::{Data, Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_workbook};
@@ -306,6 +306,7 @@ fn parse_org_spreadsheet_matches(
                 proofs: Vec::new(),
                 metadata: ArbitraryMetadata::new(),
                 details: match_details,
+                timestamp_added: NsTimestamp::now(),
             };
 
             let mut performance_data = Vec::new();

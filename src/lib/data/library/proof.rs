@@ -131,7 +131,7 @@ pub struct Proof {
     #[serde(default)]
     pub tags: Tags,
 
-    /// Timestamp (in nanoseconds) of when this file was added/scanned into the library.
+    /// Timestamp of when this file was added/scanned into the library.
     pub timestamp_added: NsTimestamp,
 
     /// Arbitrary user-added metadata.

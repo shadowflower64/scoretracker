@@ -1,4 +1,5 @@
 use dyn_clone::{DynClone, clone_trait_object};
+use postgres_types::FromSql;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -27,6 +28,19 @@ pub struct Chartset {
     pub details: Box<AnyChartsetDetails>,
 }
 
+impl Chartset {
+    pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
+        Ok(Self {
+            game: row.try_get("game")?,
+            chartset_id: row.try_get("chartset_id")?,
+            song_id: row.try_get("song_id")?,
+            title: row.try_get("title")?,
+            artist: row.try_get("artist")?,
+            details: row.try_get("details")?,
+        })
+    }
+}
+
 #[typetag::serde(tag = "game")]
 pub trait ChartsetDetails: Debug + DynClone {
     fn game_id(&self) -> &'static str {
@@ -36,3 +50,15 @@ pub trait ChartsetDetails: Debug + DynClone {
 
 clone_trait_object! {ChartsetDetails}
 pub type AnyChartsetDetails = dyn ChartsetDetails + 'static;
+
+impl<'a> FromSql<'a> for Box<AnyChartsetDetails> {
+    fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let value = serde_json::Value::from_sql(ty, raw)?;
+        let details = serde_json::from_value(value)?;
+        Ok(details)
+    }
+
+    fn accepts(ty: &postgres_types::Type) -> bool {
+        serde_json::Value::accepts(ty)
+    }
+}
