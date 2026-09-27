@@ -7,6 +7,9 @@ use std::{any::Any, fmt::Debug};
 /// The struct holds information about a note chart, a playable set of notes.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Chart {
+    /// Named chart ID, unique across all games.
+    pub chart_id: String,
+
     /// Game ID.
     pub game: String,
 
@@ -95,9 +98,9 @@ mod test {
         }
 
         let cases = vec![
-            json!({"game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder"}}),
-            json!({"game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder2", "note_count": 1337}}),
-            json!({"game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder3", "note_count": 420}}),
+            json!({"chart_id": "placeholder/xi-freedom_dive/piano/expert", "game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder"}}),
+            json!({"chart_id": "placeholder/xi-freedom_dive/piano/expert", "game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder2", "note_count": 1337}}),
+            json!({"chart_id": "placeholder/xi-freedom_dive/piano/expert", "game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder3", "note_count": 420}}),
         ];
         for json_data in cases {
             println!("json data: {json_data}");

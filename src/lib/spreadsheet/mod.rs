@@ -378,6 +378,9 @@ fn parse_org_spreadsheet_songs(
 // 2b. fetch uuids of proofs with relevant youtube ids / insert if not found
 // 3. construct the final match/performance structs
 // 4. insert match/performance records into database / warn if too close
+//
+// songs should be ignored entirely -- this is meant to be a function accessible via the user-facing API, not a generic "database import" kinda function.
+// songs should be importable in a different way.
 #[named]
 pub fn import_org_spreadsheet_generic(
     mut worksheets: Vec<(String, Range<Data>)>,
