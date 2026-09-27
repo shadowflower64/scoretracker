@@ -1,15 +1,14 @@
 //! Data structures for Beatstar.
 
-use crate::data::scoreboard::r#match::{Match, MatchDetails};
-use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
-use crate::game_impl;
-use crate::spreadsheet::BadRecordError;
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::ParseChartsetRecordResult;
-use crate::spreadsheet::context::Context;
-use crate::spreadsheet::record::Record;
-use crate::util::command_line::AskError;
-use crate::{data::game::Game, register_game};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, context::Context, record::Record},
+    util::command_line::AskError,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

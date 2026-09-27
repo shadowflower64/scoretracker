@@ -1,14 +1,17 @@
 //! Data structures for Clone Hero.
 
-use crate::data::game::Game;
-use crate::data::scoreboard::r#match::MatchDetails;
-use crate::data::scoreboard::performance::PerformanceDetails;
-use crate::data::scoreboard::{r#match::Match, performance::Performance};
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit};
-use crate::{game_impl, register_game};
-use crate::{spreadsheet::record::Record, util::command_line::AskError};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{
+        BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit, context::Context,
+        record::Record,
+    },
+    util::command_line::AskError,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

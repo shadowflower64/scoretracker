@@ -2,7 +2,6 @@ use calamine::Hyperlink;
 use chrono_tz::Tz;
 
 use crate::data::library::proof::Proof;
-use crate::data::scoreboard::player::Player;
 use crate::spreadsheet::record::Record;
 use crate::spreadsheet::{BadRecordError, BadRecordErrorWithContext, ParseRecordResult, SkipOrQuit};
 use crate::util::youtube_id;

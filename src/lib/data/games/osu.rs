@@ -1,4 +1,5 @@
 //! Data structures for osu!
+
 use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 

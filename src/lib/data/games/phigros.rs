@@ -1,13 +1,14 @@
 //! Data structures for Phigros.
 
-use crate::data::scoreboard::r#match::{Match, MatchDetails};
-use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult};
-use crate::util::command_line::AskError;
-use crate::{data::game::Game, spreadsheet::context::Context};
-use crate::{game_impl, register_game};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, context::Context, record::Record},
+    util::command_line::AskError,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

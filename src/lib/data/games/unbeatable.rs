@@ -1,4 +1,5 @@
 //! Data structures for UNBEATABLE
+
 use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 

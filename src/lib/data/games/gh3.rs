@@ -1,16 +1,17 @@
 //! Data structures for Guitar Hero III: Legends of Rock.
-//!
-//! Progress status: All fields from the original spreadsheet are implemented.
 
-use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{Match, MatchDetails};
-use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, record::Record};
-use crate::spreadsheet::{ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit};
-use crate::util::command_line::AskError;
-use crate::{game_impl, register_game};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{
+        BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit, context::Context,
+        record::Record,
+    },
+    util::command_line::AskError,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

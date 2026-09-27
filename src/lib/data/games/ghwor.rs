@@ -1,17 +1,17 @@
 //! Data structures for Guitar Hero: Warriors of Rock.
-//!
-//! Progress status: All fields from the original spreadsheet are implemented.
 
-use crate::data::game::Game;
-use crate::data::scoreboard::r#match::MatchDetails;
-use crate::data::scoreboard::performance::PerformanceDetails;
-use crate::data::scoreboard::{r#match::Match, performance::Performance};
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult, ParseMatchRecordResult, ParseRecordResult, SkipOrQuit};
-use crate::util::percentage::Percentage;
-use crate::{game_impl, register_game};
-use crate::{spreadsheet::record::Record, util::command_line::AskError};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{
+        BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, ParseMatchRecordResult, ParseRecordResult, SkipOrQuit,
+        context::Context, record::Record,
+    },
+    util::{command_line::AskError, percentage::Percentage},
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

@@ -1,17 +1,18 @@
 //! Data structures for Fortnite Festival.
-//!
-//! Progress status: All fields from the original spreadsheet are implemented.
-//! Spreadsheet bug: `!artist_title` field in the spreadsheet - song ID is not present, it should be present in the input data. (TODO)
+// Spreadsheet bug: `!artist_title` field in the spreadsheet - song ID is not present, it should be present in the input data. (TODO)
 
-use crate::data::game::Game;
-use crate::data::scoreboard::r#match::MatchDetails;
-use crate::data::scoreboard::performance::PerformanceDetails;
-use crate::data::scoreboard::{r#match::Match, performance::Performance};
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::context::Context;
-use crate::spreadsheet::{BadRecordError, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit};
-use crate::{game_impl, register_game};
-use crate::{spreadsheet::record::Record, util::command_line::AskError};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{
+        BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit, context::Context,
+        record::Record,
+    },
+    util::command_line::AskError,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

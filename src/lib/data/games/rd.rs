@@ -1,4 +1,5 @@
 //! Data structures for Rhythm Doctor
+
 use crate::data::game::Game;
 use serde::{Deserialize, Serialize};
 

@@ -1,21 +1,17 @@
 //! Data structures for Band Hero.
-//!
-//! Progress status: All fields from the original spreadsheet are implemented.
 
-use crate::data::game::Game;
-use crate::data::scoreboard::r#match::Match;
-use crate::data::scoreboard::r#match::MatchDetails;
-use crate::data::scoreboard::performance::Performance;
-use crate::data::scoreboard::performance::PerformanceDetails;
-use crate::game_impl;
-use crate::register_game;
-use crate::spreadsheet::BadRecordError;
-use crate::spreadsheet::ContinueOrQuit::Continue;
-use crate::spreadsheet::SkipOrQuit;
-use crate::spreadsheet::context::Context;
-use crate::spreadsheet::record::Record;
-use crate::spreadsheet::{ParseChartsetRecordResult, ParseMatchRecordResult};
-use crate::util::command_line::AskError;
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+    spreadsheet::{
+        BadRecordError, ContinueOrQuit::Continue, ParseChartsetRecordResult, ParseMatchRecordResult, SkipOrQuit, context::Context,
+        record::Record,
+    },
+    util::command_line::AskError,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

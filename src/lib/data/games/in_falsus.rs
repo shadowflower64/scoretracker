@@ -1,9 +1,12 @@
 //! Data structures for In Falsus.
 
-use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{Match, MatchDetails};
-use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
-use crate::{game_impl, register_game};
+use crate::{
+    data::{
+        game::Game,
+        scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
+    },
+    game_impl, register_game,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
