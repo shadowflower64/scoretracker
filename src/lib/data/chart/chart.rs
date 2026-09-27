@@ -58,8 +58,8 @@ impl Chart {
 #[cfg(test)]
 mod test {
     use crate::data::{
+        chart::chart::{Chart, ChartDetails},
         games::placeholder::PlaceholderChartDetails,
-        song::chart::{Chart, ChartDetails},
     };
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};

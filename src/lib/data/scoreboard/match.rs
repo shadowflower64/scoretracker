@@ -1,4 +1,4 @@
-use crate::data::scoreboard::metadata::ArbitraryMetadata;
+use crate::data::metadata::ArbitraryMetadata;
 use crate::util::timestamp::{NsDuration, NsTimestamp};
 use crate::util::{command_line::AskError, uuid::UuidString};
 use dyn_clone::{DynClone, clone_trait_object};

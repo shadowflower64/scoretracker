@@ -1,5 +1,6 @@
 use crate::data::library::stpl_url::{StplUrl, StplUrlError};
-use crate::data::library::{info::LibraryInfo, library_dir_of_path, path_within_library_dir};
+use crate::library::info::LibraryInfo;
+use crate::library::{library_dir_of_path, path_within_library_dir};
 use crate::{config::toml::TomlConfig, util::dirs::project_temp_dir};
 use regex::Regex;
 use std::path::{Path, PathBuf};

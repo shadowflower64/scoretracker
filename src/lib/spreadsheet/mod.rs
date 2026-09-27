@@ -3,34 +3,36 @@ pub mod field_path;
 pub mod field_value;
 pub mod record;
 
-use crate::config::toml::TomlConfigError;
-use crate::config::toolkit::ToolkitConfig;
-use crate::data::game::{AnyGame, Game, game_instance_from_id};
-use crate::data::scoreboard::r#match::{AnyMatchDetails, Match};
-use crate::data::scoreboard::metadata::ArbitraryMetadata;
-use crate::data::scoreboard::performance::AnyPerformanceDetails;
-use crate::data::song::chartset::AnyChartsetDetails;
-use crate::db::{Database, DbError};
-use crate::spreadsheet::ContinueOrQuit::{Continue, Quit};
-use crate::spreadsheet::SpreadsheetImportError::{ParseMatchError, ParseSongError};
-use crate::spreadsheet::context::{Context, youtube_ids_of_record};
-use crate::spreadsheet::field_path::FieldPath;
-use crate::spreadsheet::field_value::{CellContents, FieldValue};
-use crate::spreadsheet::record::{Record, parse_records};
-use crate::success;
-use crate::util::dirs::project_temp_dir;
-use crate::util::lockfile;
-use crate::util::uuid::UuidString;
-use crate::{info, log_fn_name, warn};
-use calamine::Data;
-use calamine::{Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_workbook};
+use crate::{
+    config::{toml::TomlConfigError, toolkit::ToolkitConfig},
+    data::{
+        chart::chartset::AnyChartsetDetails,
+        game::{AnyGame, Game, game_instance_from_id},
+        metadata::ArbitraryMetadata,
+        scoreboard::{
+            r#match::{AnyMatchDetails, Match},
+            performance::AnyPerformanceDetails,
+        },
+    },
+    db::{Database, DbError},
+    info, log_fn_name,
+    spreadsheet::{
+        ContinueOrQuit::{Continue, Quit},
+        SpreadsheetImportError::{ParseMatchError, ParseSongError},
+        context::{Context, youtube_ids_of_record},
+        field_path::FieldPath,
+        field_value::{CellContents, FieldValue},
+        record::{Record, parse_records},
+    },
+    success,
+    util::{dirs::project_temp_dir, lockfile, uuid::UuidString},
+    warn,
+};
+use calamine::{Data, Hyperlink, Ods, OdsError, Range, Reader, Xlsx, XlsxError, open_workbook};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use chrono_tz::Europe::Warsaw;
-use chrono_tz::Tz;
+use chrono_tz::{Europe::Warsaw, Tz};
 use function_name::named;
-use std::error::Error;
-use std::path::Path;
-use std::{fmt, fs};
+use std::{error::Error, fmt, fs, path::Path};
 use thiserror::Error;
 use uuid::Uuid;
 

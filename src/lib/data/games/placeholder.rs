@@ -4,7 +4,7 @@ use crate::{
     data::{
         game::Game,
         scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
-        song::{chart::ChartDetails, chartset::ChartsetDetails},
+        chart::{chart::ChartDetails, chartset::ChartsetDetails},
     },
     game_impl, register_game,
     spreadsheet::{

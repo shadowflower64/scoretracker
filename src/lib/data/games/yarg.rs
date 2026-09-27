@@ -1,7 +1,7 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
+use crate::data::chart::chartset::ChartsetDetails;
 use crate::data::game::Game;
 use crate::data::scoreboard::performance::{self, PerformanceDetails};
-use crate::data::song::chartset::ChartsetDetails;
 use crate::register_game;
 use crate::util::command_line::{AskError, ask_string, ask_u64, ask_yn};
 use crate::util::normalize_unsigned_to_unit_range;

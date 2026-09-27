@@ -19,7 +19,7 @@ use crate::{
             stpl_url::StplUrl,
             tag::Tags,
         },
-        scoreboard::metadata::ArbitraryMetadata,
+        metadata::ArbitraryMetadata,
     },
     util::{
         timestamp::{NsDuration, NsTimestamp},

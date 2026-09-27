@@ -2,11 +2,11 @@ pub mod library_tab;
 pub mod toml;
 pub mod toolkit;
 
-use crate::data::library::aux_data::LibraryAuxData;
-use crate::data::library::cache::LibraryCache;
-use crate::data::library::index::LibraryIndex;
 use crate::data::library::stpl_url::LibraryDomain;
 use crate::hive::queue::TaskQueue;
+use crate::library::aux_data::LibraryAuxData;
+use crate::library::cache::LibraryCache;
+use crate::library::index::LibraryIndex;
 use crate::util::dirs::config_dir;
 use crate::util::file_ex;
 use crate::util::filelocked::{FileLockableDataJson, FileLockableDataWithDefaultPath};

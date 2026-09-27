@@ -3,8 +3,8 @@
 //! Progress status: All fields from the original spreadsheet are implemented.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::{Match, MatchDetails};
-use crate::data::scoreboard::performance::{Performance, PerformanceDetails};
+use crate::data::scoreboard::r#match::MatchDetails;
+use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;
 use crate::spreadsheet::context::Context;

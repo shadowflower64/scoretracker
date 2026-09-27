@@ -50,6 +50,7 @@ pub mod data;
 pub mod db;
 pub mod ffmpeg;
 pub mod hive;
+pub mod library;
 pub mod spreadsheet;
 pub mod tests;
 pub mod util;

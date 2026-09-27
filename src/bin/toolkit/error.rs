@@ -1,8 +1,8 @@
 use scoretracker::cli::cmdline_error::CmdlineError;
 use scoretracker::config::toml::TomlConfigError;
-use scoretracker::data::library::LibraryScanError;
 use scoretracker::db::DbError;
 use scoretracker::hive::worker::WorkerStartError;
+use scoretracker::library::LibraryScanError;
 use scoretracker::spreadsheet::SpreadsheetImportError;
 use scoretracker::util::command_line::AskError;
 use scoretracker::util::{file_ex, lockfile};

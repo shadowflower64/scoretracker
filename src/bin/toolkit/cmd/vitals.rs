@@ -5,7 +5,7 @@ use scoretracker::{
     config::LegacyConfig,
     data::{
         game::game_instance_from_id,
-        library::{entry::Proof, sha256::Sha256Hash},
+        library::{proof::Proof, sha256::Sha256Hash},
         scoreboard::{r#match::MatchDetails, performance::Performance, player::Player},
     },
     db::Database,

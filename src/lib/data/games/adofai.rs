@@ -1,9 +1,7 @@
 //! Data structures for A Dance of Fire and Ice.
 
 use crate::data::game::Game;
-use crate::data::scoreboard::r#match::Match;
 use crate::data::scoreboard::r#match::MatchDetails;
-use crate::data::scoreboard::performance::Performance;
 use crate::data::scoreboard::performance::PerformanceDetails;
 use crate::spreadsheet::BadRecordError;
 use crate::spreadsheet::ContinueOrQuit::Continue;

@@ -1,5 +1,5 @@
 use crate::config::toml::TomlConfigError;
-use crate::data::library::root::LibraryRoot;
+use crate::library::root::LibraryRoot;
 use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Serialize};

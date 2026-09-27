@@ -3,7 +3,7 @@ use std::error::Error;
 use postgres_types::{FromSql, IsNull, ToSql, to_sql_checked};
 use serde::{Deserialize, Serialize};
 
-use crate::data::library::entry::GameId;
+use crate::data::library::proof::GameId;
 
 /// The contents of the video or image that the library entry is associated with - what kind of footage does the video show?
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

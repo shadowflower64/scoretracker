@@ -3,8 +3,8 @@
 //! This module handles reading the `library_tab.toml` global config file, which contains a list of all locally available proof libraries.
 //! It also contains code for checking the availability of the specified library paths, and provides a structure for storing list of paths and the availability of them.
 use crate::config::toml::TomlConfig;
-use crate::data::library::info::LibraryInfo;
 use crate::data::library::stpl_url::LibraryDomain;
+use crate::library::info::LibraryInfo;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;

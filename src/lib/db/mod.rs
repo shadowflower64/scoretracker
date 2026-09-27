@@ -10,9 +10,9 @@ use uuid::Uuid;
 use crate::{
     config::{toml::TomlConfigError, toolkit::ToolkitConfig},
     data::{
-        library::{entry::Proof, stpl_url::LibraryDomain},
+        chart::{chart::Chart, chartset::Chartset, song::Song},
+        library::{proof::Proof, stpl_url::LibraryDomain},
         scoreboard::{r#match::Match, performance::Performance, player::Player},
-        song::{chart::Chart, chartset::Chartset, song::Song},
     },
     db::schema_name::SafeSchemaName,
     debug, info, log_fn_name, log_should_print_debug, success,
