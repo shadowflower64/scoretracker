@@ -1,7 +1,7 @@
 use dyn_clone::{DynClone, clone_trait_object};
 use postgres_types::FromSql;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{any::Any, fmt::Debug};
 
 /// This structure represents a specific set of charts in one rhythm game.
 ///
@@ -29,6 +29,9 @@ pub struct Chartset {
 }
 
 impl Chartset {
+    pub fn downcast_details<T: ChartsetDetails>(&self) -> Option<&T> {
+        self.details.downcast_ref()
+    }
     pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
         Ok(Self {
             game: row.try_get("game")?,
@@ -42,14 +45,23 @@ impl Chartset {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait ChartsetDetails: Debug + DynClone {
+pub trait ChartsetDetails: Debug + DynClone + Any {
     fn game_id(&self) -> &'static str {
         self.typetag_name()
     }
 }
 
+impl dyn ChartsetDetails {
+    fn any_ref(&self) -> &dyn Any {
+        self
+    }
+    fn downcast_ref<T: ChartsetDetails>(&self) -> Option<&T> {
+        self.any_ref().downcast_ref()
+    }
+}
+
 clone_trait_object! {ChartsetDetails}
-pub type AnyChartsetDetails = dyn ChartsetDetails + 'static;
+pub type AnyChartsetDetails = dyn ChartsetDetails;
 
 impl<'a> FromSql<'a> for Box<AnyChartsetDetails> {
     fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {

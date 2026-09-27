@@ -1,8 +1,6 @@
 use crate::toolkit::cmd::CmdError;
 use function_name::named;
 use scoretracker::data::game::game_instance_from_id;
-use scoretracker::db::Database;
-use scoretracker::success_npr;
 use scoretracker::{info_npr, log_fn_name, util::command_line::ask_yn};
 
 #[named]

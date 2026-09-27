@@ -5,6 +5,7 @@ use dyn_clone::{DynClone, clone_trait_object};
 use postgres_types::FromSql;
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
@@ -39,6 +40,9 @@ pub struct Match {
 }
 
 impl Match {
+    pub fn downcast_details<T: MatchDetails>(&self) -> Option<&T> {
+        self.details.downcast_ref()
+    }
     pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
         Ok(Self {
             match_uuid: row.try_get("match_uuid")?,
@@ -54,7 +58,7 @@ impl Match {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait MatchDetails: Debug + DynClone {
+pub trait MatchDetails: Debug + DynClone + Any {
     fn game_id(&self) -> &'static str {
         self.typetag_name()
     }
@@ -66,8 +70,18 @@ pub trait MatchDetails: Debug + DynClone {
         Ok(())
     }
 }
+
+impl dyn MatchDetails {
+    fn any_ref(&self) -> &dyn Any {
+        self
+    }
+    fn downcast_ref<T: MatchDetails>(&self) -> Option<&T> {
+        self.any_ref().downcast_ref()
+    }
+}
+
 clone_trait_object! {MatchDetails}
-pub type AnyMatchDetails = dyn MatchDetails + 'static;
+pub type AnyMatchDetails = dyn MatchDetails;
 
 impl<'a> FromSql<'a> for Box<AnyMatchDetails> {
     fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {

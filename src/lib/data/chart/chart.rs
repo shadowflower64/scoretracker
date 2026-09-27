@@ -54,7 +54,7 @@ pub struct Chart {
 }
 
 impl Chart {
-    pub fn downcast_details<T: ChartDetails + 'static>(&self) -> Option<&T> {
+    pub fn downcast_details<T: ChartDetails>(&self) -> Option<&T> {
         self.details.downcast_ref()
     }
     pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
@@ -79,10 +79,9 @@ mod test {
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
     use serde_json::json;
-    use std::any::Any;
 
     #[test]
-    pub fn testing_downcast() {
+    pub fn downcast_testing() {
         // Some struct for testing
         #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
         pub struct PlaceholderChartDetails2 {
@@ -90,11 +89,7 @@ mod test {
         }
 
         #[typetag::serde(name = "placeholder2")]
-        impl ChartDetails for PlaceholderChartDetails2 {
-            fn any_ref(&self) -> &dyn Any {
-                self
-            }
-        }
+        impl ChartDetails for PlaceholderChartDetails2 {}
 
         // Identical structure, different type
         #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -103,11 +98,7 @@ mod test {
         }
 
         #[typetag::serde(name = "placeholder3")]
-        impl ChartDetails for PlaceholderChartDetails3 {
-            fn any_ref(&self) -> &dyn Any {
-                self
-            }
-        }
+        impl ChartDetails for PlaceholderChartDetails3 {}
 
         let cases = vec![
             json!({"chart_id": "placeholder/xi-freedom_dive/piano/expert", "game": "placeholder", "chartset_id": "xi-freedom_dive", "instrument": "piano", "difficulty": "expert", "chart_group": null, "details": {"game": "placeholder"}}),
@@ -129,21 +120,23 @@ mod test {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait ChartDetails: Debug + DynClone {
+pub trait ChartDetails: Debug + DynClone + Any {
     fn game_id(&self) -> &'static str {
         self.typetag_name()
     }
-    fn any_ref(&self) -> &dyn Any;
 }
 
 impl dyn ChartDetails {
-    fn downcast_ref<T: Any>(&self) -> Option<&T> {
+    fn any_ref(&self) -> &dyn Any {
+        self
+    }
+    fn downcast_ref<T: ChartDetails>(&self) -> Option<&T> {
         self.any_ref().downcast_ref()
     }
 }
 
 clone_trait_object! {ChartDetails}
-pub type AnyChartDetails = dyn ChartDetails + 'static;
+pub type AnyChartDetails = dyn ChartDetails;
 
 impl<'a> FromSql<'a> for Box<AnyChartDetails> {
     fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {

@@ -2,9 +2,9 @@
 
 use crate::{
     data::{
+        chart::{chart::ChartDetails, chartset::ChartsetDetails},
         game::Game,
         scoreboard::{r#match::MatchDetails, performance::PerformanceDetails},
-        chart::{chart::ChartDetails, chartset::ChartsetDetails},
     },
     game_impl, register_game,
     spreadsheet::{
@@ -14,7 +14,6 @@ use crate::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct PlaceholderChartsetDetails {}
@@ -26,11 +25,7 @@ impl ChartsetDetails for PlaceholderChartsetDetails {}
 pub struct PlaceholderChartDetails {}
 
 #[typetag::serde(name = "placeholder")]
-impl ChartDetails for PlaceholderChartDetails {
-    fn any_ref(&self) -> &dyn Any {
-        self
-    }
-}
+impl ChartDetails for PlaceholderChartDetails {}
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct PlaceholderMatchDetails {}

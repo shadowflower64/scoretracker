@@ -5,6 +5,7 @@ use dyn_clone::{DynClone, clone_trait_object};
 use postgres_types::FromSql;
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use thiserror::Error;
@@ -38,6 +39,9 @@ pub struct Performance {
 }
 
 impl Performance {
+    pub fn downcast_details<T: PerformanceDetails>(&self) -> Option<&T> {
+        self.details.downcast_ref()
+    }
     pub fn from_postgres_row(row: &tokio_postgres::Row) -> Result<Self, tokio_postgres::Error> {
         Ok(Self {
             performance_uuid: row.try_get("performance_uuid")?,
@@ -53,7 +57,7 @@ impl Performance {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait PerformanceDetails: Debug + DynClone {
+pub trait PerformanceDetails: Debug + DynClone + Any {
     fn game_id(&self) -> &'static str {
         self.typetag_name()
     }
@@ -66,8 +70,17 @@ pub trait PerformanceDetails: Debug + DynClone {
     }
 }
 
+impl dyn PerformanceDetails {
+    fn any_ref(&self) -> &dyn Any {
+        self
+    }
+    fn downcast_ref<T: PerformanceDetails>(&self) -> Option<&T> {
+        self.any_ref().downcast_ref()
+    }
+}
+
 clone_trait_object! {PerformanceDetails}
-pub type AnyPerformanceDetails = dyn PerformanceDetails + 'static;
+pub type AnyPerformanceDetails = dyn PerformanceDetails;
 
 impl<'a> FromSql<'a> for Box<AnyPerformanceDetails> {
     fn from_sql(ty: &postgres_types::Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
