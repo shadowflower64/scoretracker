@@ -25,10 +25,6 @@ path = "src/bin/server_main.rs"
 name = "scoretracker-worker"
 path = "src/bin/worker_main.rs"
 
-[[bin]]
-name = "scoretracker-playground"
-path = "src/playground/main.rs"
-
 [dependencies]
 chrono = "0.4.45"
 directories = "6.0.0"
