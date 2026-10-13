@@ -8,6 +8,7 @@ use std::fmt::{self, Display};
 use std::path::Path;
 use std::str::FromStr;
 use thiserror::Error;
+use utoipa::ToSchema;
 
 #[derive(Debug, Error)]
 pub enum StplUrlError {
@@ -25,7 +26,7 @@ pub enum StplUrlError {
     PathFail,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, ToSchema)]
 pub struct LibraryDomain(String);
 
 impl TryFrom<String> for LibraryDomain {

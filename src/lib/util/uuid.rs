@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::fmt::{self, Display};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// Wrapper structure for serializing and deserializing UUID values.
@@ -28,8 +29,9 @@ use uuid::Uuid;
 /// let uuid_string = UuidString::from(uuid);
 /// assert_eq!(uuid_string.0, uuid);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromSql, ToSql)]
-#[postgres(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromSql, ToSql, ToSchema)]
+#[serde(transparent)]
+#[schema(value_type = String)]
 pub struct UuidString(pub Uuid);
 
 impl Deref for UuidString {

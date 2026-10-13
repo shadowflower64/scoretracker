@@ -6,6 +6,7 @@ use std::{
 
 use postgres_types::{FromSql, ToSql, to_sql_checked};
 use serde::{Deserialize, Serialize, de::Visitor};
+use utoipa::ToSchema;
 
 /// This struct represents a SHA256 hash digest. It holds exactly 32 bytes.
 ///
@@ -14,7 +15,7 @@ use serde::{Deserialize, Serialize, de::Visitor};
 /// For JSON, this struct gets (de-)serialized as a 64-character lowercase hexadecimal string.
 ///
 /// In the database, this struct gets represented as a `bytea` (unsized byte array) field.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToSchema)]
 pub struct Sha256Hash(pub [u8; 32]);
 
 impl Serialize for Sha256Hash {

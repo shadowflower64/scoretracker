@@ -1,3 +1,4 @@
+pub mod library;
 pub mod r#match;
 pub mod performance;
 pub mod worker_connect;

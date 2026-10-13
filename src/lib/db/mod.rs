@@ -11,7 +11,11 @@ use crate::{
     config::{toml::TomlConfigError, toolkit::ToolkitConfig},
     data::{
         chart::{chart::Chart, chartset::Chartset, song::Song},
-        library::{proof::Proof, stpl_url::LibraryDomain},
+        library::{
+            proof::Proof,
+            sha256::Sha256Hash,
+            stpl_url::{LibraryDomain, StplUrl},
+        },
         scoreboard::{r#match::Match, performance::Performance, player::Player},
     },
     db::schema_name::SafeSchemaName,
@@ -688,5 +692,15 @@ impl Database {
             // import.songs.len()
         );
         Ok(())
+    }
+
+    #[named]
+    pub async fn remove_all_references_to_library_domain(&mut self, library_domain: &LibraryDomain) -> DbResult<Uuid> {
+        todo!()
+    }
+
+    #[named]
+    pub async fn add_url_to_proof_by_sha256_or_insert_new(&mut self, sha256_hash: &Sha256Hash, url: StplUrl) -> DbResult<Uuid> {
+        todo!()
     }
 }
