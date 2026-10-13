@@ -69,6 +69,8 @@ pub fn automark_library_files(library_dir: PathBuf) -> Result<(), CmdError> {
 
     // TODO
     // info!("reading database");
+    // let config = ToolkitConfig::global().map_err(CmdError::ToolkitConfigError)?;
+
     // let config = LegacyConfig::load().map_err(CmdError::ConfigReadError)?;
     // let library_index =
     //     LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(CmdError::LibraryIndexReadError)?;

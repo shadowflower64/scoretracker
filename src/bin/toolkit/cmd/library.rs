@@ -1,5 +1,6 @@
 use crate::toolkit::cmd::CmdError;
 use function_name::named;
+use rand::{RngExt, distr};
 use relative_path::RelativePathBuf;
 use scoretracker::cli::cmdline_argument::CmdlineArgument;
 use scoretracker::config::library_tab::LibraryTab;
@@ -87,6 +88,7 @@ pub fn init(library_dir: &Path, domain: LibraryDomain) -> Result<(), CmdError> {
 
     let info = LibraryInfo {
         domain,
+        authenticity_string: rand::rng().sample_iter(&distr::Alphanumeric).take(32).map(char::from).collect(),
         temp_dir: Some(RelativePathBuf::from("temp")),
     };
     let path = library_dir.join(LibraryInfo::STANDARD_FILENAME);
@@ -135,8 +137,7 @@ pub fn rescan(library_dir: &Path) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
     smol::block_on(async {
-        let mut db = Database::connect_with_tokio_for_toolkit().await?;
-        library_scan_full(library_dir, &mut db, None).await?;
+        library_scan_full(library_dir).await?;
         Result::<(), CmdError>::Ok(())
     })?;
 

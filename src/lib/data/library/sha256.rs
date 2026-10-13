@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Display},
     hash::Hash,
+    str::FromStr,
 };
 
 use postgres_types::{FromSql, ToSql, to_sql_checked};
@@ -85,4 +86,13 @@ impl ToSql for Sha256Hash {
         vec.to_sql(ty, out)
     }
     to_sql_checked! {}
+}
+
+impl FromStr for Sha256Hash {
+    type Err = (); // TODO: handle invalid length
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut buf = [0u8; 32];
+        hex::decode_to_slice(s, &mut buf).unwrap(); // TODO: handle invalid length
+        Ok(Sha256Hash(buf))
+    }
 }

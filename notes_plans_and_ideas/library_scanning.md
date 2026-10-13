@@ -1,7 +1,7 @@
 # Full scan (no knowledge about previous state)
 1. Find all relevant (.mp4, .png, ...) files in a given directory.
 2. Calculate their SHA256 hashes (or fetch from local `library_cache.json` file).
-3. Send all calculated/cached SHA256 hashes, along with internal filepaths, for files that are currently present in the directory to the server/database. `/api/library/sync_full`
+3. Send all calculated/cached SHA256 hashes, along with internal filepaths, for files that are currently present in the directory to the server/database. `/api/library/scan_full`
 4. The server should:
     * remove ALL previous references to this library domain in the library URLs from the database,
     * add URLs for the specified files (meaning, all old files that used be in this library and are not present anymore will have their URLs removed, and any files currently present will have their URLs updated),
@@ -11,7 +11,7 @@
 
 # Add specific files
 1. Calculate their SHA256 hashes (or fetch from local `library_cache.json` file). 
-2. Send all calculated/cached SHA256 hashes, along with internal filepaths, for files that are currently present in the directory to the server/database. `/api/library/sync_add`
+2. Send all calculated/cached SHA256 hashes, along with internal filepaths, for files that are currently present in the directory to the server/database. `/api/library/scan_add`
 3. The server should:
     * NOT remove previous references to this library domain in the library URLs from the database,
     * add URLs for the specified files,

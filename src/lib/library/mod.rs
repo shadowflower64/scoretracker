@@ -21,13 +21,14 @@ pub mod root;
 
 use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::proof::Proof;
+use crate::data::library::sha256::Sha256Hash;
 use crate::data::library::stpl_url::{LibraryDomain, StplUrl};
 use crate::db::Database;
 use crate::hive::worker::data::WorkerInfo;
 use crate::library::cache::LibraryCache;
 use crate::library::index::LibraryIndex;
 use crate::library::info::LibraryInfo;
-use crate::util::filelocked::FileLockableDataDefault;
+use crate::util::filelocked::{FileLockableDataDefault, FileLocked};
 use crate::util::{file_ex, lockfile};
 use crate::util::{filelocked::FileLockableData, uuid::UuidString};
 use crate::{debug, info, log_fn_name, log_should_print_debug, warn};
@@ -130,234 +131,139 @@ pub fn should_file_be_scanned(filename: &str) -> bool {
 
 pub const VERBOSE_SCANNING: bool = false;
 
-/// Fully scan a library directory for added/moved/removed files.
-///
-/// Scanning a library is a multi-step process, and it involves updating the [`LibraryIndex`], the [`LibraryCache`], and the [`LibraryDatabase`].
-/// To scan a folder, this function does the following steps:
-/// 1. Read the [`LibraryInfo`] file within the library directory. This file will not be written to and so can be read without locking.
-/// 2. Read the [`LibraryCache`] file into memory - it will be used to skip recalculating SHA256 hashes for known files.
-/// 3. Walk through all files in the library directory, finding all candidate files. (files with a video/image extension)
-/// 4. Fetch SHA256 hashes for known files from the candidate list. Calculate the amount of files for which the hash is not known for progress-reporting reasons.
-/// 5. Compute SHA256 hashes for all files that are not known. This takes a long time! (Autosave results after every file, so the process can be resumed at any time.)
-/// 6. Now that we have all SHA256 hashes for files in the directory, search for them in the [`LibraryDatabase`] and fetch the proof UUID, or generate a new one if the hash does not exist in the database.
-/// 7. Generate a completely new [`LibraryIndex`] file with path paths and UUIDs fetched from the database.
-/// 8. Synchronize with the database; iterate through *every* database entry, remove any existing proof URLs that have the domain of this database, and add fresh ones.
+struct FilteredLibraryFiles {
+    /// Filtered list of paths of important files in the library (.mp4, .png, ...)
+    file_paths: Vec<RelativePathBuf>,
+    all_file_count: usize,
+    filtered_files_count: usize,
+    skipped_files_count: usize,
+}
+
+/// Get all files in directory recursively
 #[named]
-pub async fn library_scan_full(library_dir: &Path, db: &mut Database, worker_info: Option<&WorkerInfo>) -> Result<(), LibraryScanError> {
-    type E = LibraryScanError;
+fn traverse_library_dir(library_dir: &Path) -> Vec<PathBuf> {
     log_fn_name!("library" : auto);
     log_should_print_debug!(VERBOSE_SCANNING);
 
-    // let info = LibraryInfo::read_without_locking(library_dir.join(LibraryInfo::STANDARD_FILENAME)).expect("could not read library info");
-
-    let scanning_start_timestamp = Instant::now();
-
-    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
-    let library_domain = library_info.domain;
-
-    let mut index = LibraryIndex::default();
-    let mut cache = LibraryCache::lock_and_read_or_default(library_dir.join(LibraryCache::STANDARD_FILENAME), worker_info)
-        .map_err(E::CannotReadCache)?;
-
-    let mut skipped = 0;
-
-    // Get all files in directory recursively
     info!("looking for files in directory");
-    let files_in_dir: Vec<DirEntry> = WalkDir::new(library_dir)
+    WalkDir::new(library_dir)
         .into_iter()
-        .filter_map(|result| result.ok().filter(|dir_entry| dir_entry.file_type().is_file()))
-        .collect();
-    let total_files_in_dir = files_in_dir.len();
-
-    // Filter the found files, only include ones that are actual video/image files
-    info!("found {total_files_in_dir} files; filtering results");
-    let files_to_scan: Vec<RelativePathBuf> = files_in_dir
-        .iter()
-        .filter_map(|dir_entry| {
-            let denormalized_path = dir_entry.path();
-            let Some(relative_path) = path_within_library_dir(library_dir, denormalized_path) else {
-                warn!("not within library bounds: {denormalized_path:?} (path_within_library_dir returned None)");
-                skipped += 1;
-                return None;
-            };
-
-            let is_supposed_to_be_scanned = should_file_be_scanned(dir_entry.file_name().to_os_string().to_string_lossy().as_ref());
-            if !is_supposed_to_be_scanned {
-                debug!("skipping {relative_path:?}");
-                skipped += 1;
-                return None;
-            }
-
-            Some(relative_path)
-        })
-        .collect();
-    let total_files_to_scan = files_to_scan.len();
-
-    let mut sha256_hashes = HashMap::new();
-    let mut hashes_to_calculate = 0;
-
-    // Scan for any cached sha256 hashes
-    info!("filtered down to {total_files_to_scan}; fetching cache for sha256 hashes");
-    for (i, relative_path) in files_to_scan.iter().enumerate() {
-        debug!("[{}/{}] fetching cache for: {relative_path:?}", i + 1, total_files_to_scan);
-        let cached_hash_opt = cache.fetch_file_sha256_hash(&relative_path.to_path(library_dir));
-        if cached_hash_opt.is_none() {
-            hashes_to_calculate += 1;
-        }
-        sha256_hashes.insert(relative_path, cached_hash_opt);
-    }
-
-    // Calculate remaining ones (this takes a long time, so the db is closed during this step)
-    info!("calculating sha256 hashes for {hashes_to_calculate} files (this may take a long time)");
-    let mut calculated_hashes = 0;
-    let mut cached_hashes = 0;
-    let sha256_hashes: HashMap<_, _> = sha256_hashes
-        .iter()
-        .map(|(relative_path, cached_hash_opt)| {
-            if let Some(cached_sha256_hash) = cached_hash_opt {
-                cached_hashes += 1;
-                (*relative_path, cached_sha256_hash.to_owned())
-            } else {
-                info!(
-                    "[{}/{}] calculating sha256 hash for: {relative_path:?}",
-                    calculated_hashes + 1,
-                    hashes_to_calculate
-                );
-                let calculated_sha256_hash = cache.fetch_or_compute_file_sha256_hash(&relative_path.to_path(library_dir));
-                calculated_hashes += 1;
-                (*relative_path, calculated_sha256_hash)
-            }
-        })
-        .collect();
-
-    // Write all results to cache (if they haven't been already saved by the autosave)
-    cache.save_and_unlock().map_err(E::CannotWriteCache)?;
-
-    // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
-    info!("inserting and updating entries in database");
-    let mut db = todo!();
-    /*
-    let len = sha256_hashes.len();
-    for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
-        let stpl_url = StplUrl::new(library_domain.clone(), Some(relative_path.to_string()));
-        let (uuid, existed) = db.fetch_or_insert(sha256_hash.clone(), stpl_url.clone());
-        if existed {
-            debug!(
-                "[{}/{}] fetching uuid for existing database entry ({uuid}) for: {relative_path:?}",
-                i + 1,
-                len
-            );
-        } else {
-            debug!("[{}/{}] adding new database entry ({uuid}) for: {relative_path:?}", i + 1, len);
-        }
-
-        let entry = db
-            .find_entry_by_uuid_mut(uuid)
-            .expect("uuid should always be valid, we just inserted a new proof");
-        entry.update_stat(stpl_url, relative_path.to_path(library_dir));
-        // entry_mutator(entry);
-
-        index.files.insert((*relative_path).clone(), uuid.into());
-    }
-    index
-        .save(&library_dir.join(LibraryIndex::STANDARD_FILENAME))
-        .map_err(E::CannotWriteReplaceIndex)?;
-
-    // Now sync all of the URLs within the index file with the database
-    info!("syncing database");
-    sync_library_index_with_db_essence(library_dir, &index, db, library_domain, worker_info)?;
-
-    let scanning_end_timestamp = Instant::now();
-    let scanning_duration = scanning_end_timestamp.duration_since(scanning_start_timestamp);
-
-    info!(
-        "scanning done; took {scanning_duration:?}; {total_files_in_dir} files found in directory: {total_files_to_scan} files scanned in, {skipped} files skipped, {calculated_hashes} new hashes calculated, {cached_hashes} existing hashes fetched"
-    );
-
-    Ok(())
-     */
+        .filter_map(|result| result.ok())
+        .filter(|dir_entry| dir_entry.file_type().is_file())
+        .map(|a| a.path().to_path_buf())
+        .collect()
 }
 
 #[named]
-pub fn scan_register_added_files(
-    library_dir: &Path,
-    library_db_path: &Path,
-    file_paths: &[&Path],
-    entry_mutator: impl Fn(&mut Proof),
-    worker_info: Option<&WorkerInfo>,
-) -> Result<HashMap<RelativePathBuf, Uuid>, LibraryScanError> {
-    type E = LibraryScanError;
+fn find_specific_in_library_dir(file_paths: &[&Path]) -> Vec<PathBuf> {
     log_fn_name!("library" : auto);
     log_should_print_debug!(VERBOSE_SCANNING);
 
-    let scanning_start_timestamp = Instant::now();
-
-    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
-    let library_domain = library_info.domain;
-
-    let mut index = LibraryIndex::lock_and_read_or_default(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info).expect("todo");
-    let mut cache = LibraryCache::lock_and_read_or_default(library_dir.join(LibraryCache::STANDARD_FILENAME), worker_info)
-        .map_err(E::CannotReadCache)?;
-
-    let mut skipped = 0;
-
-    // Get all files in directory recursively
     info!("looking for files in directory");
-    let files_in_dir: Vec<PathBuf> = file_paths
+    file_paths
         .iter()
         .filter(|path| path.is_file())
         .map(|path| path.to_path_buf())
-        .collect();
-    let total_files_in_dir = files_in_dir.len();
+        .collect()
+}
 
-    // Filter the found files, only include ones that are actual video/image files
-    info!("found {total_files_in_dir} files; filtering results");
-    let files_to_scan: Vec<RelativePathBuf> = files_in_dir
-        .iter()
+/// Filter the found files, only include ones that are actual video/image files
+#[named]
+fn filter_down_files(library_dir: &Path, all_files: Vec<PathBuf>) -> FilteredLibraryFiles {
+    log_fn_name!("library" : auto);
+    log_should_print_debug!(VERBOSE_SCANNING);
+
+    let all_file_count = all_files.len();
+    info!("found {all_file_count} files; filtering results");
+    let mut skipped_files_count = 0;
+    let filtered_file_paths: Vec<RelativePathBuf> = all_files
+        .into_iter()
         .filter_map(|denormalized_path| {
-            let Some(relative_path) = path_within_library_dir(library_dir, denormalized_path) else {
+            let Some(relative_path) = path_within_library_dir(library_dir, &denormalized_path) else {
                 warn!("not within library bounds: {denormalized_path:?} (path_within_library_dir returned None)");
-                skipped += 1;
+                skipped_files_count += 1;
                 return None;
             };
 
             let is_supposed_to_be_scanned =
-                should_file_be_scanned(denormalized_path.file_name().expect("no filename").to_string_lossy().as_ref());
+                should_file_be_scanned(denormalized_path.file_name().unwrap_or_default().to_string_lossy().as_ref());
             if !is_supposed_to_be_scanned {
                 debug!("skipping {relative_path:?}");
-                skipped += 1;
+                skipped_files_count += 1;
                 return None;
             }
 
             Some(relative_path)
         })
         .collect();
-    let total_files_to_scan = files_to_scan.len();
 
-    let mut sha256_hashes = HashMap::new();
+    let filtered_files_count = filtered_file_paths.len();
+    info!("filtered down to {filtered_files_count}; fetching cache for sha256 hashes");
+
+    FilteredLibraryFiles {
+        file_paths: filtered_file_paths,
+        all_file_count,
+        filtered_files_count,
+        skipped_files_count,
+    }
+}
+
+struct FetchedHashesFromCache {
+    sha256_hashes: HashMap<RelativePathBuf, Option<Sha256Hash>>,
+    hashes_to_calculate: usize,
+}
+
+/// Scan for any cached sha256 hashes
+#[named]
+fn fetch_sha256_hashes_from_cache(
+    library_dir: &Path,
+    file_paths: Vec<RelativePathBuf>,
+    filtered_files_count: usize,
+    cache: &LibraryCache,
+) -> FetchedHashesFromCache {
+    log_fn_name!("library" : auto);
+    log_should_print_debug!(VERBOSE_SCANNING);
+    let mut sha256_hashes_of_all_files = HashMap::new();
     let mut hashes_to_calculate = 0;
 
-    // Scan for any cached sha256 hashes
-    info!("filtered down to {total_files_to_scan}; fetching cache for sha256 hashes");
-    for (i, relative_path) in files_to_scan.iter().enumerate() {
-        debug!("[{}/{}] fetching cache for: {relative_path:?}", i + 1, total_files_to_scan);
+    for (i, relative_path) in file_paths.into_iter().enumerate() {
+        debug!("[{}/{}] fetching cache for: {relative_path:?}", i + 1, filtered_files_count);
         let cached_hash_opt = cache.fetch_file_sha256_hash(&relative_path.to_path(library_dir));
         if cached_hash_opt.is_none() {
             hashes_to_calculate += 1;
         }
-        sha256_hashes.insert(relative_path, cached_hash_opt);
+        sha256_hashes_of_all_files.insert(relative_path, cached_hash_opt);
     }
+    FetchedHashesFromCache {
+        sha256_hashes: sha256_hashes_of_all_files,
+        hashes_to_calculate,
+    }
+}
+struct CalculatedHashes {
+    sha256_hashes: HashMap<RelativePathBuf, Sha256Hash>,
+    calculated_hashes: usize,
+    fetched_hashes: usize,
+}
 
-    // Calculate remaining ones (this takes a long time, so the db is closed during this step)
+/// Calculate remaining file hashes (this takes a long time)
+#[named]
+fn calculate_missing_sha256_hashes(
+    library_dir: &Path,
+    cache: &mut FileLocked<LibraryCache>,
+    known_sha256_hashes: HashMap<RelativePathBuf, Option<Sha256Hash>>,
+    hashes_to_calculate: usize,
+) -> Result<CalculatedHashes, LibraryScanError> {
+    type E = LibraryScanError;
+    log_fn_name!("library" : auto);
     info!("calculating sha256 hashes for {hashes_to_calculate} files (this may take a long time)");
     let mut calculated_hashes = 0;
     let mut cached_hashes = 0;
-    let sha256_hashes: HashMap<_, _> = sha256_hashes
-        .iter()
+    let sha256_hashes: HashMap<_, _> = known_sha256_hashes
+        .into_iter()
         .map(|(relative_path, cached_hash_opt)| {
             if let Some(cached_sha256_hash) = cached_hash_opt {
                 cached_hashes += 1;
-                (*relative_path, cached_sha256_hash.to_owned())
+                (relative_path, cached_sha256_hash)
             } else {
                 info!(
                     "[{}/{}] calculating sha256 hash for: {relative_path:?}",
@@ -366,67 +272,201 @@ pub fn scan_register_added_files(
                 );
                 let calculated_sha256_hash = cache.fetch_or_compute_file_sha256_hash(&relative_path.to_path(library_dir));
                 calculated_hashes += 1;
-                (*relative_path, calculated_sha256_hash)
+                (relative_path, calculated_sha256_hash)
             }
         })
         .collect();
 
     // Write all results to cache (if they haven't been already saved by the autosave)
-    cache.save_and_unlock().map_err(E::CannotWriteCache)?;
+    cache.save_to_file().map_err(E::CannotWriteCache)?;
 
-    // Look up proof UUIDs in the database, and insert new proof entries in the database if no entry with the given sha256 hash is found.
-    info!("inserting and updating entries in database");
-    let mut db = todo!();
-    /*
-    let len = sha256_hashes.len();
-    let mut added_files = HashMap::new();
-    for (i, (relative_path, sha256_hash)) in sha256_hashes.iter().enumerate() {
-        let stpl_url = StplUrl::new(library_domain.clone(), Some(relative_path.to_string()));
-        let (uuid, existed) = library_db.fetch_or_insert(sha256_hash.clone(), stpl_url.clone());
-        if existed {
-            debug!(
-                "[{}/{}] fetching uuid for existing database entry ({uuid}) for: {relative_path:?}",
-                i + 1,
-                len
-            );
-        } else {
-            debug!("[{}/{}] adding new database entry ({uuid}) for: {relative_path:?}", i + 1, len);
+    Ok(CalculatedHashes {
+        sha256_hashes,
+        calculated_hashes,
+        fetched_hashes: cached_hashes,
+    })
+}
+
+struct ServerScanResponse {
+    proof_uuids: HashMap<RelativePathBuf, UuidString>,
+    proofs: Vec<Proof>,
+}
+
+impl ServerScanResponse {
+    pub fn into_index(self) -> LibraryIndex {
+        LibraryIndex { files: self.proof_uuids }
+    }
+    pub fn add_to_index(&self, index: &mut LibraryIndex) {
+        todo!("merge existing index with new info from server: {index:?}");
+    }
+    pub async fn apply_mutations(&mut self, proof_mutator: impl Fn(&mut Proof)) {
+        for proof in &mut self.proofs {
+            proof_mutator(proof);
         }
 
-        let entry = library_db
-            .find_entry_by_uuid_mut(uuid)
-            .expect("uuid should always be valid, we just inserted a new proof");
-        entry.update_stat(stpl_url, relative_path.to_path(library_dir));
-        entry_mutator(entry);
-
-        index.files.insert((*relative_path).clone(), uuid.into());
-        added_files.insert((*relative_path).clone(), uuid);
+        for proof in &self.proofs {
+            // submit changed proofs
+            todo!("send PUT request to /api/library/proof")
+        }
+    }
+}
+async fn submit_scan_full_to_server(library_info: &LibraryInfo, sha256_hashes: HashMap<RelativePathBuf, Sha256Hash>) -> ServerScanResponse {
+    #[derive(Debug)]
+    struct RequestBody {
+        library_domain: LibraryDomain,
+        authenticity_string: String,
+        sha256_hashes: HashMap<RelativePathBuf, Sha256Hash>,
     }
 
-    // Now sync all of the URLs within the index file with the database
-    info!("syncing database with index");
-    sync_library_index_with_db_essence(library_dir, &index.inner, |_| Ok(library_db), library_domain, worker_info)?;
-    index.save_and_unlock().expect("todo"); //.map_err(E::CannotWriteReplaceIndex)?;
+    let body = RequestBody {
+        library_domain: library_info.domain.clone(),
+        authenticity_string: library_info.authenticity_string.clone(),
+        sha256_hashes,
+    };
+
+    // Send all calculated/cached SHA256 hashes, along with internal filepaths, for files that are currently present in the directory to the server/database. `/api/library/scan_full`
+    // Also send credentials, so that we know this is the real library that it claims to be.
+    todo!("send POST request to /api/library/scan_full {body:#?}");
+
+    // The server should:
+    //     * remove ALL previous references to this library domain in the library URLs from the database,
+    //     * add URLs for the specified files (meaning, all old files that used be in this library and are not present anymore will have their URLs removed, and any files currently present will have their URLs updated),
+    //     * insert new proof records in the case that a SHA256 hash was not found in the database,
+    //     * return proof UUIDs for every file/hash pair in the request.
+}
+
+async fn submit_scan_add_to_server(library_info: &LibraryInfo, sha256_hashes: HashMap<RelativePathBuf, Sha256Hash>) -> ServerScanResponse {
+    #[derive(Debug)]
+    struct RequestBody {
+        library_domain: LibraryDomain,
+        authenticity_string: String,
+        sha256_hashes: HashMap<RelativePathBuf, Sha256Hash>,
+    }
+
+    let body = RequestBody {
+        library_domain: library_info.domain.clone(),
+        authenticity_string: library_info.authenticity_string.clone(),
+        sha256_hashes,
+    };
+
+    // Send all calculated/cached SHA256 hashes, along with internal filepaths, for files that are currently present in the directory to the server/database. `/api/library/scan_full`
+    // Also send credentials, so that we know this is the real library that it claims to be.
+    todo!("send POST request to /api/library/scan_add {body:#?}");
+
+    // The server should:
+    //     * remove ALL previous references to this library domain in the library URLs from the database,
+    //     * add URLs for the specified files (meaning, all old files that used be in this library and are not present anymore will have their URLs removed, and any files currently present will have their URLs updated),
+    //     * insert new proof records in the case that a SHA256 hash was not found in the database,
+    //     * return proof UUIDs for every file/hash pair in the request.
+}
+
+/// Fully scan a library directory for added/moved/removed files.
+///
+/// Scanning a library is a multi-step process, and it involves updating the [`LibraryIndex`], the [`LibraryCache`], and the [`LibraryDatabase`].
+/// To scan a folder, this function does the following steps:
+/// 1. Read the [`LibraryInfo`] file within the library directory.
+/// 2. Read the [`LibraryCache`] file into memory - it will be used to skip recalculating SHA256 hashes for known files.
+/// 3. Walk through all files in the library directory, finding all candidate files. (files with a video/image extension)
+/// 4. Fetch SHA256 hashes for known files from the candidate list. Calculate the amount of files for which the hash is not known for progress-reporting reasons.
+/// 5. Compute SHA256 hashes for all files that are not known. This takes a long time! (Autosave results after every file, so the process can be resumed at any time.)
+/// 6. Now that we have all SHA256 hashes for files that are currently in the library directory, send all internal filepaths and hashes to the server.
+/// - The server has to remove any existing proof URLs that have the domain of this database from all database entries, and add fresh ones; and return proof UUIDs (new or existing) for all requested files to the client.
+/// 7. Generate a completely new [`LibraryIndex`] file with UUIDs fetched from the database, returned by the server.
+#[named]
+pub async fn library_scan_full(library_dir: &Path) -> Result<(), LibraryScanError> {
+    type E = LibraryScanError;
+    log_fn_name!("library" : auto);
+
+    let scanning_start_timestamp = Instant::now();
+
+    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let mut cache = LibraryCache::lock_and_read_or_default(
+        library_dir.join(LibraryCache::STANDARD_FILENAME),
+        None, /* TODO: is this correct? */
+    )
+    .map_err(E::CannotReadCache)?;
+
+    let all_files = traverse_library_dir(library_dir);
+    let filtered = filter_down_files(library_dir, all_files);
+    let fetched = fetch_sha256_hashes_from_cache(library_dir, filtered.file_paths, filtered.filtered_files_count, &cache);
+    let hashes = calculate_missing_sha256_hashes(library_dir, &mut cache, fetched.sha256_hashes, fetched.hashes_to_calculate)?;
+
+    let res = submit_scan_full_to_server(&library_info, hashes.sha256_hashes).await;
+    let index = res.into_index();
+    index
+        .save(&library_dir.join(LibraryIndex::STANDARD_FILENAME))
+        .map_err(E::CannotWriteReplaceIndex)?;
 
     let scanning_end_timestamp = Instant::now();
     let scanning_duration = scanning_end_timestamp.duration_since(scanning_start_timestamp);
 
     info!(
-        "scanning done; took {scanning_duration:?}; {total_files_in_dir} files found in directory: {total_files_to_scan} files scanned in, {skipped} files skipped, {calculated_hashes} new hashes calculated, {cached_hashes} existing hashes fetched"
+        "scanning done; took {scanning_duration:?}; {} files found in directory: {} files scanned in, {} files skipped, {} new hashes calculated, {} existing hashes fetched",
+        filtered.all_file_count,
+        filtered.filtered_files_count,
+        filtered.skipped_files_count,
+        hashes.calculated_hashes,
+        hashes.fetched_hashes,
     );
-
-    Ok(added_files)
-     */
+    Ok(())
 }
 
-pub fn scan_register_added_file(
+/// Scan-in specific files within the library dir, without traversing through the entire library directory.
+#[named]
+pub async fn library_scan_add_files(
     library_dir: &Path,
-    library_db_path: &Path,
+    file_paths: &[&Path],
+    proof_mutator: impl Fn(&mut Proof),
+) -> Result<HashMap<RelativePathBuf, UuidString>, LibraryScanError> {
+    type E = LibraryScanError;
+    log_fn_name!("library" : auto);
+
+    let scanning_start_timestamp = Instant::now();
+
+    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let mut cache = LibraryCache::lock_and_read_or_default(
+        library_dir.join(LibraryCache::STANDARD_FILENAME),
+        None, /* TODO: is this correct? */
+    )
+    .map_err(E::CannotReadCache)?;
+
+    let all_files = find_specific_in_library_dir(file_paths);
+    let filtered = filter_down_files(library_dir, all_files);
+    let fetched = fetch_sha256_hashes_from_cache(library_dir, filtered.file_paths, filtered.filtered_files_count, &cache);
+    let hashes = calculate_missing_sha256_hashes(library_dir, &mut cache, fetched.sha256_hashes, fetched.hashes_to_calculate)?;
+
+    let mut index = LibraryIndex::lock_and_read_or_default(
+        library_dir.join(LibraryIndex::STANDARD_FILENAME),
+        None, /* TODO: is this correct? */
+    )
+    .expect("todo");
+    let mut res = submit_scan_add_to_server(&library_info, hashes.sha256_hashes).await;
+    res.add_to_index(&mut index.inner);
+    index.save_and_unlock().map_err(E::CannotWriteIndex)?;
+
+    res.apply_mutations(proof_mutator);
+
+    let scanning_end_timestamp = Instant::now();
+    let scanning_duration = scanning_end_timestamp.duration_since(scanning_start_timestamp);
+
+    info!(
+        "scanning (add) done; took {scanning_duration:?}; {} files found in directory: {} files scanned in, {} files skipped, {} new hashes calculated, {} existing hashes fetched",
+        filtered.all_file_count,
+        filtered.filtered_files_count,
+        filtered.skipped_files_count,
+        hashes.calculated_hashes,
+        hashes.fetched_hashes,
+    );
+
+    Ok(res.proof_uuids)
+}
+
+pub async fn scan_register_added_file(
+    library_dir: &Path,
     file_path: &Path,
-    entry_mutator: impl Fn(&mut Proof),
-    worker_info: Option<&WorkerInfo>,
-) -> Result<(RelativePathBuf, Uuid), LibraryScanError> {
-    let pairs = scan_register_added_files(library_dir, library_db_path, &vec![file_path], entry_mutator, worker_info)?;
+    proof_mutator: impl Fn(&mut Proof),
+) -> Result<(RelativePathBuf, UuidString), LibraryScanError> {
+    let pairs = library_scan_add_files(library_dir, &vec![file_path], proof_mutator).await?;
     let pair = pairs
         .iter()
         .next()
@@ -436,54 +476,12 @@ pub fn scan_register_added_file(
 }
 
 #[named]
-pub fn scan_register_removed_files(
-    library_dir: &Path,
-    library_db_path: &Path,
-    file_paths: Vec<&Path>,
-    worker_info: Option<&WorkerInfo>,
-) -> Result<(), LibraryScanError> {
-    type E = LibraryScanError;
-    log_fn_name!("library" : auto);
-
-    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
-    let library_domain = library_info.domain;
-
-    let mut library_index =
-        LibraryIndex::lock_and_read(library_dir.join(LibraryIndex::STANDARD_FILENAME), worker_info).map_err(E::CannotOpenIndex)?;
-    let mut db = todo!();
-
-    /*
-    for file_path in file_paths {
-        let Some(relpath) = path_within_library_dir(library_dir, file_path) else {
-            warn!("file path is not within library: library dir: {library_dir:?}, file: {file_path:?}; skipping...");
-            continue;
-        };
-
-        if let Some(proof_uuid) = library_index.files.remove(&relpath) {
-            if let Some(entry) = library_db.find_entry_by_uuid_mut(proof_uuid.0) {
-                let removed_file_url = StplUrl::new(library_domain.clone(), Some(relpath.to_string()));
-                entry.library_urls.retain(|x| *x != removed_file_url);
-            } else {
-                warn!("proof with uuid was not found in database: {proof_uuid}");
-            }
-        } else {
-            warn!("tried to remove a file from index, but the file was not in the index in the first place: {relpath:?}");
-        };
-    }
-
-    library_index.save_and_unlock().map_err(E::CannotWriteIndex)?;
-    library_db.save_and_unlock().map_err(E::CannotWriteDatabase)?;
-     */
-    Ok(())
+pub async fn scan_register_removed_files(library_dir: &Path, file_paths: Vec<&Path>) -> Result<(), LibraryScanError> {
+    todo!("not done");
 }
 
-pub fn scan_register_removed_file(
-    library_dir: &Path,
-    library_db_path: &Path,
-    file_path: &Path,
-    worker_info: Option<&WorkerInfo>,
-) -> Result<(), LibraryScanError> {
-    scan_register_removed_files(library_dir, library_db_path, vec![file_path], worker_info)
+pub async fn scan_register_removed_file(library_dir: &Path, library_db_path: &Path, file_path: &Path) -> Result<(), LibraryScanError> {
+    scan_register_removed_files(library_dir, vec![file_path]).await
 }
 
 #[named]

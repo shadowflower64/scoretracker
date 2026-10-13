@@ -78,13 +78,13 @@ impl LockfileContent {
     ///
     /// version = {version}
     /// pid = {pid}
-    /// # lock_timestamp = {lock_timestamp_string}
+    /// # # lock time: {lock_timestamp_string}
     /// lock_timestamp = {lock_timestamp}
     ///
     /// [worker]
     /// name = {worker.name}
     /// pid = {worker.pid}
-    /// # birth_timestamp = {birth_timestamp_string}
+    /// # birth time: {birth_timestamp_string}
     /// birth_timestamp = {worker.birth_timestamp}
     /// address = {worker.address}
     /// ```

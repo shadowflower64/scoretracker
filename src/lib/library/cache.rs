@@ -6,8 +6,10 @@
 //! While a library cache does not contain any important data and can be safely removed, doing so will significantly increase the
 //! next library scan duration. Scanning a 3,000-file library without a cache may take several hours to complete.
 //! Therefore, this file should not be deleted often, or at all - in fact, you might want to make backups of this file.
+use crate::data::library::sha256::Sha256Hash;
 use crate::library::VERBOSE_SCANNING;
-use crate::util::file_ex::{self, FileEx};
+use crate::util::file_ex::FileEx;
+use crate::util::file_ex::{self};
 use crate::util::filelocked::{FileLockableData, FileLocked};
 use crate::util::timestamp::NsTimestamp;
 use crate::{debug, log_fn_name, log_should_print_debug};
@@ -32,7 +34,7 @@ pub struct FileCacheInfo {
     pub modify_timestamp: NsTimestamp,
 
     /// SHA256 hash in a hexadecimal string format.
-    pub sha256: String,
+    pub sha256: Sha256Hash,
 }
 
 /// Cache containing hashes of library files.
@@ -111,7 +113,7 @@ impl LibraryCache {
         file_size: u64,
         birth_timestamp: NsTimestamp,
         modify_timestamp: NsTimestamp,
-    ) -> Option<String> {
+    ) -> Option<Sha256Hash> {
         self.files
             .iter()
             .find(Self::cache_find_predicate(filename, file_size, birth_timestamp, modify_timestamp))
@@ -124,7 +126,7 @@ impl LibraryCache {
     ///
     /// If this file has not been recorded in the cache yet, this function will read in the whole file,
     /// compute the hash of the file, update the cache file and save it to disk automatically.
-    pub fn fetch_file_sha256_hash(&mut self, path: &Path) -> Option<String> {
+    pub fn fetch_file_sha256_hash(&self, path: &Path) -> Option<Sha256Hash> {
         let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         let metadata = fs::metadata(path).unwrap();
         let file_size = metadata.len();
@@ -141,7 +143,7 @@ impl LibraryCache {
     /// If this file has not been recorded in the cache yet, this function will read in the whole file,
     /// compute the hash of the file, update the cache file and save it to disk automatically.
     #[named]
-    pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> (String, bool) {
+    pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> (Sha256Hash, bool) {
         log_fn_name!("library_cache" : auto);
         log_should_print_debug!(VERBOSE_SCANNING);
 
@@ -155,7 +157,7 @@ impl LibraryCache {
             debug!("using cached hash for {path:?}: {cached_hash}");
             (cached_hash, false)
         } else {
-            let computed_hash = compute_hash_of_file(path);
+            let computed_hash = compute_sha256_hash_of_file(path);
             self.insert(filename, file_size, birth_timestamp, modify_timestamp, computed_hash.clone());
             (computed_hash, true)
         }
@@ -171,7 +173,7 @@ impl LibraryCache {
         file_size: u64,
         birth_timestamp: NsTimestamp,
         modify_timestamp: NsTimestamp,
-        sha256: String,
+        sha256: Sha256Hash,
     ) {
         if let Some(existing) = self.files.iter_mut().find(Self::cache_find_predicate_mut(
             &filename, file_size, birth_timestamp, modify_timestamp,
@@ -224,7 +226,7 @@ impl FileLockableData for LibraryCache {
 }
 
 impl FileLocked<LibraryCache> {
-    pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> String {
+    pub fn fetch_or_compute_file_sha256_hash(&mut self, path: &Path) -> Sha256Hash {
         let (hash, new) = self.inner.fetch_or_compute_file_sha256_hash(path);
         if new && LibraryCache::AUTOSAVE {
             self.save_to_file().expect("could not autosave cache to file");
@@ -233,30 +235,17 @@ impl FileLocked<LibraryCache> {
     }
 }
 
-#[derive(Debug)]
-enum HashingMethod {
-    SHA256,
-    #[allow(unused)]
-    MD5,
-}
-
 #[named]
-pub fn compute_hash_of_file(path: &Path) -> String {
+pub fn compute_sha256_hash_of_file(path: &Path) -> Sha256Hash {
     log_fn_name!("scan" : auto);
     log_should_print_debug!(VERBOSE_SCANNING);
 
     // note: changing the hashing method does not change the behaviour/naming of the hash in other places - everywhere else its still called sha256
-    const METHOD: HashingMethod = HashingMethod::SHA256;
-    debug!("computing hash for {path:?} using {METHOD:?}...");
+    debug!("computing hash for {path:?} with sha256...");
 
     let bytes = std::fs::read(path).unwrap();
-    let hash = match METHOD {
-        HashingMethod::SHA256 => sha256::digest(&bytes),
-        HashingMethod::MD5 => {
-            format!("{:x}", md5::compute(&bytes))
-        }
-    };
+    let hash: Sha256Hash = sha256::digest(&bytes).parse().unwrap(); // TODO: get rid of this parse? surely this internally uses a byte array already. no need to convert to a string and back. 
 
-    debug!("computing hash for {path:?} using {METHOD:?}... done: {hash}");
+    debug!("computing hash for {path:?} with sha256... done: {hash}");
     hash
 }

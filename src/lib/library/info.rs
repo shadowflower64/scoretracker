@@ -18,6 +18,17 @@ pub struct LibraryInfo {
     /// This name is a unique identifier for this library.
     pub domain: LibraryDomain,
 
+    /// "Password" for this library.
+    ///
+    /// This string is sent to the server to confirm the authenticity of this library.
+    /// If this string matches with the string on the server, the request is allowed to proceed as normal.
+    /// If it doesn't match, then that means that someone tried to rescan another library with our domain name,
+    /// so the request should do nothing.
+    ///
+    /// This string is a proof of ownership, proof of having access to the library.
+    /// Like a password, it should be kept private and should not be publicly accessible.
+    pub authenticity_string: String,
+
     /// Relative path to the directory for temporary files related to this library.
     ///
     /// This path is stored as a relative path, because the filesystem that this library repository lives on

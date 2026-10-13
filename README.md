@@ -39,7 +39,12 @@ cargo run db init scoretracker_dev
 
 the `scoretracker_dev` above is the name of the schema to initialize, so you can actually change the schema name to whatever you like. the name of the user should be stored in `server.toml` or `toolkit.toml` along with the password, so you can also name the user however you like.
 
-to delete the schema use the following statement:
+to import some example data to the newly created schema, run the command:
+```sh
+cargo run db import example/db_import
+```
+
+to delete the schema use the following statement in the sql shell:
 ```sql
 DROP SCHEMA IF EXISTS scoretracker_dev CASCADE;
 ```
