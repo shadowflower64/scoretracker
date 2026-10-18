@@ -444,7 +444,7 @@ pub async fn library_scan_add_files(
     res.add_to_index(&mut index.inner);
     index.save_and_unlock().map_err(E::CannotWriteIndex)?;
 
-    res.apply_mutations(proof_mutator);
+    res.apply_mutations(proof_mutator).await;
 
     let scanning_end_timestamp = Instant::now();
     let scanning_duration = scanning_end_timestamp.duration_since(scanning_start_timestamp);

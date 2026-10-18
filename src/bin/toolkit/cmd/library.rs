@@ -9,7 +9,7 @@ use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::db::{Database, DbError};
 use scoretracker::library::info::LibraryInfo;
 use scoretracker::library::library_scan_full;
-use scoretracker::{log_fn_name, success_npr};
+use scoretracker::{log_fn_name, success_npr, warn_npr};
 use std::borrow::Cow;
 use std::convert::Infallible;
 use std::path::{Path, PathBuf};
@@ -126,9 +126,63 @@ pub fn install(library_dir: &Path) -> Result<(), CmdError> {
     }
 
     let modified_toml = document.to_string();
+    println!("{}", modified_toml);
     LibraryTab::write_raw(LibraryTab::default_path(), &modified_toml).expect("todo: write error");
 
-    success_npr!("installed library with domain '{}'", info.domain);
+    success_npr!("installed library with domain '{}' located at: {:?}", info.domain, library_dir);
+    Ok(())
+}
+
+#[named]
+pub fn uninstall(library_dir: &Path) -> Result<(), CmdError> {
+    log_fn_name!(auto);
+
+    let mut found_domains = Vec::new();
+
+    let source_toml = LibraryTab::load_raw().map_err(CmdError::LibraryTableError)?;
+    let mut document: DocumentMut = source_toml.parse().expect("todo: invalid library table");
+
+    let internal_libraries_tab = document["internal_libraries"].as_table_mut().expect("todo: invalid library table");
+    for (key, item) in internal_libraries_tab.iter_mut() {
+        let domain = key.to_string();
+
+        let paths_arr = item.as_array_mut().expect("todo: invalid library table");
+        paths_arr.retain(|value| {
+            if let Some(path_string) = value.as_str()
+                && path_string == library_dir
+            {
+                found_domains.push(domain.clone());
+                // delete this element
+                false
+            } else {
+                // keep all other elemments
+                true
+            }
+        });
+    }
+
+    let modified_toml = document.to_string();
+    println!("{}", modified_toml);
+    LibraryTab::write_raw(LibraryTab::default_path(), &modified_toml).expect("todo: write error");
+
+    if found_domains.is_empty() {
+        warn_npr!("could not uninstall library located at: {library_dir:?} - it was not installed");
+    } else {
+        success_npr!("uninstalled library with domains: {found_domains:?} located at: {library_dir:?} ");
+    }
+
+    Ok(())
+}
+
+#[named]
+pub fn list() -> Result<(), CmdError> {
+    log_fn_name!(auto);
+
+    let tab = LibraryTab::load().map_err(CmdError::LibraryTableError)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&tab).map_err(CmdError::ConfigSerializationError)?
+    );
     Ok(())
 }
 

@@ -74,6 +74,7 @@ pub trait TomlConfig: Sized + Serialize + for<'a> Deserialize<'a> {
     fn write_raw(path: impl AsRef<Path>, toml: &str) -> Result<(), TomlConfigError> {
         let mut file = OpenOptions::new()
             .write(true)
+            .truncate(true)
             .open(&path)
             .map_err(|e| TomlConfigError::WriteError {
                 path: path.as_ref().to_path_buf(),

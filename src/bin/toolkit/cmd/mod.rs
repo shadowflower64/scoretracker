@@ -26,6 +26,7 @@ pub mod library;
 pub mod log;
 pub mod paths;
 pub mod spreadsheet;
+pub mod util;
 pub mod version;
 pub mod vitals;
 
@@ -172,6 +173,11 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
                 let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
                 cmd::library::install(&library_dir)
             }
+            "uninstall" => {
+                let library_dir: PathBuf = ctx.pull_arg("library_dir", "path of the library directory")?;
+                cmd::library::uninstall(&library_dir)
+            }
+            "list" => cmd::library::list(),
             "rescan" => {
                 let library: LibraryIdentifier =
                     if let Some(arg) = ctx.pull_arg_opt("library", "library domain name or path to the library directory")? {
@@ -238,6 +244,13 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
             "import-org-xlsx" => {
                 let path: PathBuf = ctx.pull_arg("path", "path of the xlsx spreadsheet file")?;
                 cmd::spreadsheet::import_org_xlsx(&path)
+            }
+            _ => ctx.unknown_cmd(),
+        },
+        "util" => match ctx.cmd()? {
+            "sha256" => {
+                let path: PathBuf = ctx.pull_arg("path", "path to the file")?;
+                cmd::util::file_sha256(&path)
             }
             _ => ctx.unknown_cmd(),
         },
