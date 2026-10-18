@@ -1,10 +1,10 @@
-use crate::server::access_rules::AccessRules;
 use function_name::named;
 use scoretracker::config::library_tab::{InternalLibraryAccessPath, InternalLibraryConnections, MirrorStatus};
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::{log_fn_name, warn};
 use std::ops::Deref;
 use std::{borrow::Cow, collections::HashMap};
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub enum LibraryMirrorLocation {
@@ -47,8 +47,18 @@ pub struct LibraryHall {
     /// Mirrors of the library. Mirrors can be online or offline, all of them should be stored here.
     pub mirrors: Vec<LibraryMirror>,
 
-    /// Domain-wide permissions, for all of the mirrors.
-    pub access_rules: AccessRules,
+    /// Which user owns this domain?
+    ///
+    /// The owner of the library should have full unrestricted read-write access to the contents of this library.
+    ///
+    /// Other users (guests) will have rights that depend on the specific file requested. Some files may be private, some may be public.
+    /// The visibility of proofs is stored in the `proofs` database table.
+    /// Note that a proof can be in multiple libraries at once, and have their own `owner` field as well, which complicates things a little bit...
+    /// But essentially, the proof owner can modify the proof metadata, and the library owner can move the proof files around.
+    pub owner_uuid: Uuid,
+
+    /// If this is true, this library hall will be findable only if you are the owner of the domain.
+    pub private: bool,
 }
 
 #[derive(Debug, Clone)]

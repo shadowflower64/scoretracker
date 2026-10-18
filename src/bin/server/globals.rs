@@ -1,9 +1,9 @@
 use scoretracker::{data::library::stpl_url::LibraryDomain, db::Database};
 use smol::lock::Mutex;
 use std::sync::{Arc, RwLock};
+use uuid::Uuid;
 
 use crate::server::{
-    access_rules::AuthenticatedUser,
     config::ServerConfig,
     domain_resolved::{DomainResolveError, DomainResolved},
     library_hall::LibraryConnections,
@@ -16,21 +16,21 @@ pub struct ServerGlobals {
 }
 
 impl ServerGlobals {
-    pub fn resolve_domain(
-        &self,
-        domain: &LibraryDomain,
-        auth_opt: Option<AuthenticatedUser>,
-    ) -> Result<DomainResolved, DomainResolveError> {
+    pub fn resolve_domain(&self, domain: &LibraryDomain, auth_info: Option<Uuid>) -> Result<DomainResolved, DomainResolveError> {
         let lock = self.connected_libraries.read().unwrap();
         let Some(hall) = lock.get(domain) else {
             return Err(DomainResolveError::NotKnown);
         };
 
-        if hall.access_rules.auth_required() {
-            let Some(auth) = auth_opt else {
+        // Additional guards for private domains
+        if hall.private {
+            // Reject requests without any authentication
+            let Some(auth_user_uuid) = auth_info else {
                 return Err(DomainResolveError::Unauthorized);
             };
-            if !hall.access_rules.does_user_have_access(auth) {
+
+            // Reject users who are not the owner
+            if auth_user_uuid != hall.owner_uuid {
                 return Err(DomainResolveError::Forbidden);
             }
         }

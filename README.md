@@ -1,30 +1,6 @@
 # Development
 
-when developing, use cargo to compile the project:
-```sh
-cargo build
-```
-
-### Web app
-if you are also messing with the web app, run this to install dependencies and compile the typescript code:
-```sh
-npm i
-npx tsc --build
-```
-
-for automatic compilation, use:
-```sh
-npx tsc --watch
-```
-
-### Typescript type generation
-to generate typescript code from rust types run:
-```sh
-cargo run gen all
-```
-
-# Database setup
-
+## Database setup
 to setup the database schema, log in to the postgress database manually, and execute the following statements:
 ```sql
 CREATE USER scoretracker_dev;
@@ -32,16 +8,20 @@ ALTER USER scoretracker_dev WITH PASSWORD 'password_here';
 CREATE SCHEMA IF NOT EXISTS scoretracker_dev AUTHORIZATION scoretracker_dev;
 ```
 
-this will create a new user `scoretracker_dev`, and an empty schema named `scoretracker_dev` with the correct permissions. set the password to whatever you like, and then store it in `server.toml` or `toolkit.toml`. and then to actually create the tables inside the schema run the command:
+then use the following commands to compile and build and set up the project:
 ```sh
+cargo build
+cargo run config init
+cargo run config set database_connection "postgresql://scoretracker_dev:password_here@localhost"
+cargo run config set database_schema "scoretracker_dev"
+cargo run server init
+cargo run server set database_connection "postgresql://scoretracker_dev:password_here@localhost"
+cargo run server set database_schema "scoretracker_dev"
 cargo run db init scoretracker_dev
-```
-
-the `scoretracker_dev` above is the name of the schema to initialize, so you can actually change the schema name to whatever you like. the name of the user should be stored in `server.toml` or `toolkit.toml` along with the password, so you can also name the user however you like.
-
-to import some example data to the newly created schema, run the command:
-```sh
-cargo run db import example/db_import
+cargo run db import "example/db_import"
+npm i
+cargo run gen all  # generates `.ts` files from Rust source code
+npx tsc --build    # or: `npx tsc --watch` for continuous compilation
 ```
 
 to delete the schema use the following statement in the sql shell:

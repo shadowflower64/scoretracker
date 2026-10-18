@@ -57,6 +57,24 @@ ALTER TYPE media_category OWNER TO scoretracker_dev;
 
 
 
+-- Type: proof_visibility
+-- DROP TYPE IF EXISTS proof_visibility;
+CREATE TYPE proof_visibility AS ENUM ('private', 'public');
+ALTER TYPE proof_visibility OWNER TO scoretracker_dev;
+
+
+
+-- Table: users
+-- DROP TABLE IF EXISTS users;
+CREATE TABLE IF NOT EXISTS users
+(
+    user_uuid uuid NOT NULL PRIMARY KEY,
+    name character varying(32)
+);
+ALTER TABLE IF EXISTS users OWNER TO scoretracker_dev;
+
+
+
 -- Table: players
 -- DROP TABLE IF EXISTS players;
 CREATE TABLE IF NOT EXISTS players
@@ -141,6 +159,8 @@ CREATE TABLE IF NOT EXISTS proofs
     automatic_content_detection_information jsonb,
     tags character varying(256)[],
     timestamp_added timestamp with time zone NOT NULL DEFAULT now(),
+    owner_uuid uuid NOT NULL REFERENCES users(user_uuid),
+    visibility proof_visibility NOT NULL,
     metadata jsonb
 );
 ALTER TABLE IF EXISTS proofs OWNER TO scoretracker_dev;
@@ -203,3 +223,15 @@ CREATE TABLE IF NOT EXISTS performance_proofs
     UNIQUE (performance_uuid, proof_uuid)
 );
 ALTER TABLE IF EXISTS performance_proofs OWNER TO scoretracker_dev;
+
+
+
+-- Table: libraries
+-- DROP TABLE IF EXISTS libraries;
+CREATE TABLE IF NOT EXISTS libraries
+(
+    library_domain character varying(256) NOT NULL PRIMARY KEY,
+    authentication_string_hash character varying(256) NOT NULL,
+    owner_uuid uuid NOT NULL REFERENCES users(user_uuid)
+);
+ALTER TABLE IF EXISTS users OWNER TO scoretracker_dev;

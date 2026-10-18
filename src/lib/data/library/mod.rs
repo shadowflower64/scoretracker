@@ -1,11 +1,12 @@
 pub mod automatic_content_detection_information;
 pub mod cloth_info;
 pub mod content_description;
-pub mod proof;
 pub mod entry_kind;
 pub mod file_stat;
 pub mod media_category;
 pub mod media_metadata;
+pub mod proof;
+pub mod proof_visibility;
 pub mod quality_state;
 pub mod sha256;
 pub mod stpl_url;

@@ -14,6 +14,7 @@ use crate::{
             file_stat::{FileStat, FileStats},
             media_category::MediaCategory,
             media_metadata::MediaMetadata,
+            proof_visibility::ProofVisibility,
             quality_state::QualityState,
             sha256::Sha256Hash,
             stpl_url::StplUrl,
@@ -35,7 +36,7 @@ pub type GameId = String;
 
 /// An entry in the proofs table, containing information about proof videos and images, and other files inside of libraries.
 ///
-/// Every unique file inside of the library should have exactly one library entry.
+/// Every unique file inside of the global system of libraries should have exactly one library entry.
 /// Old files, which have been deleted, moved, or transcoded into other files, should *not* have their entries removed from the library.
 /// This is to preserve information about the source files for processed and cut files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +135,23 @@ pub struct Proof {
     /// Timestamp of when this file was added/scanned into the library.
     pub timestamp_added: NsTimestamp,
 
+    /// User UUID of the owner of this file. Every proof file has one owner.
+    ///
+    /// Any "new" proofs that are uploaded later, but have the same SHA256 will still belong to the original uploader.
+    /// That means that the metadata values in this [`Proof`] struct can only be edited by the owner and by no one else.
+    ///
+    /// The exception to that would be the [`Self::library_urls`] field (maybe? TODO: consider this. It would be nice if
+    /// people could host other people's proofs for preservation purposes, but maybe this is wrong? What if a malicious
+    /// actor says that they got the file and instead serve a different, spoofed one? Everything could be going through
+    /// the server as a proxy, and the server could check the sha256 hash for correctness, but if another client requests
+    /// the file from the library directly, then there is no way to check/moderate that, apart from manual user reports I guess.
+    /// Some libraries/library domains/library owners should probably be banned from rehosting specifically other people's
+    /// proofs in that case, which i think is a nice middleground.)
+    pub owner_uuid: UuidString,
+
+    /// Is this proof data (and access to files) accessible to other people?
+    pub visibility: ProofVisibility,
+
     /// Arbitrary user-added metadata.
     pub metadata: ArbitraryMetadata,
 }
@@ -165,17 +183,18 @@ impl Proof {
             automatic_content_detection_information: row.try_get("automatic_content_detection_information")?,
             tags: row.try_get("tags")?,
             timestamp_added: row.try_get("timestamp_added")?,
+            owner_uuid: row.try_get("owner_uuid")?,
+            visibility: row.try_get("visibility")?,
             metadata: row.try_get("metadata")?,
         })
     }
-}
 
-impl Default for Proof {
-    fn default() -> Self {
+    pub fn default_with_owner(owner_uuid: UuidString) -> Self {
         Self {
             // Explicitly set custom values
             proof_uuid: Uuid::now_v7().into(),
             timestamp_added: NsTimestamp::now(),
+            visibility: ProofVisibility::Private,
 
             // Default values for other fields
             youtube_id: None,
@@ -196,6 +215,7 @@ impl Default for Proof {
             timestamp_end: None,
             duration: None,
             automatic_content_detection_information: None,
+            owner_uuid,
             metadata: ArbitraryMetadata::new(),
         }
     }

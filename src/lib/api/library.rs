@@ -9,6 +9,7 @@ use crate::{
     util::uuid::UuidString,
 };
 
+/// Data structure for the request body of the `POST /api/library/scan_full` API endpoint.
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct ScanFullRequest {
     pub library_domain: LibraryDomain,
@@ -16,6 +17,7 @@ pub struct ScanFullRequest {
     pub sha256_hashes: HashMap<RelativePathBufString, Sha256Hash>,
 }
 
+/// Data structure for the response body of the `POST /api/library/scan_full` API endpoint.
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct ScanFullResponse {
     pub proof_uuids: HashMap<RelativePathBufString, UuidString>,
