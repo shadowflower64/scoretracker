@@ -178,7 +178,7 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
                 cmd::library::uninstall(&library_dir)
             }
             "list" => cmd::library::list(),
-            "rescan" => {
+            "scan" => {
                 let library: LibraryIdentifier =
                     if let Some(arg) = ctx.pull_arg_opt("library", "library domain name or path to the library directory")? {
                         Ok(arg)
@@ -186,13 +186,13 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
                         Ok(LibraryIdentifier::DomainName(default.clone()))
                     } else {
                         Err(CmdlineError::ArgumentNotProvided {
-                            cmd: "library:rescan".to_string(),
+                            cmd: "library:scan".to_string(),
                             arg_name: "library".to_string(),
                             arg_desc: "library domain name or path to the library directory".to_string(),
                         })
                     }?;
                 let dir_path = library.dir_path().expect("todo: invalid library domain/path");
-                cmd::library::rescan(&dir_path)
+                cmd::library::scan(&dir_path)
             }
             "remove-domain" => {
                 let library_domain: LibraryDomain = ctx.pull_arg("library_domain", "library domain name")?;

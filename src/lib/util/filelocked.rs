@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hive::worker::data::WorkerInfo;
-use crate::util::file_ex::{self, FileEx};
+use crate::util::file_ex::{self, read_from_json, write_as_json_pretty};
 use crate::util::lockfile::{self, LockfileHandle};
 use std::fs;
 use std::marker::PhantomData;
@@ -16,15 +16,16 @@ pub struct FileLocked<T: FileLockableData> {
 }
 
 pub trait FileLockableData: Sized {
-    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>>;
-    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()>;
+    fn _inner_read(path: &Path) -> file_ex::Result<Option<Self>>;
+    fn _inner_write(&self, path: &Path) -> file_ex::Result<()>;
 
     fn read_without_locking(path: impl AsRef<Path>) -> file_ex::Result<Self> {
         Self::_inner_read(path.as_ref())?.ok_or_else(|| file_ex::Error::file_not_found(path.as_ref().to_path_buf()))
     }
     fn lock_and_read(path: impl AsRef<Path>, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
         let lockfile = LockfileHandle::acquire_wait(&path, worker_info)?;
-        let inner = Self::_inner_read(&lockfile)?.ok_or_else(|| file_ex::Error::file_not_found(path.as_ref().to_path_buf()))?;
+        let inner =
+            Self::_inner_read(lockfile.main_file_path())?.ok_or_else(|| file_ex::Error::file_not_found(path.as_ref().to_path_buf()))?;
         Ok(FileLocked {
             inner,
             lockfile,
@@ -38,12 +39,12 @@ impl<T> FileLockableData for T
 where
     T: for<'a> Deserialize<'a> + Serialize + FileLockableDataJson,
 {
-    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
-        file_ex.read_from_json()
+    fn _inner_read(path: &Path) -> file_ex::Result<Option<Self>> {
+        read_from_json(path)
     }
 
-    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
-        file_ex.write_as_json_pretty(self)
+    fn _inner_write(&self, path: &Path) -> file_ex::Result<()> {
+        write_as_json_pretty(path, self)
     }
 }
 
@@ -63,7 +64,7 @@ pub trait FileLockableDataDefault: FileLockableData + Default {
     /// This is to prevent overwriting existing data if it has become corrupted or protected by permissions.
     fn lock_and_read_or_default(path: impl AsRef<Path>, worker_info: Option<&WorkerInfo>) -> lockfile::Result<FileLocked<Self>> {
         let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
-        let inner = Self::_inner_read(&lockfile)?.unwrap_or_default();
+        let inner = Self::_inner_read(lockfile.main_file_path())?.unwrap_or_default();
         Ok(FileLocked {
             inner,
             lockfile,
@@ -101,7 +102,7 @@ impl<T: FileLockableData> FileLocked<T> {
 
 impl<T: FileLockableData> FileLocked<T> {
     pub fn save_to_file(&self) -> lockfile::Result<()> {
-        Ok(T::_inner_write(&self.inner, &self.lockfile)?)
+        Ok(T::_inner_write(&self.inner, self.lockfile.main_file_path())?)
     }
 
     pub fn save_and_unlock(self) -> lockfile::Result<()> {
@@ -120,7 +121,7 @@ impl<T: FileLockableData> FileLocked<T> {
             .main_file_path()
             .parent()
             .and_then(|parent| fs::create_dir_all(parent).ok());
-        Ok(T::_inner_write(&self.inner, &self.lockfile)?)
+        Ok(T::_inner_write(&self.inner, self.lockfile.main_file_path())?)
     }
 }
 

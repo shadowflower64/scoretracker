@@ -1,6 +1,6 @@
 //! File lock handling.
 use crate::hive::worker::data::WorkerInfo;
-use crate::util::file_ex::{self, FileEx};
+use crate::util::file_ex::{self};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
 use crate::{SCORETRACKER_VERSION, debug, info, log_fn_name, log_should_print_debug, warn};
@@ -349,11 +349,5 @@ impl Drop for LockfileHandle {
         } else {
             debug!("unlocked by dropping: {:?}", &self.lockfile_path);
         }
-    }
-}
-
-impl FileEx for LockfileHandle {
-    fn file_path(&self) -> &Path {
-        &self.main_file_path
     }
 }

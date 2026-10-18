@@ -187,7 +187,7 @@ pub fn list() -> Result<(), CmdError> {
 }
 
 #[named]
-pub fn rescan(library_dir: &Path) -> Result<(), CmdError> {
+pub fn scan(library_dir: &Path) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
     smol::block_on(async {

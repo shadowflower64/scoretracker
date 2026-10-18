@@ -2,7 +2,7 @@ use crate::toolkit::cmd::CmdError;
 use scoretracker::config::LegacyConfig;
 use scoretracker::data::library::stpl_url::LibraryDomain;
 use scoretracker::util::command_line::{ask_string, ask_yn};
-use scoretracker::util::file_ex::FileEx;
+use scoretracker::util::file_ex::{read_from_json, write_as_json_pretty};
 use scoretracker::util::filelocked::FileLockableDataWithDefaultPath;
 use scoretracker::util::lockfile;
 use scoretracker::{info_npr, success_npr, warn_npr};
@@ -20,7 +20,7 @@ fn print_config(config: &LegacyConfig) -> Result<(), CmdError> {
 
 pub fn init() -> Result<(), CmdError> {
     let path = LegacyConfig::default_path();
-    let has_to_confirm = match path.read_from_json() {
+    let has_to_confirm = match read_from_json(&path) {
         Ok(Some(config)) => {
             info_npr!("current config is:");
             print_config(&config)?;
@@ -60,7 +60,7 @@ pub fn init() -> Result<(), CmdError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| CmdError::CreateDirAllError(parent.to_owned(), e))?;
     }
-    path.write_as_json_pretty(&config)
+    write_as_json_pretty(&path, &config)
         .map_err(lockfile::Error::from)
         .map_err(CmdError::ConfigWriteError)?;
 

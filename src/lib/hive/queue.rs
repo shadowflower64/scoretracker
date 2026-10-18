@@ -1,5 +1,7 @@
+use std::path::Path;
+
 use crate::hive::task::{Task, TaskState};
-use crate::util::file_ex::{self, FileEx};
+use crate::util::file_ex::{self, read_from_jsonlines, read_from_jsonlines_opt, write_as_jsonlines};
 use crate::util::filelocked::FileLockableData;
 use thiserror::Error;
 use uuid::Uuid;
@@ -123,10 +125,10 @@ impl TaskQueue {
 }
 
 impl FileLockableData for TaskQueue {
-    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
-        file_ex.read_from_jsonlines().map(|x| x.map(|y| Self { tasks: y }))
+    fn _inner_read(path: &Path) -> file_ex::Result<Option<Self>> {
+        read_from_jsonlines_opt(path).map(|x| x.map(|y| Self { tasks: y }))
     }
-    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
-        file_ex.write_as_jsonlines(&self.tasks)
+    fn _inner_write(&self, path: &Path) -> file_ex::Result<()> {
+        write_as_jsonlines(path, &self.tasks)
     }
 }

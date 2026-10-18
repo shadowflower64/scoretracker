@@ -8,8 +8,8 @@
 //! Therefore, this file should not be deleted often, or at all - in fact, you might want to make backups of this file.
 use crate::data::library::sha256::Sha256Hash;
 use crate::library::VERBOSE_SCANNING;
-use crate::util::file_ex::FileEx;
-use crate::util::file_ex::{self};
+use crate::util::file_ex::{self, read_from_jsonlines_opt};
+use crate::util::file_ex::{read_from_jsonlines, write_as_jsonlines};
 use crate::util::filelocked::{FileLockableData, FileLocked};
 use crate::util::timestamp::NsTimestamp;
 use crate::{debug, log_fn_name, log_should_print_debug};
@@ -57,13 +57,8 @@ impl LibraryCache {
     /// This is recommended to be `true` as it reduces the risk of having to do all of the hash calculations all over when the program crashes.
     const AUTOSAVE: bool = true;
 
-    /// Determines whether the JSON written to file should contain unnecessary whitespace or not.
-    ///
-    /// This is recommended to be `false` as it reduces the final written file size and speeds up the saving process, especially when autosaving.
-    pub const WRITE_PRETTY_JSON: bool = false;
-
     /// Standard filename used for library cache
-    pub const STANDARD_FILENAME: &str = "library_cache.json";
+    pub const STANDARD_FILENAME: &str = "library_cache.jsonl";
 
     /// Function for filtering the cache to find a specific entry.
     ///
@@ -197,30 +192,25 @@ impl LibraryCache {
 
 impl FileLockableData for LibraryCache {
     #[named]
-    fn _inner_read<F: FileEx + ?Sized>(file_ex: &F) -> file_ex::Result<Option<Self>> {
+    fn _inner_read(path: &Path) -> file_ex::Result<Option<Self>> {
         log_fn_name!("scan" : auto);
         log_should_print_debug!(VERBOSE_SCANNING);
 
-        let inner_opt = file_ex.read_from_json()?;
-        let cache_file_path = file_ex.file_path();
+        let inner_opt = read_from_jsonlines_opt(path)?;
         if inner_opt.is_some() {
-            debug!("loading library cache from {cache_file_path:?}");
+            debug!("loading library cache from {path:?}");
         } else {
-            debug!("library cache at {cache_file_path:?} not found");
+            debug!("library cache at {path:?} not found");
         }
-        Ok(inner_opt)
+        Ok(inner_opt.map(|files| LibraryCache { files }))
     }
 
     /// Saves the cache file to disk.
     ///
     /// This function uses the stored file path to save the cache data to file.
     /// Depending on the constant [`Self::WRITE_PRETTY_JSON`], this function either writes the data using [`serde_json::to_string`] or [`serde_json::to_string_pretty`].
-    fn _inner_write<F: FileEx + ?Sized>(&self, file_ex: &F) -> file_ex::Result<()> {
-        if Self::WRITE_PRETTY_JSON {
-            file_ex.write_as_json_pretty(self)?;
-        } else {
-            file_ex.write_as_json(self)?;
-        }
+    fn _inner_write(&self, path: &Path) -> file_ex::Result<()> {
+        write_as_jsonlines(path, &self.files)?;
         Ok(())
     }
 }

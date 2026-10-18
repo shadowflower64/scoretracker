@@ -36,121 +36,108 @@ impl Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
-#[deprecated]
-pub trait FileEx {
-    #[deprecated]
-    fn file_path(&self) -> &Path;
-
-    #[deprecated]
-    fn read_to_string(&self) -> io::Result<Option<String>> {
-        match fs::read_to_string(self.file_path()) {
-            Ok(content) => Ok(Some(content)),
-            Err(e) => {
-                if matches!(e.kind(), io::ErrorKind::NotFound) {
-                    Ok(None)
-                } else {
-                    Err(e)
-                }
+pub fn read_to_string(path: impl AsRef<Path>) -> io::Result<Option<String>> {
+    match fs::read_to_string(path.as_ref()) {
+        Ok(content) => Ok(Some(content)),
+        Err(e) => {
+            if matches!(e.kind(), io::ErrorKind::NotFound) {
+                Ok(None)
+            } else {
+                Err(e)
             }
         }
-    }
-
-    #[deprecated]
-    fn read_from_json<D: for<'a> Deserialize<'a>>(&self) -> Result<Option<D>> {
-        let content = self.read_to_string().map_err(|e| Error::CannotReadFile {
-            path: self.file_path().to_path_buf(),
-            e,
-        })?;
-        if let Some(json) = content {
-            let deserialized = serde_json::from_str(&json).map_err(|e| Error::CannotDeserializeJSON {
-                path: self.file_path().to_path_buf(),
-                e,
-            })?;
-            Ok(Some(deserialized))
-        } else {
-            Ok(None)
-        }
-    }
-
-    #[deprecated]
-    fn read_from_jsonlines<D: for<'a> Deserialize<'a>>(&self) -> Result<Option<Vec<D>>> {
-        let result = serde_jsonlines::json_lines(self.file_path());
-        match result {
-            Err(e) => {
-                if matches!(e.kind(), io::ErrorKind::NotFound) {
-                    Ok(None)
-                } else {
-                    Err(Error::CannotReadFile {
-                        path: self.file_path().to_path_buf(),
-                        e,
-                    })
-                }
-            }
-            Ok(iter) => Ok(Some(iter.collect::<io::Result<Vec<D>>>().map_err(|e| {
-                Error::CannotDeserializeJSONLines {
-                    path: self.file_path().to_path_buf(),
-                    e,
-                }
-            })?)),
-        }
-    }
-
-    #[deprecated]
-    fn write<C: AsRef<[u8]>>(&self, contents: C) -> io::Result<()> {
-        fs::write(self.file_path(), contents)
-    }
-
-    #[deprecated]
-    fn write_as_json<S: Serialize>(&self, serializable: S) -> Result<()> {
-        let json = serde_json::to_string(&serializable).map_err(|e| Error::CannotSerializeJSON {
-            path: self.file_path().to_path_buf(),
-            e,
-        })?;
-        self.write(&json).map_err(|e| Error::CannotWriteFile {
-            path: self.file_path().to_path_buf(),
-            e,
-        })?;
-        Ok(())
-    }
-
-    #[deprecated]
-    fn write_as_json_pretty<S: Serialize>(&self, serializable: S) -> Result<()> {
-        let json = serde_json::to_string_pretty(&serializable).map_err(|e| Error::CannotSerializeJSON {
-            path: self.file_path().to_path_buf(),
-            e,
-        })?;
-        self.write(&json).map_err(|e| Error::CannotWriteFile {
-            path: self.file_path().to_path_buf(),
-            e,
-        })?;
-        Ok(())
-    }
-
-    #[deprecated]
-    fn write_as_jsonlines<S: Serialize>(&self, serializable: &[S]) -> Result<()> {
-        serde_jsonlines::write_json_lines(self.file_path(), serializable).map_err(|e| Error::CannotSerializeJSONLines {
-            path: self.file_path().to_path_buf(),
-            e,
-        })?;
-        Ok(())
     }
 }
 
-impl FileEx for Path {
-    fn file_path(&self) -> &Path {
-        self
+pub fn read_from_json<D: for<'a> Deserialize<'a>>(path: impl AsRef<Path>) -> Result<Option<D>> {
+    let path = path.as_ref();
+    let content = read_to_string(path).map_err(|e| Error::CannotReadFile {
+        path: path.to_path_buf(),
+        e,
+    })?;
+    if let Some(json) = content {
+        let deserialized = serde_json::from_str(&json).map_err(|e| Error::CannotDeserializeJSON {
+            path: path.to_path_buf(),
+            e,
+        })?;
+        Ok(Some(deserialized))
+    } else {
+        Ok(None)
     }
 }
 
 pub fn read_from_jsonlines<D: for<'a> Deserialize<'a>>(path: impl AsRef<Path>) -> Result<Vec<D>> {
-    serde_jsonlines::json_lines(path.as_ref())
+    let path = path.as_ref();
+    serde_jsonlines::json_lines(path)
         .map_err(|e| Error::CannotReadFile {
-            path: path.as_ref().to_path_buf(),
+            path: path.to_path_buf(),
             e,
         })?
         .collect::<io::Result<Vec<D>>>()
         .map_err(|e| Error::CannotDeserializeJSONLines {
-            path: path.as_ref().to_path_buf(),
+            path: path.to_path_buf(),
             e,
         })
+}
+
+pub fn read_from_jsonlines_opt<D: for<'a> Deserialize<'a>>(path: impl AsRef<Path>) -> Result<Option<Vec<D>>> {
+    let path = path.as_ref();
+    let result = serde_jsonlines::json_lines(path);
+    match result {
+        Err(e) => {
+            if matches!(e.kind(), io::ErrorKind::NotFound) {
+                Ok(None)
+            } else {
+                Err(Error::CannotReadFile {
+                    path: path.to_path_buf(),
+                    e,
+                })
+            }
+        }
+        Ok(iter) => Ok(Some(iter.collect::<io::Result<Vec<D>>>().map_err(|e| {
+            Error::CannotDeserializeJSONLines {
+                path: path.to_path_buf(),
+                e,
+            }
+        })?)),
+    }
+}
+
+pub fn write<C: AsRef<[u8]>>(path: impl AsRef<Path>, contents: C) -> io::Result<()> {
+    fs::write(path.as_ref(), contents)
+}
+
+pub fn write_as_json<S: Serialize>(path: impl AsRef<Path>, serializable: S) -> Result<()> {
+    let path = path.as_ref();
+    let json = serde_json::to_string(&serializable).map_err(|e| Error::CannotSerializeJSON {
+        path: path.to_path_buf(),
+        e,
+    })?;
+    write(path, &json).map_err(|e| Error::CannotWriteFile {
+        path: path.to_path_buf(),
+        e,
+    })?;
+    Ok(())
+}
+
+pub fn write_as_json_pretty<S: Serialize>(path: impl AsRef<Path>, serializable: S) -> Result<()> {
+    let path = path.as_ref();
+    let json = serde_json::to_string_pretty(&serializable).map_err(|e| Error::CannotSerializeJSON {
+        path: path.to_path_buf(),
+        e,
+    })?;
+    write(path, &json).map_err(|e| Error::CannotWriteFile {
+        path: path.to_path_buf(),
+        e,
+    })?;
+    Ok(())
+}
+
+pub fn write_as_jsonlines<S: Serialize>(path: impl AsRef<Path>, serializable: &[S]) -> Result<()> {
+    let path = path.as_ref();
+    serde_jsonlines::write_json_lines(path, serializable).map_err(|e| Error::CannotSerializeJSONLines {
+        path: path.to_path_buf(),
+        e,
+    })?;
+    Ok(())
 }

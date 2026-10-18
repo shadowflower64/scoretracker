@@ -3,7 +3,7 @@
 //! A library index is a file that maps every filename existing in the library directory to a "proof UUID", which should be shared across all connected libraries.
 //!
 //! This file is re-created every time the library gets re-scanned for new content.
-use crate::util::file_ex::{Error, FileEx};
+use crate::util::file_ex::{Error, write_as_json_pretty};
 use crate::util::filelocked::FileLockableDataJson;
 use crate::util::uuid::UuidString;
 use relative_path::RelativePathBuf;
@@ -57,7 +57,7 @@ impl LibraryIndex {
     pub const STANDARD_FILENAME: &str = "library_index.json";
 
     pub fn save(&self, path: &Path) -> Result<(), Error> {
-        path.write_as_json_pretty(self)?;
+        write_as_json_pretty(path, self)?;
         Ok(())
     }
 }
