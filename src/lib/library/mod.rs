@@ -379,7 +379,7 @@ pub async fn library_scan_full(library_dir: &Path) -> Result<(), LibraryScanErro
 
     let scanning_start_timestamp = Instant::now();
 
-    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let library_info = LibraryInfo::read(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let mut cache = LibraryCache::lock_and_read_or_default(
         library_dir.join(LibraryCache::STANDARD_FILENAME),
         None, /* TODO: is this correct? */
@@ -423,7 +423,7 @@ pub async fn library_scan_add_files(
 
     let scanning_start_timestamp = Instant::now();
 
-    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let library_info = LibraryInfo::read(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let mut cache = LibraryCache::lock_and_read_or_default(
         library_dir.join(LibraryCache::STANDARD_FILENAME),
         None, /* TODO: is this correct? */
@@ -552,7 +552,7 @@ pub fn sync_library_index_with_db(
     worker_info: Option<&WorkerInfo>,
 ) -> Result<(), LibraryScanError> {
     type E = LibraryScanError;
-    let library_info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
+    let library_info = LibraryInfo::read(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(E::CannotReadInfo)?;
     let library_domain = library_info.domain;
     let library_index =
         LibraryIndex::read_without_locking(library_dir.join(LibraryIndex::STANDARD_FILENAME)).map_err(E::CannotReadIndex)?;

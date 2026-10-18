@@ -29,6 +29,13 @@ pub enum StplUrlError {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, ToSchema)]
 pub struct LibraryDomain(String);
 
+impl FromStr for LibraryDomain {
+    type Err = StplUrlError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from(s.to_string())
+    }
+}
+
 impl TryFrom<String> for LibraryDomain {
     type Error = StplUrlError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
@@ -43,21 +50,14 @@ impl TryFrom<String> for LibraryDomain {
     }
 }
 
-impl FromStr for LibraryDomain {
-    type Err = StplUrlError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::try_from(s.to_string())
-    }
-}
-
 impl AsRef<str> for LibraryDomain {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl Display for LibraryDomain {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for LibraryDomain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }

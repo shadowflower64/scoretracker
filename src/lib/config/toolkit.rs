@@ -14,8 +14,8 @@ pub struct ToolkitConfig {
 }
 
 impl ToolkitConfig {
-    pub fn global() -> Result<&'static Self, &'static TomlConfigError> {
-        static LOADED_CONFIG: LazyLock<Result<ToolkitConfig, TomlConfigError>> = LazyLock::new(ToolkitConfig::load);
+    pub fn load_global() -> Result<&'static Self, &'static TomlConfigError> {
+        static LOADED_CONFIG: LazyLock<Result<ToolkitConfig, TomlConfigError>> = LazyLock::new(ToolkitConfig::read_default);
         LOADED_CONFIG.as_ref()
     }
 }

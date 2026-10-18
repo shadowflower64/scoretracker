@@ -114,7 +114,7 @@ impl Database {
     }
 
     pub async fn connect_with_tokio_for_toolkit() -> DbResult<Self> {
-        let config = ToolkitConfig::global()?;
+        let config = ToolkitConfig::load_global()?;
         Self::connect_with_tokio(
             config
                 .database_connection

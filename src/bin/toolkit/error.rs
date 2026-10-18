@@ -36,13 +36,6 @@ pub enum CmdError {
     #[error("generic file input/output error: {0}")]
     FileExIoError(#[from] file_ex::Error),
     // ---
-    #[error("could not read config: {0}")]
-    ConfigReadError(&'static file_ex::Error),
-    #[error("could not open config: {0}")]
-    ConfigOpenError(lockfile::Error),
-    #[error("could not write config: {0}")]
-    ConfigWriteError(lockfile::Error),
-    //
     #[error("could not read library info: {0}")]
     LibraryInfoReadError(TomlConfigError),
     #[error("could not write library info: {0}")]
@@ -95,8 +88,10 @@ pub enum CmdError {
 
     #[error("library table error: {0}")]
     LibraryTableError(TomlConfigError),
-    #[error("secrets config error: {0}")]
-    ToolkitConfigError(&'static TomlConfigError),
+    #[error("toolkit config error: {0}")]
+    ToolkitConfigErrorRef(&'static TomlConfigError),
+    #[error("toolkit config error: {0}")]
+    ToolkitConfigError(TomlConfigError),
     // ---
     #[error("could not reveal directory: {0}")]
     RevealDirectoryError(io::Error),
@@ -127,8 +122,6 @@ impl CmdError {
             Self::AskError(..) => 5,
             Self::IoError(..) | Self::FileExIoError(..) => 6,
             // ---
-            Self::ConfigReadError(..) | Self::ConfigOpenError(..) => 11,
-            Self::ConfigWriteError(..) => 12,
             Self::LibraryInfoReadError(..) => 13,
             Self::LibraryInfoWriteError(..) => 14,
             Self::LibraryIndexReadError(..) => 15,
@@ -157,7 +150,7 @@ impl CmdError {
 
             Self::LibraryTableError(..) => 40,
             Self::PostgresError(..) | Self::DbError(..) => 41,
-            Self::ToolkitConfigError(..) => 42,
+            Self::ToolkitConfigError(..) | Self::ToolkitConfigErrorRef(..) => 42,
             // ---
             Self::LibraryRescanNeeded(..) => 51,
             // ---

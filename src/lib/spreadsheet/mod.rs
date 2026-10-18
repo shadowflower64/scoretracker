@@ -400,7 +400,7 @@ pub fn import_org_spreadsheet_generic(
     let mut matches = Vec::new();
     let mut performances = Vec::new();
 
-    let config = ToolkitConfig::global()?;
+    let config = ToolkitConfig::load_global()?;
     let mut ctx = Context {
         proofs_to_insert: Vec::new(),
         tz: Warsaw, // all legacy sheet times use Europe/Warsaw timezone

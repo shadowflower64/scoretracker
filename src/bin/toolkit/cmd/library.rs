@@ -55,7 +55,7 @@ impl LibraryIdentifier {
         type E = LibraryIdentifierError;
         match self {
             LibraryIdentifier::DomainName(domain) => Ok(Cow::Owned(
-                LibraryTab::load() // TODO: load this only once, like a config file
+                LibraryTab::read_default() // TODO: load this only once, like a config file
                     .map_err(E::CannotLoadLibraryTable)?
                     .internal_libraries
                     .get(domain)
@@ -102,9 +102,9 @@ pub fn init(library_dir: &Path, domain: LibraryDomain) -> Result<(), CmdError> {
 pub fn install(library_dir: &Path) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    let info = LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(CmdError::LibraryInfoReadError)?;
+    let info = LibraryInfo::read(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(CmdError::LibraryInfoReadError)?;
 
-    let source_toml = LibraryTab::load_raw().map_err(CmdError::LibraryTableError)?;
+    let source_toml = LibraryTab::read_raw_default().map_err(CmdError::LibraryTableError)?;
     let mut document: DocumentMut = source_toml.parse().expect("todo: invalid library table");
 
     let internal_libraries_tab = document["internal_libraries"].as_table_mut().expect("todo: invalid library table");
@@ -139,7 +139,7 @@ pub fn uninstall(library_dir: &Path) -> Result<(), CmdError> {
 
     let mut found_domains = Vec::new();
 
-    let source_toml = LibraryTab::load_raw().map_err(CmdError::LibraryTableError)?;
+    let source_toml = LibraryTab::read_raw_default().map_err(CmdError::LibraryTableError)?;
     let mut document: DocumentMut = source_toml.parse().expect("todo: invalid library table");
 
     let internal_libraries_tab = document["internal_libraries"].as_table_mut().expect("todo: invalid library table");
@@ -178,7 +178,7 @@ pub fn uninstall(library_dir: &Path) -> Result<(), CmdError> {
 pub fn list() -> Result<(), CmdError> {
     log_fn_name!(auto);
 
-    let tab = LibraryTab::load().map_err(CmdError::LibraryTableError)?;
+    let tab = LibraryTab::read_default().map_err(CmdError::LibraryTableError)?;
     println!(
         "{}",
         serde_json::to_string_pretty(&tab).map_err(CmdError::ConfigSerializationError)?

@@ -19,7 +19,7 @@ impl LibraryRoot {
     /// Traverse the filesystem to find the library root and read the library info file.
     pub fn of(path: &Path) -> Result<Self, StplUrlError> {
         let library_dir = library_dir_of_path(&path).ok_or(StplUrlError::NotInLibraryDir)?;
-        let library_info = LibraryInfo::load_from_file(path).map_err(StplUrlError::CannotReadLibraryInfo)?;
+        let library_info = LibraryInfo::read(path).map_err(StplUrlError::CannotReadLibraryInfo)?;
         Ok(Self { library_dir, library_info })
     }
 

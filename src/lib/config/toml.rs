@@ -24,23 +24,23 @@ pub trait TomlConfig: Sized + Serialize + for<'a> Deserialize<'a> {
         config_dir().join(Self::STANDARD_FILENAME)
     }
 
-    fn load() -> Result<Self, TomlConfigError> {
-        Self::load_from_file(Self::default_path())
+    fn read_default() -> Result<Self, TomlConfigError> {
+        Self::read(Self::default_path())
     }
 
-    fn load_from_file(path: impl AsRef<Path>) -> Result<Self, TomlConfigError> {
-        let file_contents = Self::load_raw_from_file(&path)?;
+    fn read(path: impl AsRef<Path>) -> Result<Self, TomlConfigError> {
+        let file_contents = Self::read_raw(&path)?;
         toml::from_str(&file_contents).map_err(|e| TomlConfigError::DeserializeError {
             path: path.as_ref().to_path_buf(),
             e,
         })
     }
 
-    fn load_raw() -> Result<String, TomlConfigError> {
-        Self::load_raw_from_file(Self::default_path())
+    fn read_raw_default() -> Result<String, TomlConfigError> {
+        Self::read_raw(Self::default_path())
     }
 
-    fn load_raw_from_file(path: impl AsRef<Path>) -> Result<String, TomlConfigError> {
+    fn read_raw(path: impl AsRef<Path>) -> Result<String, TomlConfigError> {
         fs::read_to_string(&path).map_err(|e| TomlConfigError::ReadError {
             path: path.as_ref().to_path_buf(),
             e,
@@ -69,6 +69,18 @@ pub trait TomlConfig: Sized + Serialize + for<'a> Deserialize<'a> {
             e,
         })?;
         Ok(())
+    }
+
+    fn write_default(&self) -> Result<(), TomlConfigError> {
+        self.write(Self::default_path())
+    }
+
+    fn write(&self, path: impl AsRef<Path>) -> Result<(), TomlConfigError> {
+        let toml = toml::to_string_pretty(&self).map_err(|e| TomlConfigError::SerializeError {
+            path: path.as_ref().to_path_buf(),
+            e,
+        })?;
+        Self::write_raw(path, &toml)
     }
 
     fn write_raw(path: impl AsRef<Path>, toml: &str) -> Result<(), TomlConfigError> {

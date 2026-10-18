@@ -32,7 +32,7 @@ pub async fn http_server_start_runtime() -> Result<(), ServerError> {
     const PORT: u16 = 8080;
     info!("starting server on: http://{HOST}:{PORT}");
 
-    let server_config = Arc::new(ServerConfig::load()?);
+    let server_config = Arc::new(ServerConfig::read_default()?);
     let internal_library_connections = Arc::new(RwLock::new(connect_internal_libraries::connect_internal_libraries()));
     {
         let connections = internal_library_connections.read().unwrap();

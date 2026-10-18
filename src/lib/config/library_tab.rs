@@ -2,7 +2,7 @@
 //!
 //! This module handles reading the `library_tab.toml` global config file, which contains a list of all locally available proof libraries.
 //! It also contains code for checking the availability of the specified library paths, and provides a structure for storing list of paths and the availability of them.
-use crate::config::toml::TomlConfig;
+use crate::config::toml::{TomlConfig, TomlConfigError};
 use crate::data::library::stpl_url::LibraryDomain;
 use crate::library::info::LibraryInfo;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// Table of libraries available on this machine.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -23,8 +23,18 @@ impl TomlConfig for LibraryTab {
 }
 
 impl LibraryTab {
+    pub fn load_global() -> Result<&'static Self, &'static TomlConfigError> {
+        static LOADED_CONFIG: LazyLock<Result<LibraryTab, TomlConfigError>> = LazyLock::new(LibraryTab::read_default);
+        LOADED_CONFIG.as_ref()
+    }
+
     pub fn scan(self) -> InternalLibraryConnections {
         InternalLibraryConnections::scan_domains(self.internal_libraries)
+    }
+
+    pub fn scan_only(&self, domain: &LibraryDomain) -> InternalLibraryHall {
+        let paths = self.internal_libraries.get(domain).cloned().unwrap_or_default();
+        InternalLibraryHall::scan_paths(paths, domain)
     }
 }
 
@@ -135,6 +145,8 @@ impl InternalLibraryHall {
     }
 
     /// Return the first path to the library that is actually available for use.
+    ///
+    /// Returns [`None`] if no paths are available for use.
     pub fn main_path(&self) -> Option<&InternalLibraryAccessPath> {
         self.mirrors.first().and_then(|x| x.available_path())
     }
@@ -144,7 +156,7 @@ impl InternalLibraryHall {
         if !library_info_path.is_file() {
             return MirrorStatus::Unavailable;
         }
-        match LibraryInfo::load_from_file(&library_info_path) {
+        match LibraryInfo::read(&library_info_path) {
             Ok(library_info) => {
                 if &library_info.domain != expected_domain {
                     return MirrorStatus::Bad(Arc::new(BadLibraryError::WrongDomain {

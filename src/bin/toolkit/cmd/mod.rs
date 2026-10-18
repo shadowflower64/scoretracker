@@ -4,7 +4,7 @@ use crate::toolkit::{
 };
 use scoretracker::{
     cli::{cmdline_context::CmdlineContext, cmdline_error::CmdlineError},
-    config::{LegacyConfig, library_tab::LibraryTab, toml::TomlConfig},
+    config::{library_tab::LibraryTab, toml::TomlConfig, toolkit::ToolkitConfig},
     data::library::stpl_url::{LibraryDomain, StplUrl},
     db::schema_name::SafeSchemaName,
     hive::jobs::{
@@ -35,10 +35,22 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
     match ctx.cmd()? {
         "automark" => {
             let library_dir: Option<PathBuf> = ctx.pull_arg_opt("library_dir", "path of the library directory")?;
-            let library_dir = library_dir
-                .map(Ok)
-                .unwrap_or_else(|| LegacyConfig::load().map(|x| x.default_library_dir_path.clone()))
-                .map_err(CmdError::ConfigReadError)?;
+            let library_dir = if let Some(given_path) = library_dir {
+                given_path
+            } else {
+                let config = ToolkitConfig::load_global().map_err(CmdError::ToolkitConfigErrorRef)?;
+                if let Some(default_library) = &config.default_library {
+                    let library_tab = LibraryTab::read_default().map_err(CmdError::LibraryTableError)?;
+                    library_tab
+                        .scan_only(&default_library)
+                        .main_path()
+                        .expect("todo: error handling")
+                        .path
+                        .to_owned()
+                } else {
+                    todo!("error handling")
+                }
+            };
             cmd::automark::automark_library_files(library_dir)
         }
         "config" => match ctx.cmd()? {
@@ -182,7 +194,10 @@ pub fn handle_command(context: &mut CmdlineContext) -> Result<(), CmdError> {
                 let library: LibraryIdentifier =
                     if let Some(arg) = ctx.pull_arg_opt("library", "library domain name or path to the library directory")? {
                         Ok(arg)
-                    } else if let Some(default) = &LegacyConfig::load().map_err(CmdError::ConfigReadError)?.default_library {
+                    } else if let Some(default) = &ToolkitConfig::load_global()
+                        .map_err(CmdError::ToolkitConfigErrorRef)?
+                        .default_library
+                    {
                         Ok(LibraryIdentifier::DomainName(default.clone()))
                     } else {
                         Err(CmdlineError::ArgumentNotProvided {

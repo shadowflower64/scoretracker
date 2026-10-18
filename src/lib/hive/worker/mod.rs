@@ -141,7 +141,7 @@ impl Worker {
     }
 
     pub fn read_library_info(&self, library_dir: &Path) -> Result<LibraryInfo, WorkerError> {
-        LibraryInfo::load_from_file(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(WorkerError::CannotReadLibraryInfo)
+        LibraryInfo::read(library_dir.join(LibraryInfo::STANDARD_FILENAME)).map_err(WorkerError::CannotReadLibraryInfo)
     }
 
     pub fn read_library_index(&self, library_dir: &Path) -> Result<LibraryIndex, WorkerError> {
@@ -247,7 +247,7 @@ impl Worker {
 
     /// Initialize a new worker structure with a default config and a random name.
     pub async fn start_default() -> Result<(), WorkerStartError> {
-        Self::start(names::random_name().to_owned(), WorkerConfig::load()?).await
+        Self::start(names::random_name().to_owned(), WorkerConfig::read_default()?).await
     }
 
     /// Initialize a new worker structure, connect to the queue, start ipc threads, and start the worker.
@@ -291,7 +291,7 @@ impl Worker {
             task_progress_tx,
             queue_connection,
             server_connection: Arc::new(ServerConnection::connect().await?),
-            internal_libraries: LibraryTab::load().expect("todo error handling").scan(),
+            internal_libraries: LibraryTab::read_default().expect("todo error handling").scan(),
         };
 
         // Start a local TCP listener for IPC

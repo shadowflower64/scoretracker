@@ -49,7 +49,7 @@ impl AsRef<str> for SafeSchemaName {
     }
 }
 
-impl fmt::Display for &SafeSchemaName {
+impl fmt::Display for SafeSchemaName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }

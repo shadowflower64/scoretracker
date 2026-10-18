@@ -20,7 +20,7 @@ pub fn init(schema_name: SafeSchemaName) -> Result<(), CmdError> {
     log_fn_name!(auto);
 
     smol::block_on(async {
-        let config = ToolkitConfig::global().map_err(CmdError::ToolkitConfigError)?;
+        let config = ToolkitConfig::load_global().map_err(CmdError::ToolkitConfigErrorRef)?;
         let db = Database::connect_with_tokio(
             &config
                 .database_connection

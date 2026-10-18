@@ -2,7 +2,7 @@ use crate::toolkit::cmd::{CmdError, vitals::LogCheckError::GetSizeError};
 use fs_extra::dir::get_size;
 use regex::Regex;
 use scoretracker::{
-    config::LegacyConfig,
+    config::{toml::TomlConfig, toolkit::ToolkitConfig},
     data::{
         game::game_instance_from_id,
         library::{proof::Proof, sha256::Sha256Hash},
@@ -13,7 +13,7 @@ use scoretracker::{
     util::{
         byte_count::ByteCount,
         dirs::log_dir,
-        filelocked::{FileLockableData, FileLockableDataWithDefaultPath},
+        filelocked::FileLockableData,
         lockfile,
         terminal_colors::{
             ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_RESET, ANSI_ERASE_TO_END, ansi_move_cursor_left,
@@ -499,24 +499,25 @@ pub fn check_all() -> Result<(), CmdError> {
     // Disable lockfile logging
     lockfile::DEBUG_PRINT.store(false, Ordering::Release);
 
-    let config_path = LegacyConfig::default_path();
+    let config_path = ToolkitConfig::default_path();
     println!("config located at: {config_path:?}");
     print_check_name("checking config");
 
-    let config = match LegacyConfig::load() {
+    let _config = match ToolkitConfig::read(config_path) {
         Ok(config) => {
             print_check_ok();
             config
         }
         Err(e) => {
-            print_check_err(e);
-            return Err(CmdError::ConfigReadError(e));
+            print_check_err(&e);
+            return Err(CmdError::ToolkitConfigError(e));
         }
     };
 
-    let task_queue_path = config.task_queue_path();
-    println!("task queue located at: {task_queue_path:?}");
-    result_wrapper(check_task_queue(&task_queue_path));
+    // TODO:
+    // let task_queue_path = config.task_queue_path();
+    // println!("task queue located at: {task_queue_path:?}");
+    // result_wrapper(check_task_queue(&task_queue_path));
 
     let log_path = log_dir();
     println!("log directory located at: {log_path:?}");
